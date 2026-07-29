@@ -3,8 +3,14 @@ import type { FullscreenWallpaperConfig } from "../types/config";
 export const fullscreenWallpaperConfig: FullscreenWallpaperConfig = {
 	enable: true,
 	src: {
-		desktop: ["/assets/desktop-banner/1.webp", "/assets/desktop-banner/2.webp"],
-		mobile: ["/assets/mobile-banner/1.webp", "/assets/mobile-banner/2.webp"],
+		desktop: [
+			"/assets/desktop-banner/konosuba-spring.webp",
+			"/assets/desktop-banner/konosuba-journey.webp",
+		],
+		mobile: [
+			"/assets/mobile-banner/konosuba-spring.webp",
+			"/assets/mobile-banner/konosuba-journey.webp",
+		],
 	},
 	position: "center",
 	carousel: {
