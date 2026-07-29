@@ -1,5 +1,6 @@
 import type { NavBarConfig } from "../types/config";
 import { LinkPreset } from "../types/config";
+import { profileConfig } from "./profileConfig";
 
 /**
  * 导航栏菜单配置
@@ -138,26 +139,10 @@ export const navBarConfig: NavBarConfig = {
 			name: "Links",
 			url: "/links/",
 			icon: "material-symbols:link",
-			children: [
-				{
-					name: "GitHub",
-					url: "https://github.com/LyraVoid/Mizuki",
-					external: true, // 外部链接，新标签页打开
-					icon: "fa7-brands:github",
-				},
-				{
-					name: "Bilibili",
-					url: "https://space.bilibili.com/701864046",
-					external: true,
-					icon: "fa7-brands:bilibili",
-				},
-				{
-					name: "Gitee",
-					url: "https://gitee.com/matsuzakayuki/Mizuki",
-					external: true,
-					icon: "mdi:git",
-				},
-			],
+			children: profileConfig.links.map((link) => ({
+				...link,
+				external: true,
+			})),
 		},
 
 		// 自定义一级下拉菜单示例：个人内容页面
