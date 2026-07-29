@@ -6,13 +6,15 @@ import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { Icon } from "astro-icon/components";
 
 import { siteConfig } from "../config";
-import { skillsData } from "../data/skills";
+import { loadStructuredContent } from "../data/structured-content";
 import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
 
 if (!siteConfig.featurePages.skills) {
 	return Astro.redirect("/404/");
 }
+
+const { skills: skillsData } = loadStructuredContent();
 
 const categories = [...new Set(skillsData.map((skill) => skill.category))];
 
@@ -95,13 +97,16 @@ const subtitle = i18n(I18nKey.skillsSubtitle);
 				{skillsData.map((skill) => <SkillCard skill={skill} />)}
 			</div>
 
-			<div id="no-results" class="hidden text-center py-16">
+			<div
+				id="no-results"
+				class:list={["text-center py-16", { hidden: skillsData.length > 0 }]}
+			>
 				<Icon
 					name="material-symbols:search-off-rounded"
 					class="text-6xl text-black/15 dark:text-white/15 mb-4"
 				/>
 				<p class="text-black/40 dark:text-white/40 text-lg">
-					No matching skills
+					{i18n(I18nKey.noData)}
 				</p>
 			</div>
 		</div>

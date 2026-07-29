@@ -62,3 +62,9 @@ src/data/bilibili-data.json
 *.vtube.json
 # Locally packaged WordPress plugin artifacts
 wordpress-plugin/dist/
+# Build-time WordPress generated content and interrupted transaction workspaces
+src/generated/wordpress/
+public/generated/wordpress-media/
+.wordpress-sync-*/
+.playwright-cli/
+output/playwright/

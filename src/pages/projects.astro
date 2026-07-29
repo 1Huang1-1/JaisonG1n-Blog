@@ -7,13 +7,15 @@ import { Icon } from "astro-icon/components";
 
 import { siteConfig } from "../config";
 import { UNCATEGORIZED } from "../constants/constants";
-import { projectsData } from "../data/projects";
+import { loadStructuredContent } from "../data/structured-content";
 import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
 
 if (!siteConfig.featurePages.projects) {
 	return Astro.redirect("/404/");
 }
+
+const { projects: projectsData } = loadStructuredContent();
 
 const categories = [
 	...new Set(projectsData.map((project) => project.category)),
@@ -103,13 +105,16 @@ const subtitle = i18n(I18nKey.projectsSubtitle);
 				}
 			</div>
 
-			<div id="no-results" class="hidden text-center py-16">
+			<div
+				id="no-results"
+				class:list={["text-center py-16", { hidden: projectsData.length > 0 }]}
+			>
 				<Icon
 					name="material-symbols:search-off-rounded"
 					class="text-6xl text-black/15 dark:text-white/15 mb-4"
 				/>
 				<p class="text-black/40 dark:text-white/40 text-lg">
-					No matching projects
+					{i18n(I18nKey.noData)}
 				</p>
 			</div>
 		</div>

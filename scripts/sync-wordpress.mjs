@@ -1,30 +1,22 @@
-import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import he from "he";
 import { parse } from "node-html-parser";
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
+import {
+	parseGeneratedBundle,
+	parseSiteSnapshot,
+	parseStructuredContentFlag,
+	SYNC_LIMITS,
+} from "./wordpress-sync/contracts.mjs";
+import { MediaMirror, rewriteStructuredMedia } from "./wordpress-sync/media.mjs";
+import { commitDirectoryTransaction } from "./wordpress-sync/transaction.mjs";
 
 const DEFAULT_BASE_URL = "https://cms.jaisong1n.com";
-const DEFAULT_OUTPUT_DIR = path.resolve("src/content/posts/wordpress");
 const DEFAULT_AUTHOR = "JaisonG1n";
-const REQUEST_TIMEOUT_MS = 30_000;
 const WINDOWS_RESERVED_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
-const RETRYABLE_RENAME_ERRORS = new Set(["EACCES", "EBUSY", "EPERM"]);
-
-async function renameWithRetry(source, destination) {
-	for (let attempt = 1; ; attempt += 1) {
-		try {
-			await rename(source, destination);
-			return;
-		} catch (error) {
-			if (attempt >= 10 || !RETRYABLE_RENAME_ERRORS.has(error.code)) throw error;
-			await delay(attempt * 100);
-		}
-	}
-}
 
 function decodeHtml(value) {
 	return he.decode(String(value ?? ""), { isAttributeValue: false }).trim();
@@ -39,9 +31,7 @@ function removeUnsafeHtml(html) {
 
 export function htmlToPlainText(html) {
 	const root = parse(removeUnsafeHtml(html));
-	for (const node of root.querySelectorAll("style, noscript, template")) {
-		node.remove();
-	}
+	for (const node of root.querySelectorAll("style, noscript, template")) node.remove();
 	return decodeHtml(root.textContent).replace(/\s+/g, " ").trim();
 }
 
@@ -132,18 +122,14 @@ export function buildPostMarkdown(post) {
 	if (!post || typeof post !== "object") throw new Error("Invalid WordPress post object");
 	if (post.status !== "publish") throw new Error(`Post ${post.id ?? "unknown"} is not published`);
 
-	const title = decodeHtml(post.title?.rendered) || `未命名文章 ${post.id}`;
+	const title = decodeHtml(post.title?.rendered) || `Untitled post ${post.id}`;
 	const body = htmlToMarkdown(post.content?.rendered);
 	const excerpt = htmlToPlainText(post.excerpt?.rendered);
 	const description = excerpt || truncateCodePoints(htmlToPlainText(post.content?.rendered), 180);
 	const published = normalizeWordPressDate(post.date_gmt, post.date, "published");
-	const updated = normalizeWordPressDate(
-		post.modified_gmt ?? post.date_gmt,
-		post.modified ?? post.date,
-		"updated",
-	);
+	const updated = normalizeWordPressDate(post.modified_gmt ?? post.date_gmt, post.modified ?? post.date, "updated");
 	const tags = embeddedTerms(post, "post_tag");
-	const category = embeddedTerms(post, "category")[0] || "未分类";
+	const category = embeddedTerms(post, "category")[0] || "Uncategorized";
 	const alias = decodeSlug(post.slug) || `post-${post.id}`;
 
 	const frontmatter = [
@@ -162,21 +148,23 @@ export function buildPostMarkdown(post) {
 		`alias: ${yamlString(alias)}`,
 		"---",
 	];
-
 	return `${frontmatter.join("\n")}\n\n${body}\n`;
 }
 
-function buildPostsUrl(baseUrl, page) {
-	let parsedBase;
+function normalizeBaseUrl(baseUrl) {
+	let url;
 	try {
-		parsedBase = new URL(baseUrl);
+		url = new URL(baseUrl);
 	} catch (error) {
 		throw new Error(`Invalid WP_BASE_URL: ${baseUrl}`, { cause: error });
 	}
-	if (!['http:', 'https:'].includes(parsedBase.protocol)) {
-		throw new Error("WP_BASE_URL must use http or https");
-	}
-	const url = new URL("/wp-json/wp/v2/posts", parsedBase);
+	if (!["http:", "https:"].includes(url.protocol)) throw new Error("WP_BASE_URL must use HTTP(S)");
+	if (url.username || url.password) throw new Error("WP_BASE_URL must not contain credentials");
+	return url.origin;
+}
+
+function buildPostsUrl(baseUrl, page) {
+	const url = new URL("/wp-json/wp/v2/posts", baseUrl);
 	for (const [key, value] of Object.entries({
 		status: "publish",
 		per_page: "100",
@@ -184,27 +172,29 @@ function buildPostsUrl(baseUrl, page) {
 		_embed: "1",
 		orderby: "date",
 		order: "desc",
-	})) {
-		url.searchParams.set(key, value);
-	}
+	})) url.searchParams.set(key, value);
 	return url;
 }
 
-async function fetchPage(baseUrl, page, fetchImpl) {
-	const url = buildPostsUrl(baseUrl, page);
+async function fetchJsonResponse(url, fetchImpl, description) {
 	let response;
 	try {
 		response = await fetchImpl(url, {
 			headers: { Accept: "application/json" },
-			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+			signal: AbortSignal.timeout(SYNC_LIMITS.requestTimeoutMs),
 		});
 	} catch (error) {
-		throw new Error(`WordPress request failed for page ${page}: ${error.message}`, { cause: error });
+		throw new Error(`${description} request failed: ${error.message}`, { cause: error });
 	}
 	if (!response.ok) {
 		const detail = (await response.text()).slice(0, 300).replace(/\s+/g, " ");
-		throw new Error(`WordPress request failed for page ${page}: HTTP ${response.status} ${response.statusText}${detail ? ` - ${detail}` : ""}`);
+		throw new Error(`${description} request failed: HTTP ${response.status} ${response.statusText}${detail ? ` - ${detail}` : ""}`);
 	}
+	return response;
+}
+
+async function fetchPage(baseUrl, page, fetchImpl) {
+	const response = await fetchJsonResponse(buildPostsUrl(baseUrl, page), fetchImpl, `WordPress page ${page}`);
 	let posts;
 	try {
 		posts = await response.json();
@@ -219,9 +209,7 @@ export async function fetchPublishedPosts({ baseUrl, fetchImpl = fetch, logger =
 	const first = await fetchPage(baseUrl, 1, fetchImpl);
 	const totalPagesHeader = first.response.headers.get("x-wp-totalpages");
 	const totalPages = totalPagesHeader === null ? 1 : Number.parseInt(totalPagesHeader, 10);
-	if (!Number.isInteger(totalPages) || totalPages < 0) {
-		throw new Error(`Invalid X-WP-TotalPages header: ${totalPagesHeader}`);
-	}
+	if (!Number.isInteger(totalPages) || totalPages < 0) throw new Error(`Invalid X-WP-TotalPages header: ${totalPagesHeader}`);
 	logger.info(`WordPress page 1/${Math.max(totalPages, 1)}`);
 	const posts = [...first.posts];
 	for (let page = 2; page <= totalPages; page += 1) {
@@ -231,61 +219,188 @@ export async function fetchPublishedPosts({ baseUrl, fetchImpl = fetch, logger =
 	return posts.filter((post) => post?.status === "publish");
 }
 
+export async function fetchSiteSnapshot({ baseUrl, fetchImpl = fetch }) {
+	const response = await fetchJsonResponse(
+		new URL("/wp-json/jaisong1n/v1/site-snapshot", baseUrl),
+		fetchImpl,
+		"WordPress site snapshot",
+	);
+	const declaredLength = Number.parseInt(response.headers.get("content-length") ?? "", 10);
+	if (Number.isFinite(declaredLength) && declaredLength > SYNC_LIMITS.maxSnapshotBytes) throw new Error("WordPress site snapshot exceeds 2 MiB");
+	const text = await response.text();
+	if (Buffer.byteLength(text) > SYNC_LIMITS.maxSnapshotBytes) throw new Error("WordPress site snapshot exceeds 2 MiB");
+	let value;
+	try {
+		value = JSON.parse(text);
+	} catch (error) {
+		throw new Error("WordPress site snapshot returned invalid JSON", { cause: error });
+	}
+	return parseSiteSnapshot(value);
+}
+
+async function generatePosts(posts, outputDir, logger) {
+	await mkdir(outputDir, { recursive: true });
+	const usedNames = new Set();
+	const files = [];
+	const failures = [];
+	for (const post of posts) {
+		try {
+			const fileName = createSafeFilename(post.slug, post.id, usedNames);
+			await writeFile(path.join(outputDir, fileName), buildPostMarkdown(post), "utf8");
+			files.push(fileName);
+			logger.info(`Generated article: ${fileName}`);
+		} catch (error) {
+			failures.push(error);
+			logger.error(`Failed post ${post?.id ?? "unknown"}: ${error.message}`);
+		}
+	}
+	if (failures.length > 0) throw new AggregateError(failures, `Failed to convert ${failures.length} WordPress post(s)`);
+	return files;
+}
+
+async function writeJson(filePath, value) {
+	await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+async function readGeneratedBundle(generatedDir) {
+	const readJson = async (name) => JSON.parse(await readFile(path.join(generatedDir, name), "utf8"));
+	return parseGeneratedBundle({
+		meta: await readJson("snapshot-meta.json"),
+		projects: await readJson("projects.json"),
+		skills: await readJson("skills.json"),
+		aiTools: await readJson("ai-tools.json"),
+		timeline: await readJson("timeline.json"),
+	});
+}
+
+export async function validateExistingGenerated(generatedDir, mediaDir) {
+	const bundle = await readGeneratedBundle(generatedDir);
+	for (const media of bundle.meta.media) {
+		await access(path.join(mediaDir, path.basename(media.url)));
+	}
+	return bundle;
+}
+
+async function generateStructured({ snapshot, baseUrl, postsCount, generatedDir, mediaDir, mediaOptions }) {
+	await mkdir(generatedDir, { recursive: true });
+	await mkdir(mediaDir, { recursive: true });
+	const allowedHost = new URL(baseUrl).hostname;
+	const mirror = new MediaMirror({ allowedHost, outputDir: mediaDir, ...mediaOptions });
+	const rewritten = await rewriteStructuredMedia(snapshot, mirror, baseUrl);
+	const meta = {
+		schemaVersion: 2,
+		revision: snapshot.revision,
+		generatedAt: snapshot.generatedAt,
+		syncedAt: new Date().toISOString(),
+		sourceUrl: baseUrl,
+		counts: {
+			posts: postsCount,
+			projects: rewritten.projects.length,
+			skills: rewritten.skills.length,
+			aiTools: rewritten.aiTools.length,
+			timeline: rewritten.timeline.length,
+			media: mirror.getRecords().length,
+		},
+		media: mirror.getRecords(),
+	};
+	const bundle = parseGeneratedBundle({ meta, ...rewritten });
+	await Promise.all([
+		writeJson(path.join(generatedDir, "snapshot-meta.json"), bundle.meta),
+		writeJson(path.join(generatedDir, "projects.json"), bundle.projects),
+		writeJson(path.join(generatedDir, "skills.json"), bundle.skills),
+		writeJson(path.join(generatedDir, "ai-tools.json"), bundle.aiTools),
+		writeJson(path.join(generatedDir, "timeline.json"), bundle.timeline),
+	]);
+	return bundle;
+}
+
 export async function syncWordPress({
 	baseUrl = process.env.WP_BASE_URL || DEFAULT_BASE_URL,
-	outputDir = DEFAULT_OUTPUT_DIR,
+	repoRoot = path.resolve("."),
+	structuredEnabled = parseStructuredContentFlag(process.env.WORDPRESS_STRUCTURED_CONTENT_ENABLED),
+	allowStale = false,
 	fetchImpl = fetch,
 	logger = console,
+	mediaOptions = {},
+	afterReplace,
 } = {}) {
-	const normalizedBaseUrl = new URL(baseUrl).origin;
-	logger.info(`WordPress source: ${normalizedBaseUrl}`);
-	const posts = await fetchPublishedPosts({ baseUrl, fetchImpl, logger });
-	const outputParent = path.dirname(outputDir);
-	await mkdir(outputParent, { recursive: true });
-	const stagingDir = await mkdtemp(path.join(outputParent, ".wordpress-sync-"));
-	const backupDir = `${stagingDir}-previous`;
-	const usedNames = new Set();
-	const generatedFiles = [];
-	const failures = [];
+	const sourceUrl = normalizeBaseUrl(baseUrl);
+	const targets = {
+		posts: path.join(repoRoot, "src/content/posts/wordpress"),
+		generated: path.join(repoRoot, "src/generated/wordpress"),
+		media: path.join(repoRoot, "public/generated/wordpress-media"),
+	};
+	logger.info(`WordPress source: ${sourceUrl}`);
 
+	// Native posts are always strict and must finish before the optional snapshot path.
+	const posts = await fetchPublishedPosts({ baseUrl: sourceUrl, fetchImpl, logger });
+	const transactionRoot = await mkdtemp(path.join(repoRoot, ".wordpress-sync-"));
+	const stagingRoot = path.join(transactionRoot, "stage");
+	const staged = {
+		posts: path.join(stagingRoot, "posts"),
+		generated: path.join(stagingRoot, "generated"),
+		media: path.join(stagingRoot, "media"),
+	};
+	let committed = false;
 	try {
-		for (const post of posts) {
-			try {
-				const fileName = createSafeFilename(post.slug, post.id, usedNames);
-				const target = path.join(stagingDir, fileName);
-				await writeFile(target, buildPostMarkdown(post), "utf8");
-				generatedFiles.push(fileName);
-				logger.info(`Generated: ${decodeHtml(post.title?.rendered)} -> ${fileName}`);
-			} catch (error) {
-				failures.push({ id: post?.id, error });
-				logger.error(`Failed post ${post?.id ?? "unknown"}: ${error.message}`);
+		const files = await generatePosts(posts, staged.posts, logger);
+		let structuredStatus = "fresh";
+		let structuredBundle = null;
+		let structuredError = null;
+		try {
+			const snapshot = await fetchSiteSnapshot({ baseUrl: sourceUrl, fetchImpl });
+			structuredBundle = await generateStructured({
+				snapshot,
+				baseUrl: sourceUrl,
+				postsCount: files.length,
+				generatedDir: staged.generated,
+				mediaDir: staged.media,
+				mediaOptions,
+			});
+		} catch (error) {
+			structuredError = error;
+			if (structuredEnabled && allowStale) {
+				try {
+					structuredBundle = await validateExistingGenerated(targets.generated, targets.media);
+					structuredStatus = "stale";
+					logger.warn(`STALE WORDPRESS STRUCTURED CONTENT: ${error.message}`);
+				} catch (staleError) {
+					throw new AggregateError([error, staleError], "Structured sync failed and no valid stale snapshot is available");
+				}
+			} else if (structuredEnabled) {
+				throw error;
+			} else {
+				structuredStatus = "unavailable";
+				logger.warn(`WordPress structured sync skipped after warning: ${error.message}`);
 			}
 		}
 
-		if (failures.length > 0) {
-			throw new Error(`Failed to convert ${failures.length} WordPress post(s)`);
+		const replaceStructured = structuredError === null;
+		await commitDirectoryTransaction({
+			transactionRoot,
+			afterReplace,
+			entries: [
+				{ name: "posts", target: targets.posts, staged: staged.posts, mode: "replace" },
+				{ name: "generated", target: targets.generated, staged: staged.generated, mode: replaceStructured ? "replace" : "preserve" },
+				{ name: "media", target: targets.media, staged: staged.media, mode: replaceStructured ? "replace" : "preserve" },
+			],
+		});
+		committed = true;
+		logger.info(`WordPress article sync complete: ${files.length} article(s)`);
+		if (structuredBundle) {
+			logger.info(`WordPress structured sync ${structuredStatus}: projects=${structuredBundle.projects.length}, skills=${structuredBundle.skills.length}, aiTools=${structuredBundle.aiTools.length}, timeline=${structuredBundle.timeline.length}`);
 		}
-
-		let previousOutputMoved = false;
-		try {
-			await renameWithRetry(outputDir, backupDir);
-			previousOutputMoved = true;
-		} catch (error) {
-			if (error.code !== "ENOENT") throw error;
-		}
-
-		try {
-			await renameWithRetry(stagingDir, outputDir);
-		} catch (error) {
-			if (previousOutputMoved) await renameWithRetry(backupDir, outputDir);
-			throw error;
-		}
-		if (previousOutputMoved) await rm(backupDir, { recursive: true, force: true });
-		logger.info(`WordPress sync complete: ${generatedFiles.length} article(s)`);
-		return { count: generatedFiles.length, files: generatedFiles };
-	} catch (error) {
-		await rm(stagingDir, { recursive: true, force: true });
-		throw error;
+		return {
+			count: files.length,
+			files,
+			structured: {
+				status: structuredStatus,
+				counts: structuredBundle?.meta.counts ?? null,
+			},
+		};
+	} finally {
+		await rm(transactionRoot, { recursive: true, force: true });
+		if (!committed) logger.error("WordPress sync transaction was not committed");
 	}
 }
 
@@ -294,8 +409,15 @@ const isDirectExecution = process.argv[1]
 	: false;
 
 if (isDirectExecution) {
-	syncWordPress().catch((error) => {
-		console.error(`WordPress sync failed: ${error.message}`);
+	const allowedArgs = new Set(["--allow-stale"]);
+	const unknownArgs = process.argv.slice(2).filter((arg) => !allowedArgs.has(arg));
+	if (unknownArgs.length > 0) {
+		console.error(`Unknown sync argument(s): ${unknownArgs.join(", ")}`);
 		process.exitCode = 1;
-	});
+	} else {
+		syncWordPress({ allowStale: process.argv.includes("--allow-stale") }).catch((error) => {
+			console.error(`WordPress sync failed: ${error.message}`);
+			process.exitCode = 1;
+		});
+	}
 }

@@ -8,6 +8,7 @@ export interface TimelineItem {
 	id: string;
 	title: string;
 	description: string;
+	contentHtml?: string;
 	type: "education" | "work" | "project" | "achievement";
 	startDate: string;
 	endDate?: string;

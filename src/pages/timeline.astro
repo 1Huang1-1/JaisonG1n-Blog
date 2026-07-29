@@ -6,13 +6,15 @@ import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { Icon } from "astro-icon/components";
 
 import { siteConfig } from "../config";
-import { timelineData } from "../data/timeline";
+import { loadStructuredContent } from "../data/structured-content";
 import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
 
 if (!siteConfig.featurePages.timeline) {
 	return Astro.redirect("/404/");
 }
+
+const { timeline: timelineData } = loadStructuredContent();
 
 const types = ["education", "work", "project", "achievement"] as const;
 
@@ -91,13 +93,16 @@ const subtitle = i18n(I18nKey.timelineSubtitle);
 				{timelineData.map((item) => <TimelineCard item={item} />)}
 			</div>
 
-			<div id="no-results" class="hidden text-center py-16">
+			<div
+				id="no-results"
+				class:list={["text-center py-16", { hidden: timelineData.length > 0 }]}
+			>
 				<Icon
 					name="material-symbols:search-off-rounded"
 					class="text-6xl text-black/15 dark:text-white/15 mb-4"
 				/>
 				<p class="text-black/40 dark:text-white/40 text-lg">
-					No matching items
+					{i18n(I18nKey.noData)}
 				</p>
 			</div>
 		</div>

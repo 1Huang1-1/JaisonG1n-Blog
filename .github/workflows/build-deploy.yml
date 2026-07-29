@@ -43,6 +43,7 @@ jobs:
       - name: Build site
         env:
           WP_BASE_URL: ${{ vars.WP_BASE_URL || 'https://cms.jaisong1n.com' }}
+          WORDPRESS_STRUCTURED_CONTENT_ENABLED: ${{ vars.WORDPRESS_STRUCTURED_CONTENT_ENABLED || 'false' }}
         run: pnpm build
 
       - name: Verify build output

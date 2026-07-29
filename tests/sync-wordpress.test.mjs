@@ -51,6 +51,21 @@ function post(overrides = {}) {
 	};
 }
 
+function snapshot(overrides = {}) {
+	return {
+		schemaVersion: 2,
+		revision: "a".repeat(64),
+		generatedAt: "2026-07-29T00:00:00+00:00",
+		projects: [],
+		skills: [],
+		aiTools: [],
+		timeline: [],
+		mediaManifest: [],
+		friends: [],
+		...overrides,
+	};
+}
+
 test("converts WordPress HTML and safe frontmatter", () => {
 	const markdown = buildPostMarkdown(post());
 	assert.match(markdown, /title: "标题：\\"你好\\" & 世界"/);
@@ -115,16 +130,22 @@ test("fetches all pages and filters non-published responses", async () => {
 
 test("replaces only the generated output after a successful sync", async () => {
 	const root = await mkdtemp(path.join(os.tmpdir(), "wordpress-sync-test-"));
-	const outputDir = path.join(root, "wordpress");
-	const fetchImpl = async () =>
-		new Response(JSON.stringify([post()]), {
-			status: 200,
-			headers: { "X-WP-TotalPages": "1", "Content-Type": "application/json" },
-		});
+	const outputDir = path.join(root, "src/content/posts/wordpress");
+	const fetchImpl = async (url) =>
+		new Response(
+			JSON.stringify(
+				new URL(url).pathname.includes("site-snapshot") ? snapshot() : [post()],
+			),
+			{
+				status: 200,
+				headers: { "X-WP-TotalPages": "1", "Content-Type": "application/json" },
+			},
+		);
 	try {
 		const result = await syncWordPress({
 			baseUrl: "https://cms.example",
-			outputDir,
+			repoRoot: root,
+			structuredEnabled: false,
 			fetchImpl,
 			logger: { info() {}, error() {} },
 		});
@@ -143,8 +164,8 @@ test("keeps the previous output when conversion fails", async () => {
 	const root = await mkdtemp(
 		path.join(os.tmpdir(), "wordpress-sync-failure-test-"),
 	);
-	const outputDir = path.join(root, "wordpress");
-	await mkdir(outputDir);
+	const outputDir = path.join(root, "src/content/posts/wordpress");
+	await mkdir(outputDir, { recursive: true });
 	await writeFile(path.join(outputDir, "existing.md"), "existing", "utf8");
 	const invalidPost = post({ date: "", date_gmt: "" });
 	const fetchImpl = async () =>
@@ -157,7 +178,8 @@ test("keeps the previous output when conversion fails", async () => {
 		await assert.rejects(
 			syncWordPress({
 				baseUrl: "https://cms.example",
-				outputDir,
+				repoRoot: root,
+				structuredEnabled: false,
 				fetchImpl,
 				logger: { info() {}, error() {} },
 			}),

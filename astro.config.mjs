@@ -1,12 +1,12 @@
+import { unified } from "@astrojs/markdown-remark";
+import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
-import mdx from '@astrojs/mdx';
-import { unified } from '@astrojs/markdown-remark';
 import svelte, { vitePreprocess } from "@astrojs/svelte";
 import { pluginCollapsibleSections } from "@expressive-code/plugin-collapsible-sections";
 import { pluginLineNumbers } from "@expressive-code/plugin-line-numbers";
 import swup from "@swup/astro";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig, fontProviders } from "astro/config";
+import { defineConfig, envField, fontProviders } from "astro/config";
 import expressiveCode from "astro-expressive-code";
 import icon from "astro-icon";
 import { oddmisc } from "oddmisc";
@@ -18,9 +18,8 @@ import rehypeSlug from "rehype-slug";
 import remarkDirective from "remark-directive";
 import remarkMath from "remark-math";
 import remarkSectionize from "remark-sectionize";
-
-import { buildIconInclude } from "./src/plugins/astro-icon-include.mjs";
 import { siteConfig } from "./src/config/index.ts";
+import { buildIconInclude } from "./src/plugins/astro-icon-include.mjs";
 import { pluginCustomCopyButton } from "./src/plugins/expressive-code/custom-copy-button.js";
 import { pluginLanguageBadge } from "./src/plugins/expressive-code/language-badge.ts";
 import { AdmonitionComponent } from "./src/plugins/rehype-component-admonition.mjs";
@@ -37,6 +36,17 @@ import { remarkMermaid } from "./src/plugins/remark-mermaid.js";
 
 // https://astro.build/config
 export default defineConfig({
+	env: {
+		schema: {
+			WORDPRESS_STRUCTURED_CONTENT_ENABLED: envField.enum({
+				values: ["true", "false"],
+				context: "server",
+				access: "public",
+				optional: true,
+				default: "false",
+			}),
+		},
+	},
 	fonts: [
 		{
 			name: "JetBrains Mono",
@@ -120,11 +130,7 @@ export default defineConfig({
 			animateHistoryBrowsing: false,
 			skipPopStateHandling: (event) => {
 				// 跳过锚点链接的处理，让浏览器原生处理
-				return (
-					event.state &&
-					event.state.url &&
-					event.state.url.includes("#")
-				);
+				return event.state?.url?.includes("#");
 			},
 		}),
 		icon({
@@ -215,8 +221,7 @@ export default defineConfig({
 							grid: ImageGridComponent,
 							note: (x, y) => AdmonitionComponent(x, y, "note"),
 							tip: (x, y) => AdmonitionComponent(x, y, "tip"),
-							important: (x, y) =>
-								AdmonitionComponent(x, y, "important"),
+							important: (x, y) => AdmonitionComponent(x, y, "important"),
 							caution: (x, y) => AdmonitionComponent(x, y, "caution"),
 							warning: (x, y) => AdmonitionComponent(x, y, "warning"),
 						},
@@ -287,12 +292,8 @@ export default defineConfig({
 			rollupOptions: {
 				onwarn(warning, warn) {
 					if (
-						warning.message.includes(
-							"is dynamically imported by",
-						) &&
-						warning.message.includes(
-							"but also statically imported by",
-						)
+						warning.message.includes("is dynamically imported by") &&
+						warning.message.includes("but also statically imported by")
 					) {
 						return;
 					}
@@ -303,9 +304,7 @@ export default defineConfig({
 		// 生产环境移除 console.log 和 debugger
 		esbuildOptions: {
 			drop:
-				process.env.NODE_ENV === "production"
-					? ["console", "debugger"]
-					: [],
+				process.env.NODE_ENV === "production" ? ["console", "debugger"] : [],
 		},
 	},
 });

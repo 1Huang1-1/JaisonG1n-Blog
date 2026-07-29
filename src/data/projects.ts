@@ -12,11 +12,25 @@ export interface Project {
 	liveDemo?: string;
 	sourceCode?: string;
 	visitUrl?: string;
-	startDate: string;
+	startDate?: string;
 	endDate?: string;
 	featured?: boolean;
 	tags?: string[];
 	showImage?: boolean;
+	contentHtml?: string;
+	imageMedia?: {
+		id: number;
+		url: string;
+		alt: string;
+		mimeType:
+			| "image/jpeg"
+			| "image/png"
+			| "image/webp"
+			| "image/gif"
+			| "image/avif";
+		width: number;
+		height: number;
+	} | null;
 }
 
 export const projectsData: Project[] = [
