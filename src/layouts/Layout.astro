@@ -144,6 +144,10 @@ const bannerOffset =
 >
 	<head>
 		<meta charset="UTF-8" />
+		<!-- Keep Tailwind's cascade layers stable across Swup partial navigations. -->
+		<style is:inline data-swup-persist>
+			@layer properties, theme, base, components, utilities;
+		</style>
 		<Font cssVariable="--font-body" preload />
 		<Font cssVariable="--font-cjk" />
 		<Font cssVariable="--font-jetbrains-mono" />
