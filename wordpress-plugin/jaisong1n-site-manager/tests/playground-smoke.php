@@ -1,0 +1,269 @@
+<?php
+
+if (!defined('ABSPATH')) {
+	require_once dirname(__DIR__, 4) . '/wp-load.php';
+}
+
+function jg_smoke_assert(bool $condition, string $message): void {
+	if (!$condition) {
+		throw new RuntimeException($message);
+	}
+}
+
+function jg_create_item(string $post_type, string $slug, string $content, int $menu_order = 0, string $status = 'publish'): int {
+	$post_id = wp_insert_post(array(
+		'post_type' => $post_type,
+		'post_status' => $status,
+		'post_title' => ucwords(str_replace('-', ' ', $slug)),
+		'post_name' => $slug,
+		'post_content' => $content,
+		'post_date' => '2026-01-01 00:00:00',
+		'post_date_gmt' => '2026-01-01 00:00:00',
+		'menu_order' => $menu_order,
+	), true);
+	jg_smoke_assert(!is_wp_error($post_id), 'Could not create fixture ' . $slug . '.');
+	return (int) $post_id;
+}
+
+function jg_create_image_attachment(): int {
+	$upload = wp_upload_dir(null, true, true);
+	wp_mkdir_p($upload['path']);
+	$file = trailingslashit($upload['path']) . 'jg-schema-v2.png';
+	$png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=', true);
+	jg_smoke_assert(is_string($png) && file_put_contents($file, $png) !== false, 'Could not create media fixture.');
+	$attachment_id = wp_insert_attachment(array(
+		'post_mime_type' => 'image/png',
+		'post_title' => 'Schema v2 image',
+		'post_status' => 'inherit',
+		'guid' => trailingslashit($upload['url']) . 'jg-schema-v2.png',
+	), $file, 0, true);
+	jg_smoke_assert(!is_wp_error($attachment_id), 'Could not create media attachment.');
+	update_attached_file((int) $attachment_id, $file);
+	wp_update_attachment_metadata((int) $attachment_id, array(
+		'width' => 1,
+		'height' => 1,
+		'file' => ltrim(str_replace(wp_normalize_path($upload['basedir']), '', wp_normalize_path($file)), '/'),
+		'sizes' => array(),
+	));
+	update_post_meta((int) $attachment_id, '_wp_attachment_image_alt', 'Schema image alt');
+	return (int) $attachment_id;
+}
+
+jg_smoke_assert(class_exists('JG_Site_Manager'), 'The plugin was not activated.');
+wp_set_current_user(1);
+
+update_option('home', 'https://cms.example.com');
+update_option('siteurl', 'https://cms.example.com');
+update_option('upload_url_path', 'https://cms.example.com/wp-content/uploads');
+JG_Content_Types::register();
+JG_Content_Types::grant_capabilities();
+JG_Settings::install_defaults();
+$settings = JG_Settings::get();
+$settings['trusted_media_hosts'] = 'cms.example.com';
+update_option(JG_Settings::OPTION, $settings);
+do_action('rest_api_init');
+
+$administrator = get_role('administrator');
+$editor = get_role('editor');
+$author = get_role('author');
+jg_smoke_assert($administrator && $administrator->has_cap('edit_jg_projects'), 'Administrator lacks project capability.');
+jg_smoke_assert($editor && $editor->has_cap('edit_jg_projects'), 'Editor lacks project capability.');
+jg_smoke_assert($author && !$author->has_cap('edit_jg_projects'), 'Author unexpectedly received project capability.');
+
+foreach (array_keys(JG_Content_Types::definitions()) as $post_type) {
+	$object = get_post_type_object($post_type);
+	jg_smoke_assert($object instanceof WP_Post_Type, 'Missing post type ' . $post_type . '.');
+	jg_smoke_assert(!$object->publicly_queryable, $post_type . ' is publicly queryable.');
+	jg_smoke_assert($object->exclude_from_search, $post_type . ' is included in search.');
+	jg_smoke_assert(!$object->has_archive && $object->show_ui && $object->show_in_rest, $post_type . ' headless flags are incorrect.');
+}
+
+$hosts = JG_Content_Policy::sanitize_host_list(array('cms.example.com', 'localhost', '127.0.0.1', '10.0.0.1', 'media.local'));
+jg_smoke_assert($hosts === array('cms.example.com'), 'Private or local media host passed validation.');
+
+$sanitized = JG_Content_Policy::sanitize_public_html(
+	'<p onclick="alert(1)">Safe</p><script>alert(1)</script><iframe src="https://evil.example/embed"></iframe>',
+	array('player.bilibili.com')
+);
+jg_smoke_assert(str_contains($sanitized, '<p>Safe</p>'), 'Safe rich text was removed.');
+jg_smoke_assert(!str_contains($sanitized, 'onclick'), 'Event handler survived sanitization.');
+jg_smoke_assert(!str_contains($sanitized, '<script') && !str_contains($sanitized, 'alert(1)'), 'Script content survived sanitization.');
+jg_smoke_assert(!str_contains($sanitized, '<iframe'), 'Disallowed embed survived sanitization.');
+
+$reserved_request = new WP_REST_Request('POST', '/wp/v2/jg_project');
+$reserved_request->set_param('type', 'jg_project');
+$reserved = JG_Content_Types::validate_rest_save((object) array(
+	'post_type' => 'jg_project',
+	'post_name' => 'about',
+	'post_title' => 'Reserved route',
+	'post_content' => '',
+), $reserved_request);
+jg_smoke_assert(is_wp_error($reserved) && $reserved->get_error_code() === 'jg_reserved_slug', 'Reserved slug was not rejected.');
+
+$fields = JG_Content_Types::field_definitions();
+$legacy_specs = JG_Content_Types::sanitize_field('16 GB / 1 TB', $fields['jg_device']['specs']);
+$legacy_links = JG_Content_Types::sanitize_field("Demo|https://example.com|website", $fields['jg_timeline']['links']);
+$legacy_media = JG_Content_Types::sanitize_field('9,9,10', $fields['jg_album']['photos']);
+jg_smoke_assert($legacy_specs === array(array('label' => '规格', 'value' => '16 GB / 1 TB')), 'Legacy device specs were not converted.');
+jg_smoke_assert(($legacy_links[0]['type'] ?? '') === 'website', 'Legacy timeline links were not converted.');
+jg_smoke_assert($legacy_media === array(array('mediaId' => 9), array('mediaId' => 10)), 'Legacy media IDs were not converted or deduplicated.');
+
+$media_id = jg_create_image_attachment();
+$rich = '<p>Hello&nbsp; <strong>&amp; world</strong></p><script>bad()</script>';
+
+$project_first = jg_create_item('jg_project', 'project-first', $rich, -1);
+set_post_thumbnail($project_first, $media_id);
+update_post_meta($project_first, '_jg_category', 'web');
+update_post_meta($project_first, '_jg_tech_stack', 'Astro, TypeScript');
+update_post_meta($project_first, '_jg_status', 'completed');
+update_post_meta($project_first, '_jg_source_code', 'https://github.com/example/project');
+update_post_meta($project_first, '_jg_visit_url', 'https://example.com/project');
+update_post_meta($project_first, '_jg_featured', true);
+update_post_meta($project_first, '_jg_show_image', true);
+$project_a = jg_create_item('jg_project', 'project-a', 'A', 0);
+$project_b = jg_create_item('jg_project', 'project-b', 'B', 0);
+jg_create_item('jg_project', 'project-draft', 'Draft', 0, 'draft');
+
+$skill_id = jg_create_item('jg_skill', 'skill-one', 'Skill description');
+update_post_meta($skill_id, '_jg_icon', 'logos:typescript-icon');
+update_post_meta($skill_id, '_jg_category', 'frontend');
+update_post_meta($skill_id, '_jg_level', 'advanced');
+update_post_meta($skill_id, '_jg_experience_years', 2);
+update_post_meta($skill_id, '_jg_experience_months', 6);
+
+$ai_id = jg_create_item('jg_ai_tool', 'ai-one', 'AI description');
+update_post_meta($ai_id, '_jg_icon', 'material-symbols:smart-toy');
+update_post_meta($ai_id, '_jg_category', 'chat');
+update_post_meta($ai_id, '_jg_frequency', 'daily');
+update_post_meta($ai_id, '_jg_usage', '每天使用');
+
+$timeline_id = jg_create_item('jg_timeline', 'timeline-one', $rich);
+update_post_meta($timeline_id, '_jg_type', 'work');
+update_post_meta($timeline_id, '_jg_start_date', '2025-01-01');
+update_post_meta($timeline_id, '_jg_links', array(array('name' => 'Website', 'url' => 'https://example.com', 'type' => 'website')));
+
+$friend_id = jg_create_item('jg_friend', 'friend-one', 'Friend description');
+set_post_thumbnail($friend_id, $media_id);
+update_post_meta($friend_id, '_jg_site_url', 'https://example.com');
+
+$device_id = jg_create_item('jg_device', 'device-one', 'Device description');
+set_post_thumbnail($device_id, $media_id);
+update_post_meta($device_id, '_jg_category', 'Router');
+update_post_meta($device_id, '_jg_specs', array(array('label' => '内存', 'value' => '16 GB'), array('label' => '存储', 'value' => '1 TB')));
+update_post_meta($device_id, '_jg_link', 'https://example.com/device');
+
+$diary_id = jg_create_item('jg_diary', 'diary-one', $rich);
+update_post_meta($diary_id, '_jg_images', array(array('mediaId' => $media_id)));
+update_post_meta($diary_id, '_jg_location', 'Shanghai');
+
+$album_id = jg_create_item('jg_album', 'album-one', $rich);
+set_post_thumbnail($album_id, $media_id);
+update_post_meta($album_id, '_jg_photos', array(array('mediaId' => $media_id)));
+update_post_meta($album_id, '_jg_album_date', '2026-01-01');
+
+$anime_id = jg_create_item('jg_anime', 'anime-one', 'Anime description');
+set_post_thumbnail($anime_id, $media_id);
+update_post_meta($anime_id, '_jg_status', 'onhold');
+update_post_meta($anime_id, '_jg_rating', 8.5);
+update_post_meta($anime_id, '_jg_progress', 3);
+update_post_meta($anime_id, '_jg_total_episodes', 12);
+
+$announcement_id = jg_create_item('jg_announcement', 'announcement-one', 'Announcement content');
+update_post_meta($announcement_id, '_jg_closable', true);
+update_post_meta($announcement_id, '_jg_link_enable', true);
+update_post_meta($announcement_id, '_jg_link_text', 'Details');
+update_post_meta($announcement_id, '_jg_link_url', 'https://example.com/details');
+
+foreach (array_keys(JG_Content_Types::definitions()) as $post_type) {
+	jg_create_item($post_type, 'draft-' . str_replace('jg_', '', $post_type), 'Private draft fixture', 0, 'draft');
+}
+
+$page_id = jg_create_item('page', 'snapshot-page', '<p>Page content</p>');
+set_post_thumbnail($page_id, $media_id);
+
+$first_request = new WP_REST_Request('GET', '/jaisong1n/v1/site-snapshot');
+$first_response = rest_do_request($first_request);
+$first_data = $first_response->get_data();
+jg_smoke_assert(
+	$first_response->get_status() === 200,
+	'Snapshot did not return HTTP 200: status=' . $first_response->get_status() . ' data=' . wp_json_encode($first_data)
+);
+jg_smoke_assert(($first_data['schemaVersion'] ?? null) === 2, 'Unexpected snapshot schema version.');
+jg_smoke_assert(count($first_data['projects'] ?? array()) === 3, 'Draft filtering or project count is incorrect.');
+foreach (array('skills', 'aiTools', 'timeline', 'friends', 'devices', 'diary', 'albums', 'anime', 'announcements') as $collection) {
+	jg_smoke_assert(count($first_data[$collection] ?? array()) === 1, 'Draft filtering failed for ' . $collection . '.');
+}
+jg_smoke_assert(array_column($first_data['projects'], 'id') === array('project-first', 'project-a', 'project-b'), 'Deterministic project ordering failed.');
+jg_smoke_assert(
+	$first_data['projects'][0]['description'] === 'Hello & world',
+	'Description was not normalized to plain text: ' . wp_json_encode($first_data['projects'][0]['description'])
+);
+jg_smoke_assert(str_contains($first_data['projects'][0]['contentHtml'], '<strong>&amp; world</strong>'), 'Safe contentHtml was not preserved.');
+jg_smoke_assert(!str_contains($first_data['projects'][0]['contentHtml'], 'bad()'), 'Unsafe script content survived contentHtml cleanup.');
+jg_smoke_assert(($first_data['projects'][0]['imageMedia']['mimeType'] ?? '') === 'image/png', 'Project media object is invalid.');
+jg_smoke_assert(($first_data['aiTools'][0]['description']['zh_CN'] ?? '') === 'AI description', 'AI description is not a zh_CN LocaleString.');
+jg_smoke_assert(($first_data['timeline'][0]['links'][0]['type'] ?? '') === 'website', 'Timeline links are not structured.');
+jg_smoke_assert(($first_data['devices'][0]['specs'][1]['value'] ?? '') === '1 TB', 'Device specs are not structured.');
+jg_smoke_assert(($first_data['diary'][0]['images'][0]['mediaId'] ?? 0) === $media_id, 'Diary MediaRef is invalid.');
+jg_smoke_assert(($first_data['albums'][0]['photos'][0]['src'] ?? '') === wp_get_attachment_url($media_id), 'Album MediaRef is invalid.');
+jg_smoke_assert(!str_contains($first_data['timeline'][0]['contentHtml'], 'bad()'), 'Timeline contentHtml was not sanitized.');
+jg_smoke_assert(!str_contains($first_data['diary'][0]['contentHtml'], 'bad()'), 'Diary contentHtml was not sanitized.');
+jg_smoke_assert(!str_contains($first_data['albums'][0]['contentHtml'], 'bad()'), 'Album contentHtml was not sanitized.');
+jg_smoke_assert(($first_data['anime'][0]['status'] ?? '') === 'onhold', 'Extended anime status was not preserved.');
+jg_smoke_assert(($first_data['announcements'][0]['link']['enable'] ?? false) === true, 'Announcement link enable flag is missing.');
+jg_smoke_assert(count($first_data['mediaManifest'] ?? array()) === 1, 'Media manifest did not deduplicate attachments.');
+jg_smoke_assert(($first_data['mediaManifest'][0]['width'] ?? 0) === 1 && ($first_data['mediaManifest'][0]['height'] ?? 0) === 1, 'Media dimensions are invalid.');
+$snapshot_pages = array_values(array_filter($first_data['pages'], static fn($page) => ($page['slug'] ?? '') === 'snapshot-page'));
+jg_smoke_assert(($snapshot_pages[0]['featuredImageMedia']['id'] ?? 0) === $media_id, 'Page featured media object is missing.');
+
+$etag = $first_response->get_headers()['ETag'] ?? '';
+$second_request = new WP_REST_Request('GET', '/jaisong1n/v1/site-snapshot');
+$second_request->set_header('If-None-Match', $etag);
+$second_response = rest_do_request($second_request);
+jg_smoke_assert($etag !== '' && $second_response->get_status() === 304, 'Matching ETag did not return HTTP 304 in Playground.');
+
+$headless_actions = JG_Content_Types::remove_view_action(array('view' => 'View', 'edit' => 'Edit'), get_post($project_first));
+$page_actions = JG_Content_Types::remove_view_action(array('view' => 'View'), get_post($page_id));
+jg_smoke_assert(!isset($headless_actions['view']), 'Headless view action was not removed.');
+jg_smoke_assert(isset($page_actions['view']), 'Normal page view action was changed.');
+jg_smoke_assert(JG_Content_Types::hide_preview_link('https://cms.example.com/?preview=1', get_post($project_first)) === '', 'Headless preview link was not removed.');
+jg_smoke_assert(JG_Content_Types::hide_preview_link('https://cms.example.com/?preview=1', get_post($page_id)) !== '', 'Normal page preview link was changed.');
+jg_smoke_assert(JG_Content_Types::hide_sample_permalink('<span>permalink</span>', $project_first) === '', 'Headless sample permalink was not removed.');
+jg_smoke_assert(JG_Content_Types::hide_sample_permalink('<span>permalink</span>', $page_id) !== '', 'Normal page sample permalink was changed.');
+
+$invalid_link = JG_Content_Types::sanitize_field(
+	array(array('name' => 'Unsafe', 'url' => 'javascript:alert(1)', 'type' => 'website')),
+	$fields['jg_timeline']['links']
+);
+jg_smoke_assert($invalid_link === array(), 'Unsafe timeline link protocol was not rejected.');
+
+$upload = wp_upload_dir(null, true, true);
+$bad_file = trailingslashit($upload['path']) . 'jg-invalid-media.txt';
+file_put_contents($bad_file, 'not an image');
+$bad_media_id = wp_insert_attachment(array(
+	'post_mime_type' => 'text/plain',
+	'post_title' => 'Invalid media',
+	'post_status' => 'inherit',
+	'guid' => trailingslashit($upload['url']) . 'jg-invalid-media.txt',
+), $bad_file);
+update_attached_file((int) $bad_media_id, $bad_file);
+update_post_meta($project_first, '_thumbnail_id', (int) $bad_media_id);
+$invalid_snapshot = (new JG_Snapshot())->build();
+jg_smoke_assert(is_wp_error($invalid_snapshot) && $invalid_snapshot->get_error_code() === 'jg_media_mime', 'Invalid media MIME did not fail the snapshot.');
+update_post_meta($project_first, '_thumbnail_id', $media_id);
+
+$untrusted_settings = JG_Settings::get();
+$untrusted_settings['trusted_media_hosts'] = 'media.example.com';
+update_option(JG_Settings::OPTION, $untrusted_settings);
+$untrusted_snapshot = (new JG_Snapshot())->build();
+jg_smoke_assert(is_wp_error($untrusted_snapshot) && $untrusted_snapshot->get_error_code() === 'jg_media_host', 'Untrusted media host did not fail the snapshot.');
+update_option(JG_Settings::OPTION, $settings);
+
+echo wp_json_encode(array(
+	'ok' => true,
+	'schemaVersion' => $first_data['schemaVersion'],
+	'revision' => $first_data['revision'],
+	'projectCount' => count($first_data['projects']),
+	'mediaCount' => count($first_data['mediaManifest']),
+	'etagStatus' => $second_response->get_status(),
+), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";

@@ -3,9 +3,15 @@
   "type": "module",
   "version": "9.0",
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
+		"test:wordpress-plugin": "node --test tests/wordpress-plugin.test.mjs",
+		"test:wordpress-playground": "npx @wp-playground/cli@latest php --auto-mount wordpress-plugin/jaisong1n-site-manager --php=8.3 --wp=latest --verbosity=quiet -- /wordpress/wp-content/plugins/jaisong1n-site-manager/tests/playground-smoke.php",
+		"package:wordpress-plugin": "node scripts/package-wordpress-plugin.mjs",
+		"verify:wordpress-plugin-package": "node scripts/verify-wordpress-plugin-package.mjs wordpress-plugin/dist/jaisong1n-site-manager-0.2.1.zip",
+		"test:wordpress-upgrade": "node scripts/test-wordpress-plugin-upgrade.mjs",
     "sync-content": "node scripts/sync-content.js",
     "sync-wordpress": "node scripts/sync-wordpress.mjs",
-    "test:wordpress-sync": "node --test tests/sync-wordpress.test.mjs",
+		"test:wordpress-sync": "node --test tests/sync-wordpress.test.mjs",
     "init-content": "node scripts/init-content-repo.js",
     "predev": "node scripts/sync-content.js || true",
     "prebuild": "node scripts/sync-content.js || true",
@@ -93,8 +99,11 @@
     "@types/qrcode": "^1.5.6",
     "@types/sanitize-html": "^2.16.1",
     "glob": "^13.0.6",
+    "php-parser": "^3.7.0",
     "postcss-import": "^16.1.1",
-    "postcss-nesting": "^14.0.0"
+    "postcss-nesting": "^14.0.0",
+    "yauzl": "^3.4.0",
+    "yazl": "^3.3.1"
   },
   "packageManager": "pnpm@11.5.3"
 }

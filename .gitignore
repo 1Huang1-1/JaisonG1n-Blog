@@ -60,3 +60,5 @@ src/data/bilibili-data.json
 *.psd~
 *.cmo3
 *.vtube.json
+# Locally packaged WordPress plugin artifacts
+wordpress-plugin/dist/

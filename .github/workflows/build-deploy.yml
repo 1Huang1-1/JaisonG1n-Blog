@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - master
+  repository_dispatch:
+    types:
+      - wordpress_content_changed
   workflow_dispatch:
   schedule:
     - cron: "*/30 * * * *"
@@ -12,8 +15,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: wordpress-build-deploy
-  cancel-in-progress: false
+  group: jaisong1n-production-build
+  cancel-in-progress: true
 
 jobs:
   build-deploy:
