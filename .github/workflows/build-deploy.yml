@@ -1,0 +1,76 @@
+name: Build and deploy
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wordpress-build-deploy
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build site
+        env:
+          WP_BASE_URL: ${{ vars.WP_BASE_URL || 'https://cms.jaisong1n.com' }}
+        run: pnpm build
+
+      - name: Verify build output
+        run: test -f dist/index.html
+
+      - name: Publish dist to deploy branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          deploy_dir="${RUNNER_TEMP}/mizuki-deploy"
+          rm -rf "${deploy_dir}"
+
+          if git ls-remote --exit-code --heads origin deploy >/dev/null 2>&1; then
+            git fetch --no-tags origin deploy:refs/remotes/origin/deploy
+            git worktree add --detach "${deploy_dir}" origin/deploy
+          else
+            git worktree add --detach "${deploy_dir}" HEAD
+            git -C "${deploy_dir}" switch --orphan deploy
+          fi
+
+          rsync -a --delete --exclude=.git "${GITHUB_WORKSPACE}/dist/" "${deploy_dir}/"
+          touch "${deploy_dir}/.nojekyll"
+
+          git -C "${deploy_dir}" add -A
+          if git -C "${deploy_dir}" diff --cached --quiet; then
+            echo "No deployment changes."
+            exit 0
+          fi
+
+          git -C "${deploy_dir}" config user.name "github-actions[bot]"
+          git -C "${deploy_dir}" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "${deploy_dir}" commit -m "Deploy ${GITHUB_SHA}"
+          git -C "${deploy_dir}" push --force origin HEAD:deploy

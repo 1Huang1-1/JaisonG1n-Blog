@@ -21,6 +21,7 @@ pnpm-debug.log*
 
 # content repository (independent mode)
 /content/
+src/content/posts/wordpress/
 *.backup
 
 # Large zip files
