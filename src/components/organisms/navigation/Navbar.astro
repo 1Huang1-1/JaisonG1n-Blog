@@ -99,36 +99,36 @@ const iconWebpSrc = hasIconPngFallback
 ---
 <div id="navbar" class="z-50 onload-animation group" data-transparent-mode={navbarTransparentMode} data-is-home={isHomePage}>
     <div class="absolute h-8 left-0 right-0 -top-8 bg-[var(--card-bg)] transition"></div> <!-- used for onload animation -->
-    <div class:list={[className, "!overflow-visible max-w-[var(--page-width)] h-[4.5rem] mx-auto flex items-center justify-between px-4"]}>
-        <a href={url('/')} class="btn-plain scale-animation rounded-lg h-[2.5rem] md:h-[3.25rem] md:[.enable-banner_&]:h-[2.5rem] md:[.enable-banner_&]:group-[.scrolled]:h-[3.25rem] px-5 font-bold active:scale-95 shrink-0 transition-all duration-300">
-            <div class="flex flex-row items-center text-md">
+    <div class:list={[className, "!overflow-visible max-w-[var(--page-width)] h-[4.5rem] lg:h-[5rem] mx-auto flex items-center justify-between px-4"]}>
+        <a href={url('/')} class="btn-plain scale-animation rounded-lg h-[2.5rem] md:h-[3.25rem] md:[.enable-banner_&]:h-[2.5rem] md:[.enable-banner_&]:group-[.scrolled]:h-[3.25rem] lg:h-14 lg:[.enable-banner_&]:h-12 lg:[.enable-banner_&]:group-[.scrolled]:h-14 px-5 font-bold active:scale-95 shrink-0 transition-all duration-300">
+            <div class="flex flex-row items-center text-md lg:text-lg">
 				{/* 使用navbarTitle配置或默认配置 */}
                 {siteConfig.navbarTitle ? (
                     siteConfig.navbarTitle.mode === "logo" ? (
                         hasLogoPngFallback ? (
                             <picture>
                                 <source srcset={logoWebpSrc} type="image/webp" />
-                                <img src={logoSrc} alt={siteConfig.navbarTitle.text} class="h-[2.5rem] md:h-[3.25rem] md:[.enable-banner_&]:h-[2.5rem] md:[.enable-banner_&]:group-[.scrolled]:h-[3.25rem] max-w-full object-contain transition-all duration-300" loading="lazy" />
+                                <img src={logoSrc} alt={siteConfig.navbarTitle.text} class="h-[2.5rem] md:h-[3.25rem] md:[.enable-banner_&]:h-[2.5rem] md:[.enable-banner_&]:group-[.scrolled]:h-[3.25rem] lg:h-14 lg:[.enable-banner_&]:h-12 lg:[.enable-banner_&]:group-[.scrolled]:h-14 max-w-full object-contain transition-all duration-300" loading="lazy" />
                             </picture>
                         ) : (
-                            <img src={logoSrc} alt={siteConfig.navbarTitle.text} class="h-[2.5rem] md:h-[3.25rem] md:[.enable-banner_&]:h-[2.5rem] md:[.enable-banner_&]:group-[.scrolled]:h-[3.25rem] max-w-full object-contain transition-all duration-300" loading="lazy" />
+                            <img src={logoSrc} alt={siteConfig.navbarTitle.text} class="h-[2.5rem] md:h-[3.25rem] md:[.enable-banner_&]:h-[2.5rem] md:[.enable-banner_&]:group-[.scrolled]:h-[3.25rem] lg:h-14 lg:[.enable-banner_&]:h-12 lg:[.enable-banner_&]:group-[.scrolled]:h-14 max-w-full object-contain transition-all duration-300" loading="lazy" />
                         )
                     ) : (
                         <>
                             {hasIconPngFallback ? (
                                 <picture>
                                     <source srcset={iconWebpSrc} type="image/webp" />
-                                    <img src={iconSrc} alt="" class="h-[1.75rem] w-[1.75rem] mr-2 object-contain" loading="lazy" />
+                                    <img src={iconSrc} alt="" class="h-[1.75rem] w-[1.75rem] lg:h-8 lg:w-8 mr-2 object-contain" loading="lazy" />
                                 </picture>
                             ) : (
-                                <img src={iconSrc} alt="" class="h-[1.75rem] w-[1.75rem] mr-2 object-contain" loading="lazy" />
+                                <img src={iconSrc} alt="" class="h-[1.75rem] w-[1.75rem] lg:h-8 lg:w-8 mr-2 object-contain" loading="lazy" />
                             )}
                             <span class="dark:text-white text-black">{siteConfig.navbarTitle.text}</span>
                         </>
                     )
                 ) : (
                     <>
-                        <Icon name="material-symbols:home-pin-outline" class="text-[1.75rem] mr-2" />
+                        <Icon name="material-symbols:home-pin-outline" class="text-[1.75rem] lg:text-[2rem] mr-2" />
                         <span class="dark:text-white text-black">{siteConfig.title}</span>
                     </>
                 )}
@@ -145,8 +145,8 @@ const iconWebpSrc = hasIconPngFallback
             </div>
             {/* 只在 sidebar 模式下显示移动端 TOC 按钮 */}
 			{siteConfig.toc.enable && siteConfig.toc.mobileTop && <MobileTOC client:only="svelte"></MobileTOC>}
-            <button aria-label="Display Settings" class="btn-plain scale-animation rounded-lg h-11 w-11 active:scale-90" id="display-settings-switch">
-                <Icon name="material-symbols:palette-outline" class="text-[1.25rem]"></Icon>
+            <button aria-label="Display Settings" class="btn-plain scale-animation rounded-lg h-11 w-11 lg:h-12 lg:w-12 active:scale-90" id="display-settings-switch">
+                <Icon name="material-symbols:palette-outline" class="text-[1.25rem] lg:text-[1.375rem]"></Icon>
             </button>
             <ThemeSwitch client:only="svelte"></ThemeSwitch>
             <button aria-label="Menu" name="Nav Menu" class="btn-plain scale-animation rounded-lg w-11 h-11 active:scale-90 md:!hidden" id="nav-menu-switch">

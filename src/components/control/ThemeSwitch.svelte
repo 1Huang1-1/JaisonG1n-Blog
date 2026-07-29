@@ -79,7 +79,7 @@ function toggleScheme() {
 
 <button
 	aria-label="Light/Dark Mode"
-	class="relative btn-plain scale-animation rounded-lg h-11 w-11 active:scale-90 theme-switch-btn z-50"
+	class="relative btn-plain scale-animation rounded-lg h-11 w-11 lg:h-12 lg:w-12 active:scale-90 theme-switch-btn z-50"
 	id="scheme-switch"
 	onclick={toggleScheme}
 	data-mode={mode}
@@ -91,7 +91,7 @@ function toggleScheme() {
 	>
 		<Icon
 			icon="material-symbols:wb-sunny-outline-rounded"
-			class="text-[1.25rem]"
+			class="text-[1.25rem] lg:text-[1.375rem]"
 		></Icon>
 	</div>
 	<div
@@ -101,7 +101,7 @@ function toggleScheme() {
 	>
 		<Icon
 			icon="material-symbols:dark-mode-outline-rounded"
-			class="text-[1.25rem]"
+			class="text-[1.25rem] lg:text-[1.375rem]"
 		></Icon>
 	</div>
 </button>
