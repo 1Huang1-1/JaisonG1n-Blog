@@ -111,10 +111,18 @@ export const siteConfig: SiteConfig = {
 			desktop: [
 				"/assets/desktop-banner/konosuba-spring.webp",
 				"/assets/desktop-banner/konosuba-journey.webp",
+				"/assets/desktop-banner/background-01.png",
+				"/assets/desktop-banner/background-02.png",
+				"/assets/desktop-banner/background-03.png",
+				"/assets/desktop-banner/background-04.png",
 			], // 桌面横幅图片
 			mobile: [
 				"/assets/mobile-banner/konosuba-spring.webp",
 				"/assets/mobile-banner/konosuba-journey.webp",
+				"/assets/desktop-banner/background-01.png",
+				"/assets/desktop-banner/background-02.png",
+				"/assets/desktop-banner/background-03.png",
+				"/assets/desktop-banner/background-04.png",
 			], // 移动横幅图片
 		}, // 使用本地横幅图片
 
