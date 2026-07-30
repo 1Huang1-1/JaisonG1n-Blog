@@ -8,7 +8,7 @@ const { album } = Astro.props as AlbumCardProps;
 ---
 
 <a
-	href={`/albums/${album.id}/`}
+	href={`/albums/${encodeURIComponent(album.id)}/`}
 	data-tags={album.tags?.join(",") || ""}
 	class="album-card group relative block overflow-hidden rounded-xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
 >

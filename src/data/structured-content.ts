@@ -3,6 +3,8 @@ import path from "node:path";
 import type { GeneratedBundle } from "../../scripts/wordpress-sync/contracts.mjs";
 import { loadStructuredContentSource } from "../../scripts/wordpress-sync/gateway.mjs";
 import { announcementConfig as legacyAnnouncement } from "../config/announcementConfig";
+import type { AlbumGroup } from "../types/album";
+import { scanAlbums } from "../utils/album-scanner";
 import { aiToolsData as legacyAiTools } from "./ai-tools";
 import { getDiaryList as getLegacyDiaryList } from "./diary";
 import { friendsData as legacyFriends } from "./friends";
@@ -28,6 +30,7 @@ export interface StructuredContent {
 		| GeneratedBundle["learningResources"]
 		| typeof legacyLearningResources;
 	diary: GeneratedBundle["diary"] | ReturnType<typeof getLegacyDiaryList>;
+	albums: GeneratedBundle["albums"] | AlbumGroup[];
 }
 
 interface LoadOptions {
@@ -62,6 +65,7 @@ export function loadStructuredContent(
 			techRadar: legacyTechRadar,
 			learningResources: legacyLearningResources,
 			diary: getLegacyDiaryList(),
+			albums: [],
 		},
 		generatedDir: options?.generatedDir ?? defaultGeneratedDir,
 		readText:
@@ -69,4 +73,32 @@ export function loadStructuredContent(
 	}) as StructuredContent;
 	if (!options) cached = content;
 	return content;
+}
+
+export async function loadAlbums(): Promise<AlbumGroup[]> {
+	const content = loadStructuredContent();
+	if (content.source === "legacy") return scanAlbums();
+	return (content.albums as GeneratedBundle["albums"]).map((album) => ({
+		id: album.id,
+		title: album.title,
+		description: album.description,
+		cover: album.coverImage?.url ?? "",
+		date: album.date,
+		location: album.location,
+		tags: album.tags,
+		photos: album.images.map((image) => ({
+			id: image.id,
+			src: image.url,
+			alt: image.alt,
+			title: image.caption,
+			caption: image.caption,
+			width: image.width,
+			height: image.height,
+			order: image.order,
+		})),
+		contentHtml: album.contentHtml,
+		publishedAt: album.publishedAt,
+		updatedAt: album.updatedAt,
+		featured: album.featured,
+	}));
 }

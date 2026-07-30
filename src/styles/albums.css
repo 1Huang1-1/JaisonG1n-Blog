@@ -7,8 +7,9 @@
 
 /* 瀑布流布局 */
 .gallery-masonry {
-  column-width: 240px;
-  column-gap: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
 }
 
 .gallery-masonry .gallery-photo-card {
@@ -50,12 +51,12 @@
 /* 响应式瀑布流 */
 @media (width < 768px) {
   .gallery-masonry {
-    column-width: 180px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (width < 480px) {
   .gallery-masonry {
-    column-width: 140px;
+    grid-template-columns: 1fr;
   }
 }

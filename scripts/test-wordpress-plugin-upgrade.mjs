@@ -22,14 +22,14 @@ const REPLACEMENT_ZIP = path.join(
 	REPOSITORY_ROOT,
 	"wordpress-plugin",
 	"dist",
-	`${PLUGIN_SLUG}-0.4.0.zip`,
+	`${PLUGIN_SLUG}-0.5.0.zip`,
 );
 
 const baselinePlugin = `<?php
 /**
  * Plugin Name: JaisonG1n Site Manager
- * Description: Minimal 0.3.0 upgrade-path fixture for diary/schema upgrade testing.
- * Version: 0.3.0
+ * Description: Minimal 0.4.1 upgrade-path fixture for album/schema upgrade testing.
+ * Version: 0.4.1
  * Author: JaisonG1n
  * Text Domain: jaisong1n-site-manager
  */
@@ -94,7 +94,7 @@ function run(command, args) {
 async function main() {
 	await verifyPackage(REPLACEMENT_ZIP);
 	const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "jg-upgrade-test-"));
-	const baselineZip = path.join(temporaryDirectory, `${PLUGIN_SLUG}-0.3.0.zip`);
+	const baselineZip = path.join(temporaryDirectory, `${PLUGIN_SLUG}-0.4.1.zip`);
 	const pluginsDirectory = path.join(temporaryDirectory, "plugins");
 	const replacementDirectory = path.join(temporaryDirectory, "replacement");
 	try {

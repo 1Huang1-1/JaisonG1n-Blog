@@ -1,5 +1,5 @@
 export interface Photo {
-	id?: string;
+	id: string | number;
 	src: string;
 	alt?: string;
 	title?: string;
@@ -10,6 +10,8 @@ export interface Photo {
 	location?: string;
 	width?: number;
 	height?: number;
+	caption?: string;
+	order?: number;
 }
 
 export interface AlbumGroup {
@@ -23,4 +25,8 @@ export interface AlbumGroup {
 	photos: Photo[];
 	password?: string;
 	passwordHint?: string;
+	contentHtml?: string;
+	publishedAt?: string;
+	updatedAt?: string;
+	featured?: boolean;
 }

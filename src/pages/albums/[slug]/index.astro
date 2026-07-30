@@ -1,0 +1,89 @@
+---
+import { PhotoCard } from "@components/features/albums";
+import PasswordProtection from "@components/features/auth/PasswordProtection.astro";
+import ContentDetailLayout from "@layouts/ContentDetailLayout.astro";
+import { Icon } from "astro-icon/components";
+
+import { siteConfig } from "../../../config";
+import {
+	loadAlbums,
+	loadStructuredContent,
+} from "../../../data/structured-content";
+import I18nKey from "../../../i18n/i18nKey";
+import { i18n } from "../../../i18n/translation";
+import type { AlbumGroup } from "../../../types/album";
+import { encryptContent } from "../../../utils/crypto-utils";
+
+if (!siteConfig.featurePages.albums) return Astro.redirect("/404/");
+
+export const getStaticPaths = async () =>
+	(await loadAlbums()).map((album) => ({
+		params: { slug: album.id },
+		props: { album },
+	}));
+
+interface Props {
+	album: AlbumGroup;
+}
+const { album } = Astro.props;
+if (!album) return Astro.redirect("/404/");
+
+const albums = await loadAlbums();
+const currentIndex = albums.findIndex((entry) => entry.id === album.id);
+const previous = currentIndex > 0 ? albums[currentIndex - 1] : null;
+const next =
+	currentIndex >= 0 && currentIndex < albums.length - 1
+		? albums[currentIndex + 1]
+		: null;
+const canonicalUrl = new URL(
+	`/albums/${encodeURIComponent(album.id)}/`,
+	Astro.site,
+).href;
+const isLegacyAlbum = loadStructuredContent().source === "legacy";
+const isEncrypted = isLegacyAlbum && Boolean(album.password);
+const encryptedPhotoData = isEncrypted
+	? encryptContent(
+			album.photos
+				.map(
+					(photo) =>
+						`<a data-fancybox="gallery-${album.id}" href="${photo.src}" data-caption="${photo.alt || photo.title || ""}"><img src="${photo.src}" alt="${photo.alt || photo.title || ""}" loading="lazy" /></a>`,
+				)
+				.join(""),
+			String(album.password),
+			`album:${album.id}`,
+		)
+	: "";
+---
+
+<ContentDetailLayout
+	title={album.title}
+	description={album.description || album.title}
+	canonicalUrl={canonicalUrl}
+	sectionLabel={i18n(I18nKey.albums)}
+	sectionHref="/albums/"
+	backLabel={i18n(I18nKey.albumsBackToList)}
+	cover={album.cover || undefined}
+	coverAlt={album.title}
+>
+	<div slot="meta" class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-black/55 dark:text-white/55">
+		<span class="inline-flex items-center gap-1"><Icon name="material-symbols:calendar-today" />{album.date}</span>
+		{album.location && <span class="inline-flex items-center gap-1"><Icon name="material-symbols:location-on" />{album.location}</span>}
+		<span class="inline-flex items-center gap-1"><Icon name="material-symbols:photo-library" />{album.photos.length} {i18n(I18nKey.albumsPhotosCount)}</span>
+		{(album.tags ?? []).map((tag) => <span class="rounded bg-(--btn-regular-bg) px-2 py-0.5 text-xs">{tag}</span>)}
+	</div>
+
+	{album.contentHtml && <div class="custom-md prose max-w-none dark:prose-invert" set:html={album.contentHtml} />}
+
+	{isEncrypted ? <PasswordProtection encryptedContent={encryptedPhotoData} hint={album.passwordHint} /> : album.photos.length > 0 ? (
+		<section class="mt-8" aria-label={i18n(I18nKey.albums)}>
+			<div class="gallery-masonry">
+				{album.photos.map((photo) => <PhotoCard src={photo.src} alt={photo.alt || photo.title || ""} caption={photo.caption || photo.title || ""} width={photo.width} height={photo.height} albumId={album.id} />)}
+			</div>
+		</section>
+	) : <p class="mt-8 text-center text-black/55 dark:text-white/55">{i18n(I18nKey.albumsEmpty)}</p>}
+
+	{(previous || next) && <nav class="mt-8 flex flex-wrap justify-between gap-3 border-t border-black/10 pt-5 dark:border-white/10" aria-label="Album navigation">
+		{previous ? <a class="btn-regular focus-visible:outline-2 focus-visible:outline-(--primary)" href={`/albums/${encodeURIComponent(previous.id)}/`}>← {previous.title}</a> : <span />}
+		{next && <a class="btn-regular focus-visible:outline-2 focus-visible:outline-(--primary)" href={`/albums/${encodeURIComponent(next.id)}/`}>{next.title} →</a>}
+	</nav>}
+</ContentDetailLayout>

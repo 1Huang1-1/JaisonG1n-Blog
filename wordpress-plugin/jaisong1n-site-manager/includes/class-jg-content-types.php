@@ -91,6 +91,7 @@ final class JG_Content_Types {
 				'album_date' => self::date('相册日期'),
 				'location' => self::text('地点'),
 				'tags' => self::text('标签（逗号分隔）'),
+				'featured' => self::checkbox('Featured'),
 			),
 			'jg_anime' => array(
 				'status' => self::select('状态', array('watching' => '在看', 'completed' => '看完', 'planned' => '计划', 'onhold' => '搁置', 'dropped' => '弃番')),
@@ -162,7 +163,7 @@ final class JG_Content_Types {
 		foreach (self::definitions() as $post_type => $definition) {
 			$plural_capability = $post_type . 's';
 			$supports = array('title', 'editor', 'revisions', 'custom-fields');
-			if (in_array($post_type, array('jg_project', 'jg_timeline', 'jg_diary', 'jg_tech_radar', 'jg_learning_resource'), true)) {
+			if (in_array($post_type, array('jg_project', 'jg_timeline', 'jg_diary', 'jg_album', 'jg_tech_radar', 'jg_learning_resource'), true)) {
 				$supports[] = 'excerpt';
 			}
 			if ($definition['thumbnail']) {
@@ -568,6 +569,8 @@ final class JG_Content_Types {
 		foreach (array_slice(is_array($value) ? $value : array(), 0, self::MAX_REPEATER_ROWS) as $row) {
 			$media_id = is_array($row) ? absint($row['mediaId'] ?? $row['media_id'] ?? $row['id'] ?? 0) : absint($row);
 			if (!$media_id || isset($seen[$media_id])) continue;
+			$attachment = get_post($media_id);
+			if ($attachment instanceof WP_Post && ($attachment->post_type !== 'attachment' || !str_starts_with((string) get_post_mime_type($media_id), 'image/'))) continue;
 			$seen[$media_id] = true;
 			$rows[] = array('mediaId' => $media_id);
 		}

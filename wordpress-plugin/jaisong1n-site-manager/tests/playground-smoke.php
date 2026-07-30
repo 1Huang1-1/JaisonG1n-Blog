@@ -28,7 +28,7 @@ function jg_create_item(string $post_type, string $slug, string $content, int $m
 function jg_create_image_attachment(): int {
 	$upload = wp_upload_dir(null, true, true);
 	wp_mkdir_p($upload['path']);
-	$file = trailingslashit($upload['path']) . 'jg-schema-v3.png';
+	$file = trailingslashit($upload['path']) . 'jg-schema-v3-' . uniqid('', true) . '.png';
 	$png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=', true);
 	jg_smoke_assert(is_string($png) && file_put_contents($file, $png) !== false, 'Could not create media fixture.');
 	$attachment_id = wp_insert_attachment(array(
@@ -177,7 +177,26 @@ update_post_meta($diary_id, '_jg_location', 'Shanghai');
 
 $album_id = jg_create_item('jg_album', 'album-one', $rich);
 set_post_thumbnail($album_id, $media_id);
-update_post_meta($album_id, '_jg_photos', array(array('mediaId' => $media_id)));
+$album_media_two = jg_create_image_attachment();
+$non_image_id = wp_insert_attachment(array('post_mime_type' => 'text/plain', 'post_title' => 'Not an image', 'post_status' => 'inherit'), '', 0, true);
+jg_smoke_assert(!is_wp_error($non_image_id), 'Could not create non-image attachment fixture.');
+$_POST = array(
+	'jg_content_nonce' => wp_create_nonce('jg_save_content_fields'),
+	'jg_fields' => array('photos' => array(
+		array('mediaId' => $album_media_two),
+		array('mediaId' => $media_id),
+		array('mediaId' => $album_media_two),
+		array('mediaId' => $non_image_id),
+	)),
+);
+JG_Content_Types::save_fields($album_id, get_post($album_id));
+$saved_photos = get_post_meta($album_id, '_jg_photos', true);
+jg_smoke_assert($saved_photos === array(array('mediaId' => $album_media_two), array('mediaId' => $media_id)), 'Album media save did not preserve ordering, deduplicate, or reject non-images.');
+$_POST['jg_fields']['photos'] = array(array('mediaId' => $media_id));
+JG_Content_Types::save_fields($album_id, get_post($album_id));
+jg_smoke_assert(get_post_meta($album_id, '_jg_photos', true) === array(array('mediaId' => $media_id)), 'Album media removal did not persist.');
+jg_smoke_assert(get_post($album_media_two) instanceof WP_Post, 'Removing an album image deleted the media library attachment.');
+$_POST = array();
 update_post_meta($album_id, '_jg_album_date', '2026-01-01');
 
 $anime_id = jg_create_item('jg_anime', 'anime-one', 'Anime description');
@@ -248,7 +267,7 @@ jg_smoke_assert(
 	$first_response->get_status() === 200,
 	'Snapshot did not return HTTP 200: status=' . $first_response->get_status() . ' data=' . wp_json_encode($first_data)
 );
-jg_smoke_assert(($first_data['schemaVersion'] ?? null) === 4, 'Unexpected snapshot schema version.');
+jg_smoke_assert(($first_data['schemaVersion'] ?? null) === 5, 'Unexpected snapshot schema version.');
 jg_smoke_assert(count($first_data['projects'] ?? array()) === 3, 'Draft filtering or project count is incorrect.');
 foreach (array('skills', 'aiTools', 'timeline', 'techRadar', 'learningResources', 'diary', 'albums') as $collection) {
 	jg_smoke_assert(count($first_data[$collection] ?? array()) === 1, 'Draft filtering failed for ' . $collection . '.');
@@ -267,7 +286,9 @@ jg_smoke_assert(($first_data['aiTools'][0]['description']['zh_CN'] ?? '') === 'A
 jg_smoke_assert(($first_data['timeline'][0]['links'][0]['type'] ?? '') === 'website', 'Timeline links are not structured.');
 jg_smoke_assert(($first_data['diary'][0]['images'][0]['mediaId'] ?? 0) === $media_id, 'Diary MediaRef is invalid.');
 jg_smoke_assert(str_contains($first_data['diary'][0]['contentHtml'] ?? '', $intermediate_media_url), 'WordPress intermediate image URL was not preserved in diary content.');
-jg_smoke_assert(($first_data['albums'][0]['photos'][0]['src'] ?? '') === wp_get_attachment_url($media_id), 'Album MediaRef is invalid.');
+jg_smoke_assert(($first_data['albums'][0]['images'][0]['url'] ?? '') === wp_get_attachment_url($media_id), 'Album image record is invalid.');
+jg_smoke_assert(($first_data['albums'][0]['images'][0]['order'] ?? -1) === 0, 'Album image order was not preserved.');
+jg_smoke_assert(($first_data['albums'][0]['coverImage']['id'] ?? 0) === $media_id, 'Album cover fallback is invalid.');
 jg_smoke_assert(!str_contains($first_data['timeline'][0]['contentHtml'], 'bad()'), 'Timeline contentHtml was not sanitized.');
 jg_smoke_assert(!str_contains($first_data['diary'][0]['contentHtml'], 'bad()'), 'Diary contentHtml was not sanitized.');
 jg_smoke_assert(!str_contains($first_data['albums'][0]['contentHtml'], 'bad()'), 'Album contentHtml was not sanitized.');

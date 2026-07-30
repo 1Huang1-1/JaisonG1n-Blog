@@ -407,6 +407,22 @@ export async function rewriteStructuredMedia(snapshot, mirror, baseUrl) {
 			contentHtml: await rewriteContentHtml(item.contentHtml, { baseUrl, manifestByUrl, mirror: (url, options) => mirror.mirror(url, options) }),
 		});
 	}
+	const albums = [];
+	for (const item of snapshot.albums) {
+		const mirrorImage = async (image) => {
+			if (!image) return null;
+			const sourceUrl = new URL(image.url, baseUrl).href;
+			const manifest = manifestByUrl.get(sourceUrl) ?? null;
+			const mirrored = await mirror.mirror(sourceUrl, { manifest, alt: image.alt });
+			return { ...image, url: mirrored.url, alt: image.alt || mirrored.alt, width: mirrored.width, height: mirrored.height };
+		};
+		albums.push({
+			...item,
+			images: await Promise.all(item.images.map(mirrorImage)),
+			coverImage: await mirrorImage(item.coverImage),
+			contentHtml: await rewriteContentHtml(item.contentHtml, { baseUrl, manifestByUrl, mirror: (url, options) => mirror.mirror(url, options) }),
+		});
+	}
 	return {
 		projects,
 		skills: snapshot.skills,
@@ -417,5 +433,6 @@ export async function rewriteStructuredMedia(snapshot, mirror, baseUrl) {
 		techRadar,
 		learningResources,
 		diary,
+		albums,
 	};
 }

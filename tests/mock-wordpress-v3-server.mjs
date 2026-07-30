@@ -21,7 +21,7 @@ const post = {
 };
 
 const snapshot = {
-	schemaVersion: 4,
+	schemaVersion: 5,
 	revision: "b".repeat(64),
 	generatedAt: "2026-07-29T00:00:00.000Z",
 	projects: [],
@@ -47,6 +47,22 @@ const snapshot = {
 			images: [],
 			coverImage: null,
 			featured: true,
+		},
+	],
+	albums: [
+		{
+			id: "fixture-album",
+			title: "Fixture Album",
+			description: "Generated WordPress album fixture",
+			contentHtml: "<p>Fixture album details.</p>",
+			date: "2026-07-29",
+			publishedAt: "2026-07-29T00:00:00.000Z",
+			updatedAt: "2026-07-29T00:00:00.000Z",
+			location: "Local fixture",
+			tags: ["fixture"],
+			images: [],
+			coverImage: null,
+			featured: false,
 		},
 	],
 	mediaManifest: [],

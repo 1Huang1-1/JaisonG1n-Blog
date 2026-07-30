@@ -64,7 +64,7 @@ test("structured content types expose native excerpts", async () => {
 	);
 	assert.match(
 		source,
-		/in_array\(\$post_type, array\('jg_project', 'jg_timeline', 'jg_diary', 'jg_tech_radar', 'jg_learning_resource'\), true\)/,
+		/in_array\(\$post_type, array\('jg_project', 'jg_timeline', 'jg_diary', 'jg_album', 'jg_tech_radar', 'jg_learning_resource'\), true\)/,
 	);
 	assert.match(source, /\$supports\[\] = 'excerpt'/);
 	assert.match(source, /'jg_diary' => array\([^\n]*'thumbnail' => true/);
@@ -86,16 +86,16 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.4.1 publishes schemaVersion 4 and deterministic ordering", async () => {
+test("version 0.5.0 publishes schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.4\.1/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.4\.1'/);
-	assert.match(readme, /Stable tag:\s*0\.4\.1/);
-	assert.match(snapshot, /'schemaVersion'\s*=>\s*4/);
+	assert.match(entry, /Version:\s*0\.5\.0/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.5\.0'/);
+	assert.match(readme, /Stable tag:\s*0\.5\.0/);
+	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
 		/'orderby'\s*=>\s*array\('menu_order'\s*=>\s*'ASC',\s*'date'\s*=>\s*'DESC',\s*'ID'\s*=>\s*'ASC'\)/,
@@ -117,7 +117,7 @@ test("only announcement links opt into validated root-relative paths", async () 
 	assert.match(source, /rawurldecode/);
 });
 
-test("schema v4 fields use structured repeaters and normalized media", async () => {
+test("schema v5 fields use structured repeaters and normalized media", async () => {
 	const [types, snapshot, admin] = await Promise.all([
 		readFile(
 			path.join(pluginRoot, "includes/class-jg-content-types.php"),
@@ -136,6 +136,8 @@ test("schema v4 fields use structured repeaters and normalized media", async () 
 	assert.match(snapshot, /'imageMedia'\s*=>/);
 	assert.match(snapshot, /'avatarMedia'\s*=>/);
 	assert.match(snapshot, /'coverMedia'\s*=>/);
+	assert.match(snapshot, /'coverImage'\s*=>/);
+	assert.match(snapshot, /private function album_media_refs/);
 	for (const field of ["mediaId", "mimeType", "width", "height"]) {
 		assert.match(snapshot, new RegExp(`'${field}'\\s*=>`));
 	}

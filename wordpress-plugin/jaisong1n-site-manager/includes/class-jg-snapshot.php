@@ -25,7 +25,7 @@ final class JG_Snapshot {
 
 		$this->register_settings_media($settings);
 		$base = array(
-			'schemaVersion' => 4,
+			'schemaVersion' => 5,
 			'site' => $settings['site'],
 			'profile' => $settings['profile'],
 			'appearance' => $settings['appearance'],
@@ -318,17 +318,21 @@ final class JG_Snapshot {
 				);
 			case 'jg_album':
 				$featured = $this->featured_media($post->ID);
+				$images = $this->album_media_refs($post, 'photos');
+				$cover = $featured['media'] ? $this->album_media_ref($featured['media'], 0, $title) : ($images[0] ?? null);
 				return array(
 					'id' => $post->post_name,
 					'title' => $title,
 					'description' => $description,
 					'contentHtml' => $content_html,
-					'cover' => $featured['url'],
-					'coverMedia' => $featured['media'],
 					'date' => $this->meta($post, 'album_date') ?: get_post_time('Y-m-d', true, $post),
+					'publishedAt' => get_post_time('c', true, $post),
+					'updatedAt' => get_post_modified_time('c', true, $post),
 					'location' => $this->meta($post, 'location'),
 					'tags' => $this->csv($this->meta($post, 'tags')),
-					'photos' => $this->media_refs($post, 'photos'),
+					'images' => $images,
+					'coverImage' => $cover,
+					'featured' => $this->bool_meta($post, 'featured'),
 				);
 			case 'jg_anime':
 				$featured = $this->featured_media($post->ID);
@@ -555,6 +559,34 @@ final class JG_Snapshot {
 			);
 		}
 		return $refs;
+	}
+
+	private function album_media_refs(WP_Post $post, string $key): array {
+		$refs = array();
+		foreach ($this->structured_meta($post, $key) as $order => $row) {
+			$media = $this->media_object(absint($row['mediaId'] ?? 0));
+			if (is_wp_error($media)) {
+				$this->remember_media_error($media);
+				continue;
+			}
+			$refs[] = $this->album_media_ref($media, $order, $this->title($post));
+		}
+		return $refs;
+	}
+
+	private function album_media_ref(array $media, int $order, string $album_title): array {
+		$attachment = get_post((int) $media['id']);
+		$caption = $attachment instanceof WP_Post ? $this->plain_text($attachment->post_excerpt, $attachment->ID, 'album_caption') : '';
+		$alt = $media['alt'] !== '' ? $media['alt'] : ($caption !== '' ? $caption : $album_title . ' ' . ($order + 1));
+		return array(
+			'id' => $media['id'],
+			'url' => $media['url'],
+			'alt' => $alt,
+			'caption' => $caption,
+			'width' => $media['width'],
+			'height' => $media['height'],
+			'order' => $order,
+		);
 	}
 
 	private function diary_mood(WP_Post $post): string {

@@ -256,6 +256,31 @@ export const diarySchema = z.object({
 	featured: z.boolean(),
 }).strict();
 
+const albumImageSchema = z.object({
+	id: z.number().int().positive(),
+	url: boundedText(2_048).refine(isHttpUrl, "Expected an HTTP(S) media URL"),
+	alt: boundedText(1_000),
+	caption: boundedText(20_000),
+	width: z.number().int().positive(),
+	height: z.number().int().positive(),
+	order: z.number().int().min(0),
+}).strict();
+
+export const albumSchema = z.object({
+	id: slug,
+	title: requiredText(500),
+	description: boundedText(20_000),
+	contentHtml: boundedText(250_000),
+	date: isoDate,
+	publishedAt: z.string().refine(isIsoDateTime, "Expected a valid publishedAt value"),
+	updatedAt: z.string().refine(isIsoDateTime, "Expected a valid updatedAt value"),
+	location: boundedText(500),
+	tags: stringList,
+	images: z.array(albumImageSchema).max(500),
+	coverImage: albumImageSchema.nullable(),
+	featured: z.boolean(),
+}).strict();
+
 const uniqueIds = (items) => new Set(items.map((item) => item.id)).size === items.length;
 const collection = (schema) => z.array(schema).max(500).refine(uniqueIds, "Collection IDs must be unique");
 
@@ -266,6 +291,7 @@ export const timelineItemsSchema = collection(timelineSchema);
 export const techRadarItemsSchema = collection(techRadarSchema);
 export const learningResourceItemsSchema = collection(learningResourceSchema);
 export const diaryItemsSchema = collection(diarySchema);
+export const albumItemsSchema = collection(albumSchema);
 
 export const friendSchema = z
 	.object({
@@ -302,7 +328,7 @@ export const announcementsSchema = z.array(announcementSchema).max(100);
 
 export const siteSnapshotSchema = z
 	.object({
-		schemaVersion: z.literal(4),
+		schemaVersion: z.literal(5),
 		revision: z.string().regex(/^[a-f0-9]{64}$/i),
 		generatedAt: boundedText(64).refine(isIsoDateTime, "Expected an ISO 8601 generatedAt value"),
 		projects: projectsSchema,
@@ -314,13 +340,14 @@ export const siteSnapshotSchema = z
 		techRadar: techRadarItemsSchema,
 		learningResources: learningResourceItemsSchema,
 		diary: diaryItemsSchema,
+		albums: albumItemsSchema,
 		mediaManifest: z.array(mediaObjectSchema).max(SYNC_LIMITS.maxFiles),
 	})
 	.passthrough()
 	.superRefine((value, ctx) => {
 		for (const deprecated of ["devices", "anime"]) {
 			if (Object.prototype.hasOwnProperty.call(value, deprecated)) {
-				ctx.addIssue({ code: "custom", path: [deprecated], message: `${deprecated} is not part of schemaVersion 4` });
+				ctx.addIssue({ code: "custom", path: [deprecated], message: `${deprecated} is not part of schemaVersion 5` });
 			}
 		}
 	});
@@ -363,6 +390,12 @@ export const generatedDiarySchema = diarySchema.extend({
 export const generatedTechRadarItemsSchema = z.array(generatedTechRadarSchema).max(500);
 export const generatedLearningResourceItemsSchema = z.array(generatedLearningResourceSchema).max(500);
 export const generatedDiaryItemsSchema = z.array(generatedDiarySchema).max(500);
+const generatedAlbumImageSchema = albumImageSchema.extend({ url: localMediaPath }).strict();
+export const generatedAlbumSchema = albumSchema.extend({
+	images: z.array(generatedAlbumImageSchema).max(500),
+	coverImage: generatedAlbumImageSchema.nullable(),
+}).strict();
+export const generatedAlbumItemsSchema = z.array(generatedAlbumSchema).max(500);
 
 export const mirroredMediaSchema = z
 	.object({
@@ -379,7 +412,7 @@ export const mirroredMediaSchema = z
 
 export const snapshotMetaSchema = z
 	.object({
-		schemaVersion: z.literal(4),
+		schemaVersion: z.literal(5),
 		revision: z.string().regex(/^[a-f0-9]{64}$/i),
 		generatedAt: boundedText(64).refine(isIsoDateTime),
 		syncedAt: boundedText(64).refine(isIsoDateTime),
@@ -396,6 +429,7 @@ export const snapshotMetaSchema = z
 			techRadar: z.number().int().min(0),
 			learningResources: z.number().int().min(0),
 			diary: z.number().int().min(0),
+			albums: z.number().int().min(0),
 				media: z.number().int().min(0),
 			})
 			.strict(),
@@ -428,6 +462,7 @@ export function parseGeneratedBundle(value) {
 		techRadar: generatedTechRadarItemsSchema.parse(value.techRadar),
 		learningResources: generatedLearningResourceItemsSchema.parse(value.learningResources),
 		diary: generatedDiaryItemsSchema.parse(value.diary),
+		albums: generatedAlbumItemsSchema.parse(value.albums),
 	};
 	const { counts } = bundle.meta;
 	for (const [name, items] of Object.entries({
@@ -440,6 +475,7 @@ export function parseGeneratedBundle(value) {
 		techRadar: bundle.techRadar,
 		learningResources: bundle.learningResources,
 		diary: bundle.diary,
+		albums: bundle.albums,
 	})) {
 		if (counts[name] !== items.length) throw new Error(`Generated WordPress ${name} count does not match snapshot metadata`);
 	}

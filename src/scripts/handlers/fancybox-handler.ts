@@ -20,12 +20,23 @@ export class FancyboxHandler {
 	private Fancybox: FancyboxType | null = null;
 	private boundSelectors: string[] = [];
 	private initialized = false;
+	private initializing: Promise<void> | null = null;
 
 	/**
 	 * 初始化 Fancybox
 	 * 按需加载 Fancybox 模块和样式
 	 */
 	async init(): Promise<void> {
+		if (this.initializing) return this.initializing;
+		this.initializing = this.initialize();
+		try {
+			await this.initializing;
+		} finally {
+			this.initializing = null;
+		}
+	}
+
+	private async initialize(): Promise<void> {
 		const hasImages = this.checkForImages();
 
 		if (!hasImages) {
@@ -133,10 +144,12 @@ export class FancyboxHandler {
 			return;
 		}
 
+		this.Fancybox.close(true);
 		this.boundSelectors.forEach((selector) => {
 			this.Fancybox.unbind(selector);
 		});
 		this.boundSelectors = [];
+		this.initialized = false;
 	}
 
 	/**

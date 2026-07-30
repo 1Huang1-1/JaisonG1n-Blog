@@ -214,13 +214,38 @@ export interface GeneratedDiary {
 	featured: boolean;
 }
 
+export interface GeneratedAlbumImage {
+	id: number;
+	url: string;
+	alt: string;
+	caption: string;
+	width: number;
+	height: number;
+	order: number;
+}
+
+export interface GeneratedAlbum {
+	id: string;
+	title: string;
+	description: string;
+	contentHtml: string;
+	date: string;
+	publishedAt: string;
+	updatedAt: string;
+	location: string;
+	tags: string[];
+	images: GeneratedAlbumImage[];
+	coverImage: GeneratedAlbumImage | null;
+	featured: boolean;
+}
+
 export interface SnapshotMeta {
-	schemaVersion: 4;
+	schemaVersion: 5;
 	revision: string;
 	generatedAt: string;
 	syncedAt: string;
 	sourceUrl: string;
-	counts: { posts: number; projects: number; skills: number; aiTools: number; timeline: number; friends: number; announcements: number; techRadar: number; learningResources: number; diary: number; media: number };
+	counts: { posts: number; projects: number; skills: number; aiTools: number; timeline: number; friends: number; announcements: number; techRadar: number; learningResources: number; diary: number; albums: number; media: number };
 	media: unknown[];
 }
 
@@ -235,11 +260,12 @@ export interface GeneratedBundle {
 	techRadar: GeneratedTechRadar[];
 	learningResources: GeneratedLearningResource[];
 	diary: GeneratedDiary[];
+	albums: GeneratedAlbum[];
 }
 
 export function parseStructuredContentFlag(value: string | undefined): boolean;
 export function parseSiteSnapshot(value: unknown): Record<string, unknown> & {
-	schemaVersion: 4;
+	schemaVersion: 5;
 	revision: string;
 	generatedAt: string;
 	projects: GeneratedProject[];
@@ -251,6 +277,7 @@ export function parseSiteSnapshot(value: unknown): Record<string, unknown> & {
 	techRadar: GeneratedTechRadar[];
 	learningResources: GeneratedLearningResource[];
 	diary: GeneratedDiary[];
+	albums: GeneratedAlbum[];
 	mediaManifest: Array<{
 		id: number;
 		url: string;

@@ -162,9 +162,27 @@ function diary(overrides = {}) {
 	};
 }
 
+function album(overrides = {}) {
+	return {
+		id: "album-one",
+		title: "Album One",
+		description: "Album description",
+		contentHtml: "<p>Album details.</p>",
+		date: "2026-07-29",
+		publishedAt: "2026-07-29T00:00:00.000Z",
+		updatedAt: "2026-07-29T00:00:00.000Z",
+		location: "",
+		tags: [],
+		images: [],
+		coverImage: null,
+		featured: false,
+		...overrides,
+	};
+}
+
 function snapshot(overrides = {}) {
 	return {
-		schemaVersion: 4,
+		schemaVersion: 5,
 		revision: "a".repeat(64),
 		generatedAt: "2026-07-29T00:00:00+00:00",
 		projects: [],
@@ -185,7 +203,7 @@ function snapshot(overrides = {}) {
 function generatedBundle(overrides = {}) {
 	const bundle = {
 		meta: {
-			schemaVersion: 4,
+			schemaVersion: 5,
 			revision: "a".repeat(64),
 			generatedAt: "2026-07-29T00:00:00+00:00",
 			syncedAt: "2026-07-29T00:01:00.000Z",
@@ -201,6 +219,7 @@ function generatedBundle(overrides = {}) {
 				techRadar: 0,
 				learningResources: 0,
 				diary: 0,
+				albums: 0,
 				media: 0,
 			},
 			media: [],
@@ -214,6 +233,7 @@ function generatedBundle(overrides = {}) {
 		techRadar: [],
 		learningResources: [],
 		diary: [],
+		albums: [],
 		...overrides,
 	};
 	bundle.meta.counts = {
@@ -227,6 +247,7 @@ function generatedBundle(overrides = {}) {
 		techRadar: bundle.techRadar.length,
 		learningResources: bundle.learningResources.length,
 		diary: bundle.diary.length,
+		albums: bundle.albums.length,
 	};
 	return bundle;
 }
@@ -243,6 +264,7 @@ function generatedFiles(bundle) {
 		["tech-radar.json", JSON.stringify(bundle.techRadar)],
 		["learning-resources.json", JSON.stringify(bundle.learningResources)],
 		["diary.json", JSON.stringify(bundle.diary)],
+		["albums.json", JSON.stringify(bundle.albums)],
 	]);
 }
 
@@ -381,6 +403,25 @@ test("gateway accepts real empty arrays and complete fixture data", () => {
 	}
 });
 
+test("enabled album source never evaluates the legacy album scanner input", () => {
+	const files = generatedFiles(generatedBundle({ albums: [] }));
+	const legacy = { projects: [], skills: [], aiTools: [], timeline: [] };
+	Object.defineProperty(legacy, "albums", {
+		enumerable: true,
+		get() {
+			throw new Error("legacy album scanner was evaluated");
+		},
+	});
+	const result = loadStructuredContentSource({
+		enabledValue: "true",
+		legacy,
+		generatedDir: "C:/generated",
+		readText: (filePath) => files.get(path.basename(filePath)),
+	});
+	assert.equal(result.source, "wordpress");
+	assert.deepEqual(result.albums, []);
+});
+
 test("snapshot permits unconsumed top-level collections but selected records are strict", () => {
 	assert.equal(
 		parseSiteSnapshot(snapshot({ projects: [project()] })).friends.length,
@@ -406,13 +447,17 @@ test("snapshot permits unconsumed top-level collections but selected records are
 	);
 });
 
-test("diary records use the v4 contract and reject the previous schema", () => {
+test("diary and album records use the v5 contract and reject the previous schema", () => {
 	const parsed = parseSiteSnapshot(snapshot({ diary: [diary()] }));
 	assert.equal(parsed.diary[0].id, "diary-one");
 	assert.equal(parsed.diary[0].mood, "calm");
+	assert.equal(
+		parseSiteSnapshot(snapshot({ albums: [album()] })).albums[0].id,
+		"album-one",
+	);
 	assert.throws(
 		() => parseSiteSnapshot(snapshot({ schemaVersion: 3, diary: [diary()] })),
-		/schemaVersion.*0\.4\.0|schemaVersion/i,
+		/schemaVersion/i,
 	);
 });
 
@@ -1048,6 +1093,7 @@ test("full sync writes mapped fixture JSON and deduplicated local media", async 
 			techRadar: 0,
 			learningResources: 0,
 			diary: 1,
+			albums: 0,
 			media: 2,
 		});
 		const projects = JSON.parse(

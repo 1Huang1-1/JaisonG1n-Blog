@@ -6,15 +6,15 @@ import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { Icon } from "astro-icon/components";
 
 import { siteConfig } from "../config";
+import { loadAlbums } from "../data/structured-content";
 import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
-import { scanAlbums } from "../utils/album-scanner";
 
 if (!siteConfig.featurePages.albums) {
 	return Astro.redirect("/404/");
 }
 
-const albumsData = await scanAlbums();
+const albumsData = await loadAlbums();
 
 // Collect all unique tags for filtering
 const allTags = [...new Set(albumsData.flatMap((a) => a.tags || []))].sort();

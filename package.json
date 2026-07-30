@@ -7,7 +7,7 @@
     "test:wordpress-plugin": "node --test tests/wordpress-plugin.test.mjs",
     "test:wordpress-playground": "npx @wp-playground/cli@latest php --auto-mount wordpress-plugin/jaisong1n-site-manager --php=8.3 --wp=latest --verbosity=quiet -- /wordpress/wp-content/plugins/jaisong1n-site-manager/tests/playground-smoke.php",
     "package:wordpress-plugin": "node scripts/package-wordpress-plugin.mjs",
-    "verify:wordpress-plugin-package": "node scripts/verify-wordpress-plugin-package.mjs wordpress-plugin/dist/jaisong1n-site-manager-0.4.1.zip",
+    "verify:wordpress-plugin-package": "node scripts/verify-wordpress-plugin-package.mjs wordpress-plugin/dist/jaisong1n-site-manager-0.5.0.zip",
     "test:wordpress-upgrade": "node scripts/test-wordpress-plugin-upgrade.mjs",
     "sync-content": "node scripts/sync-content.js",
     "sync-wordpress": "node scripts/sync-wordpress.mjs",

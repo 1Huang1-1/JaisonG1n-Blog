@@ -29,6 +29,7 @@ export function loadStructuredContentSource({
 		techRadar: readJson("tech-radar.json"),
 		learningResources: readJson("learning-resources.json"),
 		diary: readJson("diary.json"),
+		albums: readJson("albums.json"),
 	});
 	return { source: "wordpress", ...bundle };
 }

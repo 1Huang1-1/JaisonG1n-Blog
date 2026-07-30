@@ -1,14 +1,21 @@
 ---
 import type { PhotoCardProps } from "./types";
 
-const { src, alt = "", albumId } = Astro.props as PhotoCardProps;
+const {
+	src,
+	alt = "",
+	albumId,
+	caption = "",
+	width,
+	height,
+} = Astro.props as PhotoCardProps;
 ---
 
 <div class="gallery-photo-card break-inside-avoid mb-3">
-	<div
+	<a
 		data-fancybox={`gallery-${albumId}`}
-		data-src={src}
-		data-type="image"
+		href={src}
+		data-caption={caption}
 		class="block rounded-xl overflow-hidden group cursor-pointer"
 	>
 		<img
@@ -16,7 +23,9 @@ const { src, alt = "", albumId } = Astro.props as PhotoCardProps;
 			alt={alt}
 			loading="lazy"
 			decoding="async"
+			width={width}
+			height={height}
 			class="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
 		/>
-	</div>
+	</a>
 </div>
