@@ -54,6 +54,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          # A queued schedule or repository_dispatch run may target an older
+          # commit. It must never overwrite a newer production deployment.
+          git fetch --no-tags origin master:refs/remotes/origin/master
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/master)" ]; then
+            echo "Skipping stale deployment for $(git rev-parse --short HEAD); latest master is $(git rev-parse --short origin/master)."
+            exit 0
+          fi
+
           deploy_dir="${RUNNER_TEMP}/mizuki-deploy"
           rm -rf "${deploy_dir}"
 
