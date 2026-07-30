@@ -51,7 +51,7 @@ const snapshot = {
 	],
 	albums: [
 		{
-			id: "fixture-album",
+			id: "测试",
 			title: "Fixture Album",
 			description: "Generated WordPress album fixture",
 			contentHtml: "<p>Fixture album details.</p>",

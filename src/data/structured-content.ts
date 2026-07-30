@@ -5,6 +5,7 @@ import { loadStructuredContentSource } from "../../scripts/wordpress-sync/gatewa
 import { announcementConfig as legacyAnnouncement } from "../config/announcementConfig";
 import type { AlbumGroup } from "../types/album";
 import { scanAlbums } from "../utils/album-scanner";
+import { getStructuredRouteSlug } from "../utils/structured-detail";
 import { aiToolsData as legacyAiTools } from "./ai-tools";
 import { getDiaryList as getLegacyDiaryList } from "./diary";
 import { friendsData as legacyFriends } from "./friends";
@@ -79,7 +80,9 @@ export async function loadAlbums(): Promise<AlbumGroup[]> {
 	const content = loadStructuredContent();
 	if (content.source === "legacy") return scanAlbums();
 	return (content.albums as GeneratedBundle["albums"]).map((album) => ({
-		id: album.id,
+		// WordPress may return an already percent-encoded post_name for CJK
+		// slugs. Normalize it once here; route links encode it exactly once.
+		id: getStructuredRouteSlug(album.id, "albums item"),
 		title: album.title,
 		description: album.description,
 		cover: album.coverImage?.url ?? "",
