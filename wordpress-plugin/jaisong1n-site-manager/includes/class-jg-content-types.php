@@ -126,6 +126,9 @@ final class JG_Content_Types {
 		foreach (self::definitions() as $post_type => $definition) {
 			$plural_capability = $post_type . 's';
 			$supports = array('title', 'editor', 'revisions', 'custom-fields');
+			if (in_array($post_type, array('jg_project', 'jg_timeline'), true)) {
+				$supports[] = 'excerpt';
+			}
 			if ($definition['thumbnail']) {
 				$supports[] = 'thumbnail';
 			}

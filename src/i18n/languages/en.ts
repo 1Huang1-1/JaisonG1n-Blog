@@ -167,6 +167,8 @@ export const en: Translation = {
 	[Key.projectsSource]: "Source Code",
 	[Key.projectsVisit]: "Visit Project",
 	[Key.projectsGitHub]: "GitHub",
+	[Key.structuredViewDetails]: "View Details",
+	[Key.projectsBackToList]: "Back to Projects",
 
 	// RSS Page
 	[Key.rss]: "RSS Feed",
@@ -311,6 +313,11 @@ export const en: Translation = {
 	[Key.timelineAchievements]: "Achievements",
 	[Key.timelineStartDate]: "Start Date",
 	[Key.timelineDuration]: "Duration",
+	[Key.timelineBackToList]: "Back to Timeline",
+	[Key.structuredProjectSummaryOnly]:
+		"This project currently has only a summary; the full content is being prepared.",
+	[Key.structuredTimelineSummaryOnly]:
+		"This experience currently has only a summary; the full content is being prepared.",
 
 	// Password Protection
 	[Key.passwordProtected]: "Password Protected",

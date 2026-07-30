@@ -1,0 +1,77 @@
+---
+import type { MarkdownHeading } from "astro";
+
+import MainGridLayout from "./MainGridLayout.astro";
+
+interface Props {
+	title: string;
+	description: string;
+	canonicalUrl: string;
+	sectionLabel: string;
+	sectionHref: string;
+	backLabel: string;
+	headings?: MarkdownHeading[];
+	cover?: string;
+	coverAlt?: string;
+}
+
+const {
+	title,
+	description,
+	canonicalUrl,
+	sectionLabel,
+	sectionHref,
+	backLabel,
+	headings = [],
+	cover,
+	coverAlt = title,
+} = Astro.props;
+---
+
+<MainGridLayout
+	title={title}
+	description={description || title}
+	setOGTypeArticle={true}
+	coverImage={cover}
+	headings={headings}
+	canonicalUrl={canonicalUrl}
+>
+	<div class="flex w-full rounded-(--radius-large) overflow-hidden relative mb-4">
+		<article id="structured-detail" class="card-base z-10 px-6 md:px-9 pt-6 pb-8 relative w-full">
+			<nav class="mb-5 text-sm text-black/50 dark:text-white/50" aria-label="Breadcrumb">
+				<a class="hover:text-(--primary) focus-visible:outline-2 focus-visible:outline-(--primary)" href={sectionHref}>
+					{sectionLabel}
+				</a>
+				<span aria-hidden="true"> / </span>
+				<span class="text-black/75 dark:text-white/75">{title}</span>
+			</nav>
+
+			<div class="relative onload-animation">
+				<h1 class="text-3xl md:text-[2.25rem]/[2.75rem] font-bold text-black/90 dark:text-white/90 mb-3 before:w-1 before:h-5 before:rounded-md before:bg-(--primary) before:absolute before:top-3 before:-left-4.5">
+					{title}
+				</h1>
+				{description && <p class="text-base leading-relaxed text-black/60 dark:text-white/60 mb-5">{description}</p>}
+			</div>
+
+			{cover && (
+				<img src={cover} alt={coverAlt} class="w-full max-h-105 object-cover rounded-xl mb-6 onload-animation" loading="eager" />
+			)}
+
+			<div class="flex flex-wrap items-center gap-2 mb-6 onload-animation">
+				<a class="btn-regular inline-flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-(--primary)" href={sectionHref}>
+					<span aria-hidden="true">←</span>
+					{backLabel}
+				</a>
+				<slot name="actions" />
+			</div>
+
+			<div class="border-t border-black/10 dark:border-white/10 pt-6 onload-animation">
+				<slot name="meta" />
+			</div>
+
+			<div class="mt-6 onload-animation">
+				<slot />
+			</div>
+		</article>
+	</div>
+</MainGridLayout>

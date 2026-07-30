@@ -162,6 +162,8 @@ export const zh_TW: Translation = {
 	[Key.projectsSource]: "原始碼",
 	[Key.projectsVisit]: "前往專案",
 	[Key.projectsGitHub]: "GitHub",
+	[Key.structuredViewDetails]: "查看詳情",
+	[Key.projectsBackToList]: "返回專案",
 
 	// RSS 頁面
 	[Key.rss]: "RSS 訂閱",
@@ -268,6 +270,11 @@ export const zh_TW: Translation = {
 	[Key.timelineAchievements]: "成就榮譽",
 	[Key.timelineStartDate]: "開始日期",
 	[Key.timelineDuration]: "持續時間",
+	[Key.timelineBackToList]: "返回時間線",
+	[Key.structuredProjectSummaryOnly]:
+		"此專案目前只有摘要資訊，完整內容正在整理中。",
+	[Key.structuredTimelineSummaryOnly]:
+		"此經歷目前只有摘要資訊，完整內容正在整理中。",
 
 	// 其他
 	[Key.noData]: "暫無資料",

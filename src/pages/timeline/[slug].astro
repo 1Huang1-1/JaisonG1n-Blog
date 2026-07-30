@@ -1,0 +1,92 @@
+---
+import { Icon } from "astro-icon/components";
+import type { TimelineItem } from "../../components/features/timeline/types";
+import StructuredHtmlContent from "../../components/misc/StructuredHtmlContent.astro";
+import { siteConfig } from "../../config";
+import { loadStructuredContent } from "../../data/structured-content";
+import I18nKey from "../../i18n/i18nKey";
+import { i18n } from "../../i18n/translation";
+import ContentDetailLayout from "../../layouts/ContentDetailLayout.astro";
+import {
+	assertUniqueStructuredSlugs,
+	getStructuredDetailHref,
+	prepareStructuredHtml,
+} from "../../utils/structured-detail";
+
+if (!siteConfig.featurePages.timeline) {
+	return Astro.redirect("/404/");
+}
+
+export function getStaticPaths() {
+	const bySlug = assertUniqueStructuredSlugs(
+		loadStructuredContent().timeline as TimelineItem[],
+		"timeline",
+	);
+	return [...bySlug.entries()].map(([slug, item]) => ({
+		params: { slug },
+		props: { item },
+	}));
+}
+
+const { item } = Astro.props as { item: TimelineItem };
+const detailHref = getStructuredDetailHref("timeline", item.id);
+const canonicalUrl = new URL(detailHref, Astro.site).toString();
+const prepared = prepareStructuredHtml(item.contentHtml);
+
+const formatDate = (value: string) =>
+	new Date(value).toLocaleDateString("zh-CN", {
+		year: "numeric",
+		month: "short",
+	});
+
+const getDuration = (startDate: string, endDate?: string) => {
+	const start = new Date(startDate).getTime();
+	const end = endDate ? new Date(endDate).getTime() : Date.now();
+	if (Number.isNaN(start) || Number.isNaN(end)) return "";
+	const months = Math.max(
+		0,
+		Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24 * 30)),
+	);
+	if (months < 12) return `${months} ${i18n(I18nKey.timelineMonths)}`;
+	const years = Math.floor(months / 12);
+	const remainder = months % 12;
+	return remainder === 0
+		? `${years} ${i18n(I18nKey.timelineYears)}`
+		: `${years} ${i18n(I18nKey.timelineYears)} ${remainder} ${i18n(I18nKey.timelineMonths)}`;
+};
+
+const typeText =
+	{
+		education: i18n(I18nKey.timelineEducation),
+		work: i18n(I18nKey.timelineWork),
+		project: i18n(I18nKey.timelineProject),
+		achievement: i18n(I18nKey.timelineAchievement),
+	}[item.type] ?? item.type;
+---
+
+<ContentDetailLayout
+	title={item.title}
+	description={item.description}
+	canonicalUrl={canonicalUrl}
+	sectionLabel={i18n(I18nKey.timeline)}
+	sectionHref="/timeline/"
+	backLabel={i18n(I18nKey.timelineBackToList)}
+	headings={prepared.headings}
+>
+	<div slot="meta" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-black/65 dark:text-white/65">
+		<div class="flex items-center gap-2"><Icon name="material-symbols:event" class="w-4 h-4 text-(--primary)" /><span>{typeText}</span></div>
+		<div class="flex items-center gap-2"><Icon name="material-symbols:calendar-month" class="w-4 h-4 text-(--primary)" /><span>{formatDate(item.startDate)} - {item.endDate ? formatDate(item.endDate) : i18n(I18nKey.timelinePresent)}</span></div>
+		<div class="flex items-center gap-2"><Icon name="material-symbols:schedule" class="w-4 h-4 text-(--primary)" /><span>{getDuration(item.startDate, item.endDate)}</span></div>
+		{item.location && <div class="flex items-center gap-2"><Icon name="material-symbols:location-on" class="w-4 h-4 text-(--primary)" /><span>{item.location}</span></div>}
+		{item.organization && <div><strong>{item.organization}</strong>{item.position ? ` · ${item.position}` : ""}</div>}
+		{item.skills && item.skills.length > 0 && <div class="sm:col-span-2 flex flex-wrap gap-2">{item.skills.map((skill) => <span class="px-2.5 py-1 rounded-md bg-(--primary)/10 text-(--primary)">{skill}</span>)}</div>}
+		{item.achievements && item.achievements.length > 0 && <ul class="sm:col-span-2 list-disc pl-5 space-y-1">{item.achievements.map((achievement) => <li>{achievement}</li>)}</ul>}
+		{item.links && item.links.length > 0 && <div class="sm:col-span-2 flex flex-wrap gap-2">{item.links.map((link) => <a class="btn-regular inline-flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-(--primary)" href={link.url} target="_blank" rel="noopener noreferrer"><Icon name="material-symbols:open-in-new" class="w-4 h-4" />{link.name}</a>)}</div>}
+	</div>
+
+	{prepared.html ? (
+		<StructuredHtmlContent html={prepared.html} />
+	) : (
+		<p class="text-black/55 dark:text-white/55">{i18n(I18nKey.structuredTimelineSummaryOnly)}</p>
+	)}
+</ContentDetailLayout>

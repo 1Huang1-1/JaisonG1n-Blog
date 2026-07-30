@@ -168,6 +168,8 @@ export const ja: Translation = {
 	[Key.projectsSource]: "ソースコード",
 	[Key.projectsVisit]: "プロジェクトを開く",
 	[Key.projectsGitHub]: "GitHub",
+	[Key.structuredViewDetails]: "詳細を見る",
+	[Key.projectsBackToList]: "プロジェクトに戻る",
 
 	// RSSページ
 	[Key.rss]: "RSSフィード",
@@ -313,6 +315,11 @@ export const ja: Translation = {
 	[Key.timelineAchievements]: "実績",
 	[Key.timelineStartDate]: "開始日",
 	[Key.timelineDuration]: "期間",
+	[Key.timelineBackToList]: "タイムラインに戻る",
+	[Key.structuredProjectSummaryOnly]:
+		"このプロジェクトには概要のみあり、詳細な内容を準備中です。",
+	[Key.structuredTimelineSummaryOnly]:
+		"この経験には概要のみあり、詳細な内容を準備中です。",
 
 	// パスワード保護
 	[Key.passwordProtected]: "パスワードで保護されています",

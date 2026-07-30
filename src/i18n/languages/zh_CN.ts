@@ -162,6 +162,8 @@ export const zh_CN: Translation = {
 	[Key.projectsSource]: "源代码",
 	[Key.projectsVisit]: "前往",
 	[Key.projectsGitHub]: "GitHub",
+	[Key.structuredViewDetails]: "查看详情",
+	[Key.projectsBackToList]: "返回项目",
 
 	// 技能展示页面
 	[Key.skills]: "技能展示",
@@ -230,6 +232,11 @@ export const zh_CN: Translation = {
 	[Key.timelineAchievements]: "成就荣誉",
 	[Key.timelineStartDate]: "开始日期",
 	[Key.timelineDuration]: "持续时间",
+	[Key.timelineBackToList]: "返回时间线",
+	[Key.structuredProjectSummaryOnly]:
+		"该项目暂时只有摘要信息，完整内容正在整理中。",
+	[Key.structuredTimelineSummaryOnly]:
+		"该经历暂时只有摘要信息，完整内容正在整理中。",
 
 	// 密码保护
 	[Key.passwordProtected]: "密码保护",

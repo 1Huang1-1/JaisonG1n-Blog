@@ -3,6 +3,7 @@ import { Icon } from "astro-icon/components";
 
 import I18nKey from "../../../i18n/i18nKey";
 import { i18n } from "../../../i18n/translation";
+import { getStructuredDetailHref } from "../../../utils/structured-detail";
 import type { ProjectCardProps } from "./types";
 
 const { project, maxTechStack = 4 } = Astro.props as ProjectCardProps;
@@ -11,6 +12,9 @@ const hasImage = !!project.image;
 const showImageArea = project.showImage !== false && hasImage;
 const hasVisitUrl = !!project.visitUrl;
 const hasSourceCode = !!project.sourceCode;
+const detailHref = project.id
+	? getStructuredDetailHref("projects", project.id)
+	: null;
 
 const getStatusText = (status: string) => {
 	switch (status) {
@@ -66,7 +70,11 @@ const getStatusText = (status: string) => {
 			<h3
 				class="text-lg font-bold text-black/90 dark:text-white/90 truncate group-hover:text-(--primary) transition-colors duration-200"
 			>
-				{project.title}
+				{detailHref ? (
+					<a href={detailHref} class="focus-visible:outline-2 focus-visible:outline-(--primary)" aria-label={`${i18n(I18nKey.structuredViewDetails)}: ${project.title}`}>
+						{project.title}
+					</a>
+				) : project.title}
 			</h3>
 			<span
 				class="shrink-0 ml-3 px-2 py-0.5 text-xs rounded-md bg-(--primary)/10 text-(--primary) font-medium"
@@ -99,14 +107,23 @@ const getStatusText = (status: string) => {
 		}
 
 		{
-			(hasVisitUrl || hasSourceCode) && (
+			(detailHref || hasVisitUrl || hasSourceCode) && (
 				<div class="flex gap-2">
+					{detailHref && (
+						<a
+							href={detailHref}
+							class="btn-regular flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium focus-visible:outline-2 focus-visible:outline-(--primary)"
+						>
+							<Icon name="material-symbols:article-outline" class="text-base w-4 h-4" />
+							{i18n(I18nKey.structuredViewDetails)}
+						</a>
+					)}
 					{hasVisitUrl && (
 						<a
 							href={project.visitUrl!}
 							target="_blank"
 							rel="noopener noreferrer"
-							class="btn-regular flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
+							class="btn-regular flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium focus-visible:outline-2 focus-visible:outline-(--primary)"
 						>
 							<Icon
 								name="material-symbols:open-in-new"
@@ -120,7 +137,7 @@ const getStatusText = (status: string) => {
 							href={project.sourceCode!}
 							target="_blank"
 							rel="noopener noreferrer"
-							class="btn-regular flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
+							class="btn-regular flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium focus-visible:outline-2 focus-visible:outline-(--primary)"
 							style={hasVisitUrl ? "" : "flex: 1;"}
 						>
 							<Icon name="mdi:github" class="text-base w-4 h-4" />

@@ -146,7 +146,7 @@ final class JG_Snapshot {
 	private function map_item(WP_Post $post): array {
 		$title = $this->title($post);
 		$content_html = $this->content_html($post->post_content, $post->ID);
-		$description = $this->plain_text($content_html);
+		$description = $this->summary($post->post_excerpt, $content_html, $post);
 
 		switch ($post->post_type) {
 			case 'jg_project':
@@ -318,29 +318,100 @@ final class JG_Snapshot {
 		return html_entity_decode(get_the_title($post), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 	}
 
-	private function content_html(string $html, int $post_id): string {
+	private function content_html($html, int $post_id): string {
+		$html = $this->safe_string($html, $post_id, 'content');
 		if (strlen($html) > JG_Content_Policy::MAX_RICH_TEXT_BYTES) {
 			throw new LengthException('Content exceeds limit for post ' . $post_id);
 		}
 		$precleaned = JG_Content_Policy::sanitize_public_html($html, $this->embed_hosts);
-		$clean = wp_kses_post(JG_Content_Policy::sanitize_public_html(apply_filters('the_content', $precleaned), $this->embed_hosts));
+		$filtered = apply_filters('the_content', $precleaned);
+		if (!is_string($filtered)) {
+			$this->log_mapping_warning($post_id, 'content_filter_non_string');
+			$filtered = $precleaned;
+		}
+		$clean = wp_kses_post(JG_Content_Policy::sanitize_public_html($filtered, $this->embed_hosts));
 		$this->register_inline_media($clean);
 		return $clean;
 	}
 
-	private function rich_text(string $html, int $post_id): string {
+	private function rich_text($html, int $post_id): string {
+		$html = $this->safe_string($html, $post_id, 'rich_text');
 		if (strlen($html) > JG_Content_Policy::MAX_RICH_TEXT_BYTES) {
 			throw new LengthException('Content exceeds limit for post ' . $post_id);
 		}
 		$precleaned = JG_Content_Policy::sanitize_public_html($html, $this->embed_hosts);
-		$clean = JG_Content_Policy::sanitize_public_html(apply_filters('the_content', $precleaned), $this->embed_hosts);
+		$filtered = apply_filters('the_content', $precleaned);
+		if (!is_string($filtered)) {
+			$this->log_mapping_warning($post_id, 'rich_text_filter_non_string');
+			$filtered = $precleaned;
+		}
+		$clean = JG_Content_Policy::sanitize_public_html($filtered, $this->embed_hosts);
 		$this->register_inline_media($clean);
 		return $clean;
 	}
 
-	private function plain_text(string $value): string {
+	private function summary($excerpt, string $content_html, WP_Post $post): string {
+		$manual = $this->plain_text($excerpt, $post->ID, 'excerpt');
+		if ($manual !== '') {
+			return $manual;
+		}
+		return $this->truncate_summary($this->plain_text($content_html, $post->ID, 'content_summary'));
+	}
+
+	private function plain_text($value, int $post_id = 0, string $stage = 'text'): string {
+		$value = $this->safe_string($value, $post_id, $stage);
 		$text = html_entity_decode(wp_strip_all_tags(wp_kses_post($value)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-		return trim((string) preg_replace('/\s+/u', ' ', $text));
+		$normalized = preg_replace('/\s+/u', ' ', $text);
+		return trim(is_string($normalized) ? $normalized : $text);
+	}
+
+	private function truncate_summary(string $text): string {
+		$limit = 140;
+		if ($this->unicode_length($text) <= $limit) {
+			return $text;
+		}
+		return $this->unicode_slice($text, $limit - 1) . '…';
+	}
+
+	private function unicode_length(string $value): int {
+		if (function_exists('mb_strlen')) {
+			return (int) mb_strlen($value, 'UTF-8');
+		}
+		preg_match_all('/./us', $value, $matches);
+		return count($matches[0] ?? array());
+	}
+
+	private function unicode_slice(string $value, int $length): string {
+		if (function_exists('mb_substr')) {
+			return (string) mb_substr($value, 0, $length, 'UTF-8');
+		}
+		preg_match_all('/./us', $value, $matches);
+		return implode('', array_slice($matches[0] ?? array(), 0, $length));
+	}
+
+	private function safe_string($value, int $post_id, string $stage): string {
+		if (!is_string($value)) {
+			if ($value !== null && $value !== false && $value !== array()) {
+				$this->log_mapping_warning($post_id, $stage . '_non_string');
+			}
+			return '';
+		}
+		$clean = wp_check_invalid_utf8($value, true);
+		if ($clean !== $value) {
+			$this->log_mapping_warning($post_id, $stage . '_invalid_utf8');
+		}
+		return is_string($clean) ? $clean : '';
+	}
+
+	private function log_mapping_warning(int $post_id, string $stage): void {
+		$post = $post_id > 0 ? get_post($post_id) : null;
+		error_log(sprintf(
+			'JaisonG1n Site Manager content mapping warning: type=%s id=%d slug=%s stage=%s',
+			$post instanceof WP_Post ? $post->post_type : 'unknown',
+			$post_id,
+			$post instanceof WP_Post ? sanitize_key($post->post_name) : '',
+			$stage,
+		));
 	}
 
 	private function register_settings_media(array $settings): void {

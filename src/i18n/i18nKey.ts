@@ -158,6 +158,8 @@ enum I18nKey {
 	projectsSource = "projectsSource",
 	projectsVisit = "projectsVisit",
 	projectsGitHub = "projectsGitHub",
+	structuredViewDetails = "structuredViewDetails",
+	projectsBackToList = "projectsBackToList",
 
 	// Skills page
 	skills = "skills",
@@ -226,6 +228,9 @@ enum I18nKey {
 	timelineAchievements = "timelineAchievements",
 	timelineStartDate = "timelineStartDate",
 	timelineDuration = "timelineDuration",
+	timelineBackToList = "timelineBackToList",
+	structuredProjectSummaryOnly = "structuredProjectSummaryOnly",
+	structuredTimelineSummaryOnly = "structuredTimelineSummaryOnly",
 
 	// 密码保护
 	passwordProtected = "passwordProtected",

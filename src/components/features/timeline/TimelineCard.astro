@@ -3,6 +3,7 @@ import { Icon } from "astro-icon/components";
 
 import I18nKey from "../../../i18n/i18nKey";
 import { i18n } from "../../../i18n/translation";
+import { getStructuredDetailHref } from "../../../utils/structured-detail";
 import type { TimelineCardProps } from "./types";
 
 const { item } = Astro.props as TimelineCardProps;
@@ -83,6 +84,9 @@ const dateRange = `${formatDate(item.startDate)} - ${item.endDate ? formatDate(i
 const duration = getDuration(item.startDate, item.endDate);
 const nodeColor = isCurrent ? "#22c55e" : item.color || "var(--primary)";
 const hasLinks = item.links && item.links.length > 0;
+const detailHref = item.id
+	? getStructuredDetailHref("timeline", item.id)
+	: null;
 ---
 
 <div
@@ -113,7 +117,11 @@ const hasLinks = item.links && item.links.length > 0;
 						<h3
 							class="text-lg font-bold text-black/90 dark:text-white/90 group-hover:text-(--primary) transition-colors duration-200"
 						>
-							{item.title}
+							{detailHref ? (
+								<a href={detailHref} class="focus-visible:outline-2 focus-visible:outline-(--primary)" aria-label={`${i18n(I18nKey.structuredViewDetails)}: ${item.title}`}>
+									{item.title}
+								</a>
+							) : item.title}
 						</h3>
 						{
 							item.featured && (
@@ -218,6 +226,16 @@ const hasLinks = item.links && item.links.length > 0;
 					)
 				}
 			</div>
+
+			{detailHref && (
+				<a
+					href={detailHref}
+					class="btn-regular inline-flex items-center gap-1.5 px-3 py-1.5 mt-3 rounded-lg text-xs font-medium focus-visible:outline-2 focus-visible:outline-(--primary)"
+				>
+					<Icon name="material-symbols:article-outline" class="text-xs w-3.5 h-3.5" />
+					{i18n(I18nKey.structuredViewDetails)}
+				</a>
+			)}
 
 			{
 				hasLinks && (

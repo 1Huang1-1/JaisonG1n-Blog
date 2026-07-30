@@ -55,15 +55,42 @@ test("custom content types use mapped, independent capabilities", async () => {
 	assert.doesNotMatch(source, /get_role\(['"]author/);
 });
 
-test("version 0.2.1 keeps schemaVersion 2 and deterministic ordering", async () => {
+test("only projects and timeline expose native excerpts", async () => {
+	const source = await readFile(
+		path.join(pluginRoot, "includes/class-jg-content-types.php"),
+		"utf8",
+	);
+	assert.match(
+		source,
+		/in_array\(\$post_type, array\('jg_project', 'jg_timeline'\), true\)/,
+	);
+	assert.match(source, /\$supports\[\] = 'excerpt'/);
+});
+
+test("structured summaries prefer post excerpts and keep full content", async () => {
+	const source = await readFile(
+		path.join(pluginRoot, "includes/class-jg-snapshot.php"),
+		"utf8",
+	);
+	assert.match(
+		source,
+		/\$description = \$this->summary\(\$post->post_excerpt, \$content_html, \$post\)/,
+	);
+	assert.match(source, /'contentHtml' => \$content_html/);
+	assert.match(source, /private function truncate_summary/);
+	assert.match(source, /function_exists\('mb_strlen'\)/);
+	assert.match(source, /preg_match_all\('\/.\/us'/);
+});
+
+test("version 0.2.2 keeps schemaVersion 2 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.2\.1/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.2\.1'/);
-	assert.match(readme, /Stable tag:\s*0\.2\.1/);
+	assert.match(entry, /Version:\s*0\.2\.2/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.2\.2'/);
+	assert.match(readme, /Stable tag:\s*0\.2\.2/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*2/);
 	assert.match(
 		snapshot,

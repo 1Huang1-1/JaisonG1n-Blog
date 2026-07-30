@@ -1,0 +1,82 @@
+---
+import { Icon } from "astro-icon/components";
+import type { Project } from "../../components/features/projects/types";
+import StructuredHtmlContent from "../../components/misc/StructuredHtmlContent.astro";
+import { siteConfig } from "../../config";
+import { loadStructuredContent } from "../../data/structured-content";
+import I18nKey from "../../i18n/i18nKey";
+import { i18n } from "../../i18n/translation";
+import ContentDetailLayout from "../../layouts/ContentDetailLayout.astro";
+import {
+	assertUniqueStructuredSlugs,
+	getStructuredDetailHref,
+	prepareStructuredHtml,
+} from "../../utils/structured-detail";
+
+if (!siteConfig.featurePages.projects) {
+	return Astro.redirect("/404/");
+}
+
+export function getStaticPaths() {
+	const bySlug = assertUniqueStructuredSlugs(
+		loadStructuredContent().projects as Project[],
+		"projects",
+	);
+	return [...bySlug.entries()].map(([slug, project]) => ({
+		params: { slug },
+		props: { project },
+	}));
+}
+
+const { project } = Astro.props as { project: Project };
+const detailHref = getStructuredDetailHref("projects", project.id);
+const canonicalUrl = new URL(detailHref, Astro.site).toString();
+const prepared = prepareStructuredHtml(project.contentHtml);
+const cover = project.showImage !== false ? project.image : "";
+
+const statusText =
+	{
+		completed: i18n(I18nKey.projectsCompleted),
+		"in-progress": i18n(I18nKey.projectsInProgress),
+		planned: i18n(I18nKey.projectsPlanned),
+	}[project.status] ?? project.status;
+---
+
+<ContentDetailLayout
+	title={project.title}
+	description={project.description}
+	canonicalUrl={canonicalUrl}
+	sectionLabel={i18n(I18nKey.projects)}
+	sectionHref="/projects/"
+	backLabel={i18n(I18nKey.projectsBackToList)}
+	headings={prepared.headings}
+	cover={cover || undefined}
+	coverAlt={project.title}
+>
+	<div slot="actions" class="flex flex-wrap gap-2">
+		{project.visitUrl && (
+			<a class="btn-regular inline-flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-(--primary)" href={project.visitUrl} target="_blank" rel="noopener noreferrer">
+				<Icon name="material-symbols:open-in-new" class="w-4 h-4" />
+				{i18n(I18nKey.projectsVisit)}
+			</a>
+		)}
+		{project.sourceCode && (
+			<a class="btn-regular inline-flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-(--primary)" href={project.sourceCode} target="_blank" rel="noopener noreferrer">
+				<Icon name="mdi:github" class="w-4 h-4" />
+				{i18n(I18nKey.projectsGitHub)}
+			</a>
+		)}
+	</div>
+
+	<div slot="meta" class="flex flex-wrap items-center gap-2 text-sm text-black/65 dark:text-white/65">
+		<span class="px-2.5 py-1 rounded-md bg-(--primary)/10 text-(--primary) font-medium">{statusText}</span>
+		<span class="px-2.5 py-1 rounded-md bg-(--btn-regular-bg)">{project.category}</span>
+		{project.techStack.map((tech) => <span class="px-2.5 py-1 rounded-md bg-(--btn-regular-bg)">{tech}</span>)}
+	</div>
+
+	{prepared.html ? (
+		<StructuredHtmlContent html={prepared.html} />
+	) : (
+		<p class="text-black/55 dark:text-white/55">{i18n(I18nKey.structuredProjectSummaryOnly)}</p>
+	)}
+</ContentDetailLayout>
