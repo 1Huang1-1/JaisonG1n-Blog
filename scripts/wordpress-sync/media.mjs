@@ -382,6 +382,27 @@ export async function rewriteStructuredMedia(snapshot, mirror, baseUrl) {
 			contentHtml: await rewriteContentHtml(item.contentHtml, { baseUrl, manifestByUrl, mirror: (url, options) => mirror.mirror(url, options) }),
 		});
 	}
+	const diary = [];
+	for (const item of snapshot.diary) {
+		const mirrorRef = async (ref) => {
+			if (!ref) return null;
+			const manifest = manifestByUrl.get(new URL(ref.src, baseUrl).href) ?? null;
+			const mirrored = await mirror.mirror(new URL(ref.src, baseUrl).href, { manifest, alt: ref.alt });
+			return {
+				mediaId: ref.mediaId,
+				src: mirrored.url,
+				alt: ref.alt || mirrored.alt,
+				width: mirrored.width,
+				height: mirrored.height,
+			};
+		};
+		diary.push({
+			...item,
+			images: await Promise.all(item.images.map((ref) => mirrorRef(ref))),
+			coverImage: await mirrorRef(item.coverImage),
+			contentHtml: await rewriteContentHtml(item.contentHtml, { baseUrl, manifestByUrl, mirror: (url, options) => mirror.mirror(url, options) }),
+		});
+	}
 	return {
 		projects,
 		skills: snapshot.skills,
@@ -391,5 +412,6 @@ export async function rewriteStructuredMedia(snapshot, mirror, baseUrl) {
 		announcements: snapshot.announcements,
 		techRadar,
 		learningResources,
+		diary,
 	};
 }

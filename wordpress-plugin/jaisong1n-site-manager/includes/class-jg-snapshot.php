@@ -25,7 +25,7 @@ final class JG_Snapshot {
 
 		$this->register_settings_media($settings);
 		$base = array(
-			'schemaVersion' => 3,
+			'schemaVersion' => 4,
 			'site' => $settings['site'],
 			'profile' => $settings['profile'],
 			'appearance' => $settings['appearance'],
@@ -295,14 +295,26 @@ final class JG_Snapshot {
 					'link' => $this->meta($post, 'link'),
 				);
 			case 'jg_diary':
+				$images = $this->diary_media_refs($post, 'images');
+				$featured = $this->featured_media($post->ID);
+				$cover = $images[0] ?? $this->media_ref($featured['media']);
+				$diary_date = $this->meta($post, 'diary_date');
+				if ($diary_date === '') $diary_date = get_post_time('Y-m-d', true, $post);
+				$mood = $this->diary_mood($post);
 				return array(
-					'content' => $description,
+					'id' => $post->post_name,
+					'title' => $title,
+					'description' => $description,
 					'contentHtml' => $content_html,
-					'date' => get_post_time('c', true, $post),
-					'images' => $this->media_refs($post, 'images'),
+					'date' => $diary_date,
+					'publishedAt' => get_post_time('c', true, $post),
+					'updatedAt' => get_post_modified_time('c', true, $post),
 					'location' => $this->meta($post, 'location'),
-					'mood' => $this->meta($post, 'mood'),
+					'mood' => $mood,
 					'tags' => $this->csv($this->meta($post, 'tags')),
+					'images' => $images,
+					'coverImage' => $cover,
+					'featured' => $this->bool_meta($post, 'featured'),
 				);
 			case 'jg_album':
 				$featured = $this->featured_media($post->ID);
@@ -524,6 +536,44 @@ final class JG_Snapshot {
 			$refs[] = array('mediaId' => $media['id'], 'src' => $media['url'], 'alt' => $media['alt']);
 		}
 		return $refs;
+	}
+
+	private function diary_media_refs(WP_Post $post, string $key): array {
+		$refs = array();
+		foreach ($this->structured_meta($post, $key) as $row) {
+			$media = $this->media_object(absint($row['mediaId'] ?? 0));
+			if (is_wp_error($media)) {
+				$this->remember_media_error($media);
+				continue;
+			}
+			$refs[] = array(
+				'mediaId' => $media['id'],
+				'src' => $media['url'],
+				'alt' => $media['alt'],
+				'width' => $media['width'],
+				'height' => $media['height'],
+			);
+		}
+		return $refs;
+	}
+
+	private function diary_mood(WP_Post $post): string {
+		$value = get_post_meta($post->ID, '_jg_mood', true);
+		if (!is_scalar($value)) return 'other';
+		$value = sanitize_key((string) $value);
+		$allowed = array('happy', 'calm', 'fulfilled', 'excited', 'thinking', 'tired', 'anxious', 'sad', 'other');
+		return in_array($value, $allowed, true) ? $value : ($value === '' ? '' : 'other');
+	}
+
+	private function media_ref(?array $media): ?array {
+		if (!$media) return null;
+		return array(
+			'mediaId' => $media['id'],
+			'src' => $media['url'],
+			'alt' => $media['alt'],
+			'width' => $media['width'],
+			'height' => $media['height'],
+		);
 	}
 
 	private function media_from_url(string $url): void {

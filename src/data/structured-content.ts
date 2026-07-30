@@ -2,14 +2,15 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { GeneratedBundle } from "../../scripts/wordpress-sync/contracts.mjs";
 import { loadStructuredContentSource } from "../../scripts/wordpress-sync/gateway.mjs";
+import { announcementConfig as legacyAnnouncement } from "../config/announcementConfig";
 import { aiToolsData as legacyAiTools } from "./ai-tools";
+import { getDiaryList as getLegacyDiaryList } from "./diary";
+import { friendsData as legacyFriends } from "./friends";
+import { learningResourcesData as legacyLearningResources } from "./learning-resources";
 import { projectsData as legacyProjects } from "./projects";
 import { skillsData as legacySkills } from "./skills";
-import { timelineData as legacyTimeline } from "./timeline";
-import { friendsData as legacyFriends } from "./friends";
-import { announcementConfig as legacyAnnouncement } from "../config/announcementConfig";
 import { techRadarData as legacyTechRadar } from "./tech-radar";
-import { learningResourcesData as legacyLearningResources } from "./learning-resources";
+import { timelineData as legacyTimeline } from "./timeline";
 
 export interface StructuredContent {
 	source: "legacy" | "wordpress";
@@ -19,9 +20,14 @@ export interface StructuredContent {
 	aiTools: GeneratedBundle["aiTools"] | typeof legacyAiTools;
 	timeline: GeneratedBundle["timeline"] | typeof legacyTimeline;
 	friends: GeneratedBundle["friends"] | typeof legacyFriends;
-	announcements: GeneratedBundle["announcements"] | typeof legacyAnnouncement[];
+	announcements:
+		| GeneratedBundle["announcements"]
+		| (typeof legacyAnnouncement)[];
 	techRadar: GeneratedBundle["techRadar"] | typeof legacyTechRadar;
-	learningResources: GeneratedBundle["learningResources"] | typeof legacyLearningResources;
+	learningResources:
+		| GeneratedBundle["learningResources"]
+		| typeof legacyLearningResources;
+	diary: GeneratedBundle["diary"] | ReturnType<typeof getLegacyDiaryList>;
 }
 
 interface LoadOptions {
@@ -55,6 +61,7 @@ export function loadStructuredContent(
 			announcements: legacyAnnouncement.content ? [legacyAnnouncement] : [],
 			techRadar: legacyTechRadar,
 			learningResources: legacyLearningResources,
+			diary: getLegacyDiaryList(),
 		},
 		generatedDir: options?.generatedDir ?? defaultGeneratedDir,
 		readText:

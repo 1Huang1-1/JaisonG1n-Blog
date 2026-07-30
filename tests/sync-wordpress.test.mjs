@@ -53,7 +53,7 @@ function post(overrides = {}) {
 
 function snapshot(overrides = {}) {
 	return {
-		schemaVersion: 3,
+		schemaVersion: 4,
 		revision: "a".repeat(64),
 		generatedAt: "2026-07-29T00:00:00+00:00",
 		projects: [],
@@ -65,6 +65,7 @@ function snapshot(overrides = {}) {
 		announcements: [],
 		techRadar: [],
 		learningResources: [],
+		diary: [],
 		...overrides,
 	};
 }

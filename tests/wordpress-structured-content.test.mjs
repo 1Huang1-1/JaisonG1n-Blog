@@ -31,7 +31,11 @@ import {
 	validateMediaUrl,
 } from "../scripts/wordpress-sync/media.mjs";
 import { commitDirectoryTransaction } from "../scripts/wordpress-sync/transaction.mjs";
-import { adaptAnnouncements, adaptFriends, announcementDismissKey } from "../scripts/wordpress-sync/view-models.mjs";
+import {
+	adaptAnnouncements,
+	adaptFriends,
+	announcementDismissKey,
+} from "../scripts/wordpress-sync/view-models.mjs";
 
 const PNG = await sharp({
 	create: { width: 2, height: 3, channels: 4, background: "#ff0000ff" },
@@ -133,9 +137,28 @@ function announcement(overrides = {}) {
 	};
 }
 
+function diary(overrides = {}) {
+	return {
+		id: "diary-one",
+		title: "Diary One",
+		description: "A diary entry",
+		contentHtml: "<p>A diary entry.</p>",
+		date: "2026-07-29",
+		publishedAt: "2026-07-29T00:00:00.000Z",
+		updatedAt: "2026-07-29T00:00:00.000Z",
+		location: "",
+		mood: "calm",
+		tags: [],
+		images: [],
+		coverImage: null,
+		featured: false,
+		...overrides,
+	};
+}
+
 function snapshot(overrides = {}) {
 	return {
-		schemaVersion: 3,
+		schemaVersion: 4,
 		revision: "a".repeat(64),
 		generatedAt: "2026-07-29T00:00:00+00:00",
 		projects: [],
@@ -147,6 +170,7 @@ function snapshot(overrides = {}) {
 		announcements: [],
 		techRadar: [],
 		learningResources: [],
+		diary: [],
 		albums: [],
 		...overrides,
 	};
@@ -155,7 +179,7 @@ function snapshot(overrides = {}) {
 function generatedBundle(overrides = {}) {
 	const bundle = {
 		meta: {
-			schemaVersion: 3,
+			schemaVersion: 4,
 			revision: "a".repeat(64),
 			generatedAt: "2026-07-29T00:00:00+00:00",
 			syncedAt: "2026-07-29T00:01:00.000Z",
@@ -170,6 +194,7 @@ function generatedBundle(overrides = {}) {
 				announcements: 0,
 				techRadar: 0,
 				learningResources: 0,
+				diary: 0,
 				media: 0,
 			},
 			media: [],
@@ -182,6 +207,7 @@ function generatedBundle(overrides = {}) {
 		announcements: [],
 		techRadar: [],
 		learningResources: [],
+		diary: [],
 		...overrides,
 	};
 	bundle.meta.counts = {
@@ -194,6 +220,7 @@ function generatedBundle(overrides = {}) {
 		announcements: bundle.announcements.length,
 		techRadar: bundle.techRadar.length,
 		learningResources: bundle.learningResources.length,
+		diary: bundle.diary.length,
 	};
 	return bundle;
 }
@@ -209,6 +236,7 @@ function generatedFiles(bundle) {
 		["announcements.json", JSON.stringify(bundle.announcements)],
 		["tech-radar.json", JSON.stringify(bundle.techRadar)],
 		["learning-resources.json", JSON.stringify(bundle.learningResources)],
+		["diary.json", JSON.stringify(bundle.diary)],
 	]);
 }
 
@@ -256,14 +284,29 @@ test("structured flag accepts only exact lowercase values", () => {
 });
 
 test("friend and announcement view models preserve deterministic source data", () => {
-	const friends = adaptFriends([friend({ avatarMedia: { url: "/generated/wordpress-media/" + "a".repeat(64) + ".png" } }), friend({ title: "No avatar", imgurl: "" })]);
-	assert.equal(friends[0].avatar, `/generated/wordpress-media/${"a".repeat(64)}.png`);
+	const friends = adaptFriends([
+		friend({
+			avatarMedia: {
+				url: `/generated/wordpress-media/${"a".repeat(64)}.png`,
+			},
+		}),
+		friend({ title: "No avatar", imgurl: "" }),
+	]);
+	assert.equal(
+		friends[0].avatar,
+		`/generated/wordpress-media/${"a".repeat(64)}.png`,
+	);
 	assert.equal(friends[1].avatar, "");
-	const [item] = adaptAnnouncements([announcement({ content: "Line one\r\nLine two" })]);
+	const [item] = adaptAnnouncements([
+		announcement({ content: "Line one\r\nLine two" }),
+	]);
 	assert.equal(item.content, "Line one\nLine two");
 	assert.match(item.dismissKey, /^[a-f0-9]{20}$/);
 	assert.equal(item.dismissKey, announcementDismissKey(item));
-	assert.notEqual(item.dismissKey, adaptAnnouncements([announcement({ content: "Changed" })])[0].dismissKey);
+	assert.notEqual(
+		item.dismissKey,
+		adaptAnnouncements([announcement({ content: "Changed" })])[0].dismissKey,
+	);
 });
 
 test("gateway does not touch generated files while disabled", () => {
@@ -354,6 +397,16 @@ test("snapshot permits unconsumed top-level collections but selected records are
 	assert.throws(
 		() => parseSiteSnapshot(snapshot({ schemaVersion: 2 })),
 		/schemaVersion/i,
+	);
+});
+
+test("diary records use the v4 contract and reject the previous schema", () => {
+	const parsed = parseSiteSnapshot(snapshot({ diary: [diary()] }));
+	assert.equal(parsed.diary[0].id, "diary-one");
+	assert.equal(parsed.diary[0].mood, "calm");
+	assert.throws(
+		() => parseSiteSnapshot(snapshot({ schemaVersion: 3, diary: [diary()] })),
+		/schemaVersion.*0\.4\.0|schemaVersion/i,
 	);
 });
 
@@ -880,6 +933,26 @@ test("full sync writes mapped fixture JSON and deduplicated local media", async 
 				contentHtml: `<p><img src="${inlineUrl}" alt="Inline"></p>`,
 			}),
 		],
+		diary: [
+			diary({
+				images: [
+					{
+						mediaId: 10,
+						src: coverUrl,
+						alt: "Diary cover",
+						width: 2,
+						height: 3,
+					},
+				],
+				coverImage: {
+					mediaId: 10,
+					src: coverUrl,
+					alt: "Diary cover",
+					width: 2,
+					height: 3,
+				},
+			}),
+		],
 		mediaManifest: [
 			{
 				id: 10,
@@ -919,18 +992,19 @@ test("full sync writes mapped fixture JSON and deduplicated local media", async 
 			},
 			logger: { info() {}, error() {}, warn() {} },
 		});
-	assert.deepEqual(result.structured.counts, {
-		posts: 1,
-		projects: 1,
-		skills: 1,
-		aiTools: 1,
-		timeline: 1,
-		friends: 0,
-		announcements: 0,
-		techRadar: 0,
-		learningResources: 0,
-		media: 2,
-	});
+		assert.deepEqual(result.structured.counts, {
+			posts: 1,
+			projects: 1,
+			skills: 1,
+			aiTools: 1,
+			timeline: 1,
+			friends: 0,
+			announcements: 0,
+			techRadar: 0,
+			learningResources: 0,
+			diary: 1,
+			media: 2,
+		});
 		const projects = JSON.parse(
 			await readFile(
 				path.join(root, "src/generated/wordpress/projects.json"),
@@ -943,6 +1017,12 @@ test("full sync writes mapped fixture JSON and deduplicated local media", async 
 				"utf8",
 			),
 		);
+		const diaryItems = JSON.parse(
+			await readFile(
+				path.join(root, "src/generated/wordpress/diary.json"),
+				"utf8",
+			),
+		);
 		assert.match(
 			projects[0].image,
 			/^\/generated\/wordpress-media\/[a-f0-9]{64}\.png$/,
@@ -950,6 +1030,10 @@ test("full sync writes mapped fixture JSON and deduplicated local media", async 
 		assert.match(
 			timelineItems[0].contentHtml,
 			/\/generated\/wordpress-media\/[a-f0-9]{64}\.png/,
+		);
+		assert.match(
+			diaryItems[0].images[0].src,
+			/^\/generated\/wordpress-media\/[a-f0-9]{64}\.png$/,
 		);
 		assert.equal(
 			(await readdir(path.join(root, "public/generated/wordpress-media")))

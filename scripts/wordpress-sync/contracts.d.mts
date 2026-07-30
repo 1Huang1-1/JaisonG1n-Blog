@@ -27,6 +27,7 @@ export const aiToolSchema: z.ZodTypeAny;
 export const timelineSchema: z.ZodTypeAny;
 export const techRadarSchema: z.ZodTypeAny;
 export const learningResourceSchema: z.ZodTypeAny;
+export const diarySchema: z.ZodTypeAny;
 export const friendSchema: z.ZodTypeAny;
 export const announcementSchema: z.ZodTypeAny;
 export const projectsSchema: z.ZodTypeAny;
@@ -35,6 +36,7 @@ export const aiToolsSchema: z.ZodTypeAny;
 export const timelineItemsSchema: z.ZodTypeAny;
 export const techRadarItemsSchema: z.ZodTypeAny;
 export const learningResourceItemsSchema: z.ZodTypeAny;
+export const diaryItemsSchema: z.ZodTypeAny;
 export const friendsSchema: z.ZodTypeAny;
 export const announcementsSchema: z.ZodTypeAny;
 export const siteSnapshotSchema: z.ZodTypeAny;
@@ -46,6 +48,8 @@ export const generatedTechRadarSchema: z.ZodTypeAny;
 export const generatedLearningResourceSchema: z.ZodTypeAny;
 export const generatedTechRadarItemsSchema: z.ZodTypeAny;
 export const generatedLearningResourceItemsSchema: z.ZodTypeAny;
+export const generatedDiarySchema: z.ZodTypeAny;
+export const generatedDiaryItemsSchema: z.ZodTypeAny;
 export const mirroredMediaSchema: z.ZodTypeAny;
 export const snapshotMetaSchema: z.ZodTypeAny;
 export const generatedProjectsSchema: z.ZodTypeAny;
@@ -186,13 +190,37 @@ export interface GeneratedLearningResource {
 	featured: boolean;
 }
 
+export interface GeneratedDiaryMediaRef {
+	mediaId: number;
+	src: string;
+	alt: string;
+	width: number;
+	height: number;
+}
+
+export interface GeneratedDiary {
+	id: string;
+	title: string;
+	description: string;
+	contentHtml: string;
+	date: string;
+	publishedAt: string;
+	updatedAt: string;
+	location: string;
+	mood: "" | "happy" | "calm" | "fulfilled" | "excited" | "thinking" | "tired" | "anxious" | "sad" | "other";
+	tags: string[];
+	images: GeneratedDiaryMediaRef[];
+	coverImage: GeneratedDiaryMediaRef | null;
+	featured: boolean;
+}
+
 export interface SnapshotMeta {
-	schemaVersion: 3;
+	schemaVersion: 4;
 	revision: string;
 	generatedAt: string;
 	syncedAt: string;
 	sourceUrl: string;
-	counts: { posts: number; projects: number; skills: number; aiTools: number; timeline: number; friends: number; announcements: number; techRadar: number; learningResources: number; media: number };
+	counts: { posts: number; projects: number; skills: number; aiTools: number; timeline: number; friends: number; announcements: number; techRadar: number; learningResources: number; diary: number; media: number };
 	media: unknown[];
 }
 
@@ -206,11 +234,12 @@ export interface GeneratedBundle {
 	announcements: GeneratedAnnouncement[];
 	techRadar: GeneratedTechRadar[];
 	learningResources: GeneratedLearningResource[];
+	diary: GeneratedDiary[];
 }
 
 export function parseStructuredContentFlag(value: string | undefined): boolean;
 export function parseSiteSnapshot(value: unknown): Record<string, unknown> & {
-	schemaVersion: 3;
+	schemaVersion: 4;
 	revision: string;
 	generatedAt: string;
 	projects: GeneratedProject[];
@@ -221,6 +250,7 @@ export function parseSiteSnapshot(value: unknown): Record<string, unknown> & {
 	announcements: GeneratedAnnouncement[];
 	techRadar: GeneratedTechRadar[];
 	learningResources: GeneratedLearningResource[];
+	diary: GeneratedDiary[];
 	mediaManifest: Array<{
 		id: number;
 		url: string;

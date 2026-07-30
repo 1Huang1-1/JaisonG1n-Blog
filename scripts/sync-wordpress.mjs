@@ -275,6 +275,7 @@ async function readGeneratedBundle(generatedDir) {
 		announcements: await readJson("announcements.json"),
 		techRadar: await readJson("tech-radar.json"),
 		learningResources: await readJson("learning-resources.json"),
+		diary: await readJson("diary.json"),
 	});
 }
 
@@ -323,7 +324,7 @@ async function generateStructured({ snapshot, baseUrl, posts, generatedDir, medi
 		permalinkConfig,
 	);
 	const meta = {
-		schemaVersion: 3,
+		schemaVersion: 4,
 		revision: snapshot.revision,
 		generatedAt: snapshot.generatedAt,
 		syncedAt: new Date().toISOString(),
@@ -336,8 +337,9 @@ async function generateStructured({ snapshot, baseUrl, posts, generatedDir, medi
 			timeline: rewritten.timeline.length,
 			friends: rewritten.friends.length,
 			announcements: rewritten.announcements.length,
-			techRadar: rewritten.techRadar.length,
+		techRadar: rewritten.techRadar.length,
 			learningResources: rewritten.learningResources.length,
+			diary: rewritten.diary.length,
 			media: mirror.getRecords().length,
 		},
 		media: mirror.getRecords(),
@@ -353,6 +355,7 @@ async function generateStructured({ snapshot, baseUrl, posts, generatedDir, medi
 		writeJson(path.join(generatedDir, "announcements.json"), bundle.announcements),
 		writeJson(path.join(generatedDir, "tech-radar.json"), bundle.techRadar),
 		writeJson(path.join(generatedDir, "learning-resources.json"), bundle.learningResources),
+		writeJson(path.join(generatedDir, "diary.json"), bundle.diary),
 	]);
 	return bundle;
 }
@@ -433,7 +436,7 @@ export async function syncWordPress({
 		committed = true;
 		logger.info(`WordPress article sync complete: ${files.length} article(s)`);
 		if (structuredBundle) {
-			logger.info(`WordPress structured sync ${structuredStatus}: projects=${structuredBundle.projects.length}, skills=${structuredBundle.skills.length}, aiTools=${structuredBundle.aiTools.length}, timeline=${structuredBundle.timeline.length}, friends=${structuredBundle.friends.length}, announcements=${structuredBundle.announcements.length}, techRadar=${structuredBundle.techRadar.length}, learningResources=${structuredBundle.learningResources.length}`);
+			logger.info(`WordPress structured sync ${structuredStatus}: projects=${structuredBundle.projects.length}, skills=${structuredBundle.skills.length}, aiTools=${structuredBundle.aiTools.length}, timeline=${structuredBundle.timeline.length}, friends=${structuredBundle.friends.length}, announcements=${structuredBundle.announcements.length}, techRadar=${structuredBundle.techRadar.length}, learningResources=${structuredBundle.learningResources.length}, diary=${structuredBundle.diary.length}`);
 		}
 		return {
 			count: files.length,

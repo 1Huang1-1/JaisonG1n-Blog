@@ -228,6 +228,34 @@ export const learningResourceSchema = z.object({
 	}
 });
 
+const diaryMood = z.union([
+	z.literal(""),
+	z.enum(["happy", "calm", "fulfilled", "excited", "thinking", "tired", "anxious", "sad", "other"]),
+]);
+const diaryMediaRefSchema = z.object({
+	mediaId: z.number().int().positive(),
+	src: boundedText(2_048).refine(isHttpUrl, "Expected an HTTP(S) media URL"),
+	alt: boundedText(1_000),
+	width: z.number().int().positive(),
+	height: z.number().int().positive(),
+}).strict();
+
+export const diarySchema = z.object({
+	id: slug,
+	title: boundedText(500),
+	description: boundedText(20_000),
+	contentHtml: boundedText(250_000),
+	date: isoDate,
+	publishedAt: z.string().refine(isIsoDateTime, "Expected a valid publishedAt value"),
+	updatedAt: z.string().refine(isIsoDateTime, "Expected a valid updatedAt value"),
+	location: boundedText(500),
+	mood: diaryMood,
+	tags: stringList,
+	images: z.array(diaryMediaRefSchema).max(500),
+	coverImage: diaryMediaRefSchema.nullable(),
+	featured: z.boolean(),
+}).strict();
+
 const uniqueIds = (items) => new Set(items.map((item) => item.id)).size === items.length;
 const collection = (schema) => z.array(schema).max(500).refine(uniqueIds, "Collection IDs must be unique");
 
@@ -237,6 +265,7 @@ export const aiToolsSchema = collection(aiToolSchema);
 export const timelineItemsSchema = collection(timelineSchema);
 export const techRadarItemsSchema = collection(techRadarSchema);
 export const learningResourceItemsSchema = collection(learningResourceSchema);
+export const diaryItemsSchema = collection(diarySchema);
 
 export const friendSchema = z
 	.object({
@@ -273,7 +302,7 @@ export const announcementsSchema = z.array(announcementSchema).max(100);
 
 export const siteSnapshotSchema = z
 	.object({
-		schemaVersion: z.literal(3),
+		schemaVersion: z.literal(4),
 		revision: z.string().regex(/^[a-f0-9]{64}$/i),
 		generatedAt: boundedText(64).refine(isIsoDateTime, "Expected an ISO 8601 generatedAt value"),
 		projects: projectsSchema,
@@ -284,13 +313,14 @@ export const siteSnapshotSchema = z
 		announcements: announcementsSchema,
 		techRadar: techRadarItemsSchema,
 		learningResources: learningResourceItemsSchema,
+		diary: diaryItemsSchema,
 		mediaManifest: z.array(mediaObjectSchema).max(SYNC_LIMITS.maxFiles),
 	})
 	.passthrough()
 	.superRefine((value, ctx) => {
 		for (const deprecated of ["devices", "anime"]) {
 			if (Object.prototype.hasOwnProperty.call(value, deprecated)) {
-				ctx.addIssue({ code: "custom", path: [deprecated], message: `${deprecated} is not part of schemaVersion 3` });
+				ctx.addIssue({ code: "custom", path: [deprecated], message: `${deprecated} is not part of schemaVersion 4` });
 			}
 		}
 	});
@@ -325,8 +355,14 @@ export const generatedLearningResourceSchema = learningResourceSchema
 		relatedPost: relatedPostSchema.nullable(),
 	})
 	.strict();
+const generatedDiaryMediaRefSchema = diaryMediaRefSchema.extend({ src: localMediaPath }).strict();
+export const generatedDiarySchema = diarySchema.extend({
+	images: z.array(generatedDiaryMediaRefSchema).max(500),
+	coverImage: generatedDiaryMediaRefSchema.nullable(),
+}).strict();
 export const generatedTechRadarItemsSchema = z.array(generatedTechRadarSchema).max(500);
 export const generatedLearningResourceItemsSchema = z.array(generatedLearningResourceSchema).max(500);
+export const generatedDiaryItemsSchema = z.array(generatedDiarySchema).max(500);
 
 export const mirroredMediaSchema = z
 	.object({
@@ -343,7 +379,7 @@ export const mirroredMediaSchema = z
 
 export const snapshotMetaSchema = z
 	.object({
-		schemaVersion: z.literal(3),
+		schemaVersion: z.literal(4),
 		revision: z.string().regex(/^[a-f0-9]{64}$/i),
 		generatedAt: boundedText(64).refine(isIsoDateTime),
 		syncedAt: boundedText(64).refine(isIsoDateTime),
@@ -357,8 +393,9 @@ export const snapshotMetaSchema = z
 				timeline: z.number().int().min(0),
 				friends: z.number().int().min(0),
 				announcements: z.number().int().min(0),
-				techRadar: z.number().int().min(0),
-				learningResources: z.number().int().min(0),
+			techRadar: z.number().int().min(0),
+			learningResources: z.number().int().min(0),
+			diary: z.number().int().min(0),
 				media: z.number().int().min(0),
 			})
 			.strict(),
@@ -390,6 +427,7 @@ export function parseGeneratedBundle(value) {
 		announcements: announcementsSchema.parse(value.announcements),
 		techRadar: generatedTechRadarItemsSchema.parse(value.techRadar),
 		learningResources: generatedLearningResourceItemsSchema.parse(value.learningResources),
+		diary: generatedDiaryItemsSchema.parse(value.diary),
 	};
 	const { counts } = bundle.meta;
 	for (const [name, items] of Object.entries({
@@ -401,6 +439,7 @@ export function parseGeneratedBundle(value) {
 		announcements: bundle.announcements,
 		techRadar: bundle.techRadar,
 		learningResources: bundle.learningResources,
+		diary: bundle.diary,
 	})) {
 		if (counts[name] !== items.length) throw new Error(`Generated WordPress ${name} count does not match snapshot metadata`);
 	}

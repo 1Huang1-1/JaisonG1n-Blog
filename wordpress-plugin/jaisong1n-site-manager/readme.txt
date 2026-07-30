@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -25,10 +25,10 @@ Deactivation retains all data. Normal uninstall removes plugin-added role capabi
 
 == Changelog ==
 
-= 0.3.0 =
+= 0.4.0 =
 
-* Adds the Tech Radar and Learning Resources headless content types and schemaVersion 3 snapshot collections.
-* Keeps legacy device and anime records hidden and intact; they are not migrated or exposed in the v3 snapshot.
+* Adds WordPress diary synchronization, article-style diary pages, and schemaVersion 4 snapshot collections.
+* Keeps legacy device and anime records hidden and intact; they are not migrated or exposed in the v4 snapshot.
 * Adds structured related post IDs, source links, dates, progress and rating fields for the new content types.
 
 = 0.2.4 =

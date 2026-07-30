@@ -1,0 +1,105 @@
+---
+import { Icon } from "astro-icon/components";
+import StructuredHtmlContent from "../../components/misc/StructuredHtmlContent.astro";
+import { siteConfig } from "../../config";
+import type { DiaryItem } from "../../data/diary";
+import { sortDiary } from "../../data/diary";
+import { loadStructuredContent } from "../../data/structured-content";
+import I18nKey from "../../i18n/i18nKey";
+import { i18n } from "../../i18n/translation";
+import ContentDetailLayout from "../../layouts/ContentDetailLayout.astro";
+import {
+	assertUniqueStructuredSlugs,
+	getStructuredDetailHref,
+	prepareStructuredHtml,
+} from "../../utils/structured-detail";
+
+if (!siteConfig.featurePages.diary) return Astro.redirect("/404/");
+
+const moodLabels: Record<string, I18nKey> = {
+	happy: I18nKey.diaryMoodHappy,
+	calm: I18nKey.diaryMoodCalm,
+	fulfilled: I18nKey.diaryMoodFulfilled,
+	excited: I18nKey.diaryMoodExcited,
+	thinking: I18nKey.diaryMoodThinking,
+	tired: I18nKey.diaryMoodTired,
+	anxious: I18nKey.diaryMoodAnxious,
+	sad: I18nKey.diaryMoodSad,
+	other: I18nKey.diaryMoodOther,
+};
+
+export function getStaticPaths() {
+	const items = sortDiary(loadStructuredContent().diary as DiaryItem[]);
+	const bySlug = assertUniqueStructuredSlugs(items, "diary");
+	return [...bySlug.entries()].map(([slug, item], index) => ({
+		params: { slug },
+		props: {
+			item,
+			previous: items[index + 1] ?? null,
+			next: items[index - 1] ?? null,
+		},
+	}));
+}
+
+const { item, previous, next } = Astro.props as {
+	item: DiaryItem;
+	previous: DiaryItem | null;
+	next: DiaryItem | null;
+};
+const displayTitle =
+	item.title.trim() || `${i18n(I18nKey.diaryUntitled)} · ${item.date}`;
+const detailHref = getStructuredDetailHref("diary", item.id);
+const canonicalUrl = new URL(detailHref, Astro.site).toString();
+const prepared = prepareStructuredHtml(item.contentHtml);
+const dateLabel = new Date(`${item.date}T00:00:00Z`).toLocaleDateString(
+	"zh-CN",
+	{ year: "numeric", month: "long", day: "numeric" },
+);
+const moodLabel = item.mood
+	? i18n(moodLabels[item.mood] ?? I18nKey.diaryMoodOther)
+	: "";
+const galleryImages = item.images.filter(
+	(image) => !prepared.html.includes(`src="${image.url}"`),
+);
+---
+
+<ContentDetailLayout
+	title={displayTitle}
+	description={item.description}
+	canonicalUrl={canonicalUrl}
+	sectionLabel={i18n(I18nKey.diary)}
+	sectionHref="/diary/"
+	backLabel={i18n(I18nKey.diaryBackToList)}
+	headings={prepared.headings}
+	cover={item.coverImage?.url || undefined}
+	coverAlt={item.coverImage?.alt || displayTitle}
+>
+	<div slot="meta" class="flex flex-wrap items-center gap-3 text-sm text-black/65 dark:text-white/65">
+		<span class="inline-flex items-center gap-1.5"><Icon name="material-symbols:calendar-month" class="h-4 w-4 text-(--primary)" /><time datetime={item.date}>{dateLabel}</time></span>
+		{moodLabel && <span class="inline-flex items-center gap-1.5"><Icon name="material-symbols:sentiment-satisfied" class="h-4 w-4 text-(--primary)" />{moodLabel}</span>}
+		{item.location && <span class="inline-flex items-center gap-1.5"><Icon name="material-symbols:location-on" class="h-4 w-4 text-(--primary)" />{item.location}</span>}
+		{item.tags.length > 0 && <span class="flex flex-wrap items-center gap-2"><Icon name="material-symbols:tag" class="h-4 w-4 text-(--primary)" />{item.tags.map((tag) => <span class="rounded-md bg-(--btn-regular-bg) px-2.5 py-1">{tag}</span>)}</span>}
+	</div>
+
+	{prepared.html ? <StructuredHtmlContent html={prepared.html} /> : <p class="text-black/55 dark:text-white/55">{item.description}</p>}
+
+	{galleryImages.length > 0 && (
+		<section class="mt-8" aria-labelledby="diary-gallery-title">
+			<h2 id="diary-gallery-title" class="mb-4 text-xl font-semibold text-black/85 dark:text-white/85">{i18n(I18nKey.diaryImage)}</h2>
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+				{galleryImages.map((image, index) => (
+					<a href={image.url} data-fancybox={`diary-gallery-${item.id}`} data-caption={image.alt || displayTitle} class="block overflow-hidden rounded-xl focus-visible:outline-2 focus-visible:outline-(--primary)">
+						<img src={image.url} alt={image.alt || `${displayTitle} ${i18n(I18nKey.diaryImage)} ${index + 1}`} width={image.width} height={image.height} loading="lazy" decoding="async" class="aspect-video h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02]" />
+					</a>
+				))}
+			</div>
+		</section>
+	)}
+
+	{(previous || next) && (
+		<nav class="mt-10 grid gap-3 border-t border-black/10 pt-6 dark:border-white/10 sm:grid-cols-2" aria-label="Diary navigation">
+			{previous ? <a href={getStructuredDetailHref("diary", previous.id)} class="btn-regular flex min-w-0 flex-col items-start gap-1 p-3 text-left focus-visible:outline-2 focus-visible:outline-(--primary)"><span class="text-xs text-black/50 dark:text-white/50">{i18n(I18nKey.diaryPrevious)}</span><strong class="w-full truncate">{previous.title.trim() || `${i18n(I18nKey.diaryUntitled)} · ${previous.date}`}</strong><time class="text-xs text-black/50 dark:text-white/50" datetime={previous.date}>{previous.date}</time></a> : <span />}
+			{next ? <a href={getStructuredDetailHref("diary", next.id)} class="btn-regular flex min-w-0 flex-col items-end gap-1 p-3 text-right focus-visible:outline-2 focus-visible:outline-(--primary)"><span class="text-xs text-black/50 dark:text-white/50">{i18n(I18nKey.diaryNext)}</span><strong class="w-full truncate">{next.title.trim() || `${i18n(I18nKey.diaryUntitled)} · ${next.date}`}</strong><time class="text-xs text-black/50 dark:text-white/50" datetime={next.date}>{next.date}</time></a> : <span />}
+		</nav>
+	)}
+</ContentDetailLayout>

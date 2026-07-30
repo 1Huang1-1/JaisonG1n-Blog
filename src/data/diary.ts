@@ -1,49 +1,81 @@
-// 日记数据配置
-// 用于管理日记页面的数据
-
-export interface DiaryItem {
-	id: number;
-	content: string;
-	date: string;
-	images?: string[];
-	location?: string;
-	mood?: string;
-	tags?: string[];
+export interface DiaryImage {
+	url: string;
+	alt: string;
+	width: number;
+	height: number;
 }
 
-// 示例日记数据
+export interface DiaryItem {
+	id: string;
+	title: string;
+	description: string;
+	contentHtml: string;
+	date: string;
+	publishedAt: string;
+	updatedAt: string;
+	location: string;
+	mood:
+		| ""
+		| "happy"
+		| "calm"
+		| "fulfilled"
+		| "excited"
+		| "thinking"
+		| "tired"
+		| "anxious"
+		| "sad"
+		| "other";
+	tags: string[];
+	images: DiaryImage[];
+	coverImage: DiaryImage | null;
+	featured: boolean;
+}
+
 const diaryData: DiaryItem[] = [
 	{
-		id: 1,
-		content:
+		id: "legacy-diary-2025-01-15",
+		title: "",
+		description:
 			"The falling speed of cherry blossoms is five centimeters per second!",
-		date: "2025-01-15T10:30:00Z",
-		images: ["/images/diary/sakura.jpg", "/images/diary/1.webp"],
+		contentHtml:
+			"<p>The falling speed of cherry blossoms is five centimeters per second!</p>",
+		date: "2025-01-15",
+		publishedAt: "2025-01-15T10:30:00.000Z",
+		updatedAt: "2025-01-15T10:30:00.000Z",
+		location: "",
+		mood: "",
+		tags: [],
+		images: [
+			{ url: "/images/diary/sakura.jpg", alt: "", width: 1200, height: 800 },
+			{ url: "/images/diary/1.webp", alt: "", width: 1200, height: 800 },
+		],
+		coverImage: {
+			url: "/images/diary/sakura.jpg",
+			alt: "",
+			width: 1200,
+			height: 800,
+		},
+		featured: false,
 	},
 ];
 
-// 获取日记列表（按时间倒序）
-export const getDiaryList = (limit?: number) => {
-	const sortedData = [...diaryData].sort(
-		(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-	);
+export function sortDiary(items: DiaryItem[]): DiaryItem[] {
+	return [...items].sort((a, b) => {
+		const dateOrder = b.date.localeCompare(a.date);
+		if (dateOrder !== 0) return dateOrder;
+		const publishedOrder = b.publishedAt.localeCompare(a.publishedAt);
+		if (publishedOrder !== 0) return publishedOrder;
+		return a.id.localeCompare(b.id);
+	});
+}
 
-	if (limit && limit > 0) {
-		return sortedData.slice(0, limit);
-	}
-
-	return sortedData;
+export const getDiaryList = (limit?: number): DiaryItem[] => {
+	const sorted = sortDiary(diaryData);
+	return limit && limit > 0 ? sorted.slice(0, limit) : sorted;
 };
 
-// 获取所有标签
-export const getAllTags = () => {
+export const getAllTags = (): string[] => {
 	const tags = new Set<string>();
-	for (const item of diaryData) {
-		if (item.tags) {
-			for (const tag of item.tags) {
-				tags.add(tag);
-			}
-		}
-	}
+	for (const item of diaryData) for (const tag of item.tags) tags.add(tag);
 	return Array.from(tags).sort();
 };

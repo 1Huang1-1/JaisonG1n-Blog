@@ -65,9 +65,6 @@ export const siteConfig: SiteConfig = {
 		// 安全提示：如 SESSDATA 已泄露，请打开 B站手机端 —— 我的 —— 设置 —— 安全隐私 —— 登陆设备管理 —— 一键退登，销毁已泄露的账号凭证
 	},
 
-	// 日记页面 Memos API 地址，留空则使用静态数据
-	diaryApiUrl: "",
-
 	// 文章列表布局配置
 	postListLayout: {
 		// 默认布局模式："list" 列表模式（单列布局），"grid" 网格模式（双列布局）

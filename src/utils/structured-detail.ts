@@ -1,7 +1,7 @@
 import type { MarkdownHeading } from "astro";
 import { parse } from "node-html-parser";
 
-export type StructuredDetailCollection = "projects" | "timeline";
+export type StructuredDetailCollection = "projects" | "timeline" | "diary";
 
 export interface PreparedStructuredHtml {
 	html: string;

@@ -233,7 +233,7 @@ jg_smoke_assert(
 	$first_response->get_status() === 200,
 	'Snapshot did not return HTTP 200: status=' . $first_response->get_status() . ' data=' . wp_json_encode($first_data)
 );
-jg_smoke_assert(($first_data['schemaVersion'] ?? null) === 3, 'Unexpected snapshot schema version.');
+jg_smoke_assert(($first_data['schemaVersion'] ?? null) === 4, 'Unexpected snapshot schema version.');
 jg_smoke_assert(count($first_data['projects'] ?? array()) === 3, 'Draft filtering or project count is incorrect.');
 foreach (array('skills', 'aiTools', 'timeline', 'techRadar', 'learningResources', 'diary', 'albums') as $collection) {
 	jg_smoke_assert(count($first_data[$collection] ?? array()) === 1, 'Draft filtering failed for ' . $collection . '.');

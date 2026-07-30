@@ -13,11 +13,15 @@ const post = {
 	title: { rendered: "Local build post" },
 	excerpt: { rendered: "Local build fixture" },
 	content: { rendered: "<p>Local build fixture.</p>" },
-	_embedded: { author: [{ name: "JaisonG1n" }], "wp:term": [], "wp:featuredmedia": [] },
+	_embedded: {
+		author: [{ name: "JaisonG1n" }],
+		"wp:term": [],
+		"wp:featuredmedia": [],
+	},
 };
 
 const snapshot = {
-	schemaVersion: 3,
+	schemaVersion: 4,
 	revision: "b".repeat(64),
 	generatedAt: "2026-07-29T00:00:00.000Z",
 	projects: [],
@@ -28,13 +32,33 @@ const snapshot = {
 	announcements: [],
 	techRadar: [],
 	learningResources: [],
+	diary: [
+		{
+			id: "local-diary-entry",
+			title: "本地日记测试",
+			description: "用于 true 构建的日记夹具。",
+			contentHtml: "<h2>今天的记录</h2><p>本地 WordPress 日记正文。</p>",
+			date: "2026-07-29",
+			publishedAt: "2026-07-29T00:00:00.000Z",
+			updatedAt: "2026-07-29T00:00:00.000Z",
+			location: "本地夹具",
+			mood: "calm",
+			tags: ["fixture"],
+			images: [],
+			coverImage: null,
+			featured: true,
+		},
+	],
 	mediaManifest: [],
 };
 
 const server = http.createServer((request, response) => {
 	const url = new URL(request.url, "http://127.0.0.1");
 	const value = url.pathname.endsWith("/site-snapshot") ? snapshot : [post];
-	response.writeHead(200, { "content-type": "application/json", "x-wp-totalpages": "1" });
+	response.writeHead(200, {
+		"content-type": "application/json",
+		"x-wp-totalpages": "1",
+	});
 	response.end(JSON.stringify(value));
 });
 

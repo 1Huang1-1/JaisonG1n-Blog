@@ -57,16 +57,18 @@ test("custom content types use mapped, independent capabilities", async () => {
 	assert.doesNotMatch(source, /get_role\(['"]author/);
 });
 
-test("projects, timeline, radar and learning expose native excerpts", async () => {
+test("structured content types expose native excerpts", async () => {
 	const source = await readFile(
 		path.join(pluginRoot, "includes/class-jg-content-types.php"),
 		"utf8",
 	);
 	assert.match(
 		source,
-		/in_array\(\$post_type, array\('jg_project', 'jg_timeline', 'jg_tech_radar', 'jg_learning_resource'\), true\)/,
+		/in_array\(\$post_type, array\('jg_project', 'jg_timeline', 'jg_diary', 'jg_tech_radar', 'jg_learning_resource'\), true\)/,
 	);
 	assert.match(source, /\$supports\[\] = 'excerpt'/);
+	assert.match(source, /'jg_diary' => array\([^\n]*'thumbnail' => true/);
+	assert.match(source, /'diary_date'\s*=>\s*self::date/);
 });
 
 test("structured summaries prefer post excerpts and keep full content", async () => {
@@ -84,16 +86,16 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.3.0 publishes schemaVersion 3 and deterministic ordering", async () => {
+test("version 0.4.0 publishes schemaVersion 4 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.3\.0/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.3\.0'/);
-	assert.match(readme, /Stable tag:\s*0\.3\.0/);
-	assert.match(snapshot, /'schemaVersion'\s*=>\s*3/);
+	assert.match(entry, /Version:\s*0\.4\.0/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.4\.0'/);
+	assert.match(readme, /Stable tag:\s*0\.4\.0/);
+	assert.match(snapshot, /'schemaVersion'\s*=>\s*4/);
 	assert.match(
 		snapshot,
 		/'orderby'\s*=>\s*array\('menu_order'\s*=>\s*'ASC',\s*'date'\s*=>\s*'DESC',\s*'ID'\s*=>\s*'ASC'\)/,
@@ -106,13 +108,16 @@ test("only announcement links opt into validated root-relative paths", async () 
 		"utf8",
 	);
 	assert.match(source, /'link_url'\s*=>\s*self::announcement_url/);
-	assert.match(source, /case 'announcement_url': return self::sanitize_announcement_url/);
+	assert.match(
+		source,
+		/case 'announcement_url': return self::sanitize_announcement_url/,
+	);
 	assert.match(source, /case 'url': return self::sanitize_http_url/);
 	assert.match(source, /str_starts_with\(\$decoded, '\/\/'\)/);
 	assert.match(source, /rawurldecode/);
 });
 
-test("schema v3 fields use structured repeaters and normalized media", async () => {
+test("schema v4 fields use structured repeaters and normalized media", async () => {
 	const [types, snapshot, admin] = await Promise.all([
 		readFile(
 			path.join(pluginRoot, "includes/class-jg-content-types.php"),

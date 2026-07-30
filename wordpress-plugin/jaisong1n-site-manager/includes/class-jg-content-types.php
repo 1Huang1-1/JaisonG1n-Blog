@@ -17,7 +17,7 @@ final class JG_Content_Types {
 			'jg_timeline' => array('single' => '时间线', 'plural' => '时间线', 'icon' => 'dashicons-backup', 'thumbnail' => false),
 			'jg_friend' => array('single' => '友链', 'plural' => '友链', 'icon' => 'dashicons-admin-links', 'thumbnail' => true),
 			'jg_device' => array('single' => '设备', 'plural' => '设备', 'icon' => 'dashicons-smartphone', 'thumbnail' => true, 'deprecated' => true),
-			'jg_diary' => array('single' => '日记', 'plural' => '日记', 'icon' => 'dashicons-edit-page', 'thumbnail' => false),
+			'jg_diary' => array('single' => '日记', 'plural' => '日记', 'icon' => 'dashicons-edit-page', 'thumbnail' => true),
 			'jg_album' => array('single' => '相册', 'plural' => '相册', 'icon' => 'dashicons-format-gallery', 'thumbnail' => true),
 			'jg_anime' => array('single' => '追番', 'plural' => '追番', 'icon' => 'dashicons-video-alt3', 'thumbnail' => true, 'deprecated' => true),
 			'jg_announcement' => array('single' => '公告', 'plural' => '公告', 'icon' => 'dashicons-megaphone', 'thumbnail' => false),
@@ -80,9 +80,11 @@ final class JG_Content_Types {
 			),
 			'jg_diary' => array(
 				'images' => self::media_repeater('日记图片'),
+				'diary_date' => self::date('日记日期'),
 				'location' => self::text('地点'),
-				'mood' => self::text('心情'),
+				'mood' => self::select('心情', array('' => '未指定', 'happy' => '开心', 'calm' => '平静', 'fulfilled' => '充实', 'excited' => '兴奋', 'thinking' => '思考', 'tired' => '疲惫', 'anxious' => '焦虑', 'sad' => '低落', 'other' => '其他')),
 				'tags' => self::text('标签（逗号分隔）'),
+				'featured' => self::checkbox('精选日记'),
 			),
 			'jg_album' => array(
 				'photos' => self::media_repeater('相册图片'),
@@ -145,6 +147,7 @@ final class JG_Content_Types {
 		add_action('add_meta_boxes', array(__CLASS__, 'add_meta_boxes'));
 		add_action('save_post', array(__CLASS__, 'save_fields'), 10, 2);
 		add_action('admin_enqueue_scripts', array(__CLASS__, 'enqueue_admin_assets'));
+		add_action('admin_init', array(__CLASS__, 'grant_capabilities'));
 		add_filter('wp_insert_post_data', array(__CLASS__, 'validate_classic_save'), 10, 4);
 		add_filter('post_row_actions', array(__CLASS__, 'remove_view_action'), 10, 2);
 		add_filter('get_sample_permalink_html', array(__CLASS__, 'hide_sample_permalink'), 10, 2);
@@ -159,7 +162,7 @@ final class JG_Content_Types {
 		foreach (self::definitions() as $post_type => $definition) {
 			$plural_capability = $post_type . 's';
 			$supports = array('title', 'editor', 'revisions', 'custom-fields');
-			if (in_array($post_type, array('jg_project', 'jg_timeline', 'jg_tech_radar', 'jg_learning_resource'), true)) {
+			if (in_array($post_type, array('jg_project', 'jg_timeline', 'jg_diary', 'jg_tech_radar', 'jg_learning_resource'), true)) {
 				$supports[] = 'excerpt';
 			}
 			if ($definition['thumbnail']) {
