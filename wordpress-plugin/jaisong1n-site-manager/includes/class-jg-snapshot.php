@@ -582,13 +582,53 @@ final class JG_Snapshot {
 			$this->remember_media_error(new WP_Error('jg_media_protocol', '媒体 URL 必须使用 HTTPS。', array('status' => 409)));
 			return;
 		}
-		$attachment_id = attachment_url_to_postid($url);
+		$attachment_id = $this->attachment_id_from_url($url);
 		if (!$attachment_id) {
 			$this->remember_media_error(new WP_Error('jg_media_attachment_missing', '媒体 URL 不是有效的 WordPress 附件：' . $url, array('status' => 409)));
 			return;
 		}
 		$media = $this->media_object((int) $attachment_id);
 		if (is_wp_error($media)) $this->remember_media_error($media);
+	}
+
+	private function attachment_id_from_url(string $url): int {
+		$attachment_id = absint(attachment_url_to_postid($url));
+		if ($attachment_id) return $attachment_id;
+
+		$uploads = wp_upload_dir();
+		$base_url = untrailingslashit((string) ($uploads['baseurl'] ?? ''));
+		$url_host = strtolower((string) wp_parse_url($url, PHP_URL_HOST));
+		$base_host = strtolower((string) wp_parse_url($base_url, PHP_URL_HOST));
+		$url_path = (string) wp_parse_url($url, PHP_URL_PATH);
+		$base_path = untrailingslashit((string) wp_parse_url($base_url, PHP_URL_PATH));
+		if ($base_url === '' || $url_host === '' || $url_host !== $base_host || $base_path === '' || !str_starts_with($url_path, $base_path . '/')) {
+			return 0;
+		}
+
+		$relative = ltrim(rawurldecode(substr($url_path, strlen($base_path))), '/');
+		if (!preg_match('/^(.*)-\\d+x\\d+(\\.[A-Za-z0-9]+)$/', $relative, $matches)) {
+			return 0;
+		}
+		$original_relative = $matches[1] . $matches[2];
+		$attachments = get_posts(array(
+			'post_type' => 'attachment',
+			'post_status' => 'inherit',
+			'posts_per_page' => 1,
+			'fields' => 'ids',
+			'meta_key' => '_wp_attached_file',
+			'meta_value' => $original_relative,
+		));
+		$attachment_id = absint($attachments[0] ?? 0);
+		if (!$attachment_id) return 0;
+
+		$metadata = wp_get_attachment_metadata($attachment_id);
+		$derived_file = wp_basename($relative);
+		foreach ((array) ($metadata['sizes'] ?? array()) as $size) {
+			if (is_array($size) && (string) ($size['file'] ?? '') === $derived_file) {
+				return $attachment_id;
+			}
+		}
+		return 0;
 	}
 
 	private function media_object(int $attachment_id) {

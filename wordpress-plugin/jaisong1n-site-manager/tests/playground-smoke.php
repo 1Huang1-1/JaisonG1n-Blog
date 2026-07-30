@@ -49,6 +49,19 @@ function jg_create_image_attachment(): int {
 	return (int) $attachment_id;
 }
 
+function jg_create_intermediate_image_url(int $attachment_id): string {
+	$upload = wp_upload_dir(null, true, true);
+	$original_file = get_attached_file($attachment_id);
+	jg_smoke_assert(is_string($original_file) && is_file($original_file), 'Could not find original image fixture.');
+	$derived_name = 'jg-schema-v3-1024x567.png';
+	$derived_file = trailingslashit($upload['path']) . $derived_name;
+	jg_smoke_assert(copy($original_file, $derived_file), 'Could not create intermediate media fixture.');
+	$metadata = wp_get_attachment_metadata($attachment_id);
+	$metadata['sizes']['fixture-medium'] = array('file' => $derived_name, 'width' => 1024, 'height' => 567);
+	wp_update_attachment_metadata($attachment_id, $metadata);
+	return trailingslashit($upload['url']) . $derived_name;
+}
+
 jg_smoke_assert(class_exists('JG_Site_Manager'), 'The plugin was not activated.');
 wp_set_current_user(1);
 
@@ -110,6 +123,8 @@ jg_smoke_assert(($legacy_links[0]['type'] ?? '') === 'website', 'Legacy timeline
 jg_smoke_assert($legacy_media === array(array('mediaId' => 9), array('mediaId' => 10)), 'Legacy media IDs were not converted or deduplicated.');
 
 $media_id = jg_create_image_attachment();
+$intermediate_media_url = jg_create_intermediate_image_url($media_id);
+jg_smoke_assert(attachment_url_to_postid($intermediate_media_url) === 0, 'Intermediate media fixture unexpectedly resolved directly.');
 $rich = '<p>Hello&nbsp; <strong>&amp; world</strong></p><script>bad()</script>';
 
 $project_first = jg_create_item('jg_project', 'project-first', $rich, -1);
@@ -156,7 +171,7 @@ update_post_meta($device_id, '_jg_category', 'Router');
 update_post_meta($device_id, '_jg_specs', array(array('label' => '内存', 'value' => '16 GB'), array('label' => '存储', 'value' => '1 TB')));
 update_post_meta($device_id, '_jg_link', 'https://example.com/device');
 
-$diary_id = jg_create_item('jg_diary', 'diary-one', $rich);
+$diary_id = jg_create_item('jg_diary', 'diary-one', $rich . '<p><img src="' . esc_url($intermediate_media_url) . '" alt="Intermediate fixture"></p>');
 update_post_meta($diary_id, '_jg_images', array(array('mediaId' => $media_id)));
 update_post_meta($diary_id, '_jg_location', 'Shanghai');
 
@@ -251,6 +266,7 @@ jg_smoke_assert(($first_data['projects'][0]['imageMedia']['mimeType'] ?? '') ===
 jg_smoke_assert(($first_data['aiTools'][0]['description']['zh_CN'] ?? '') === 'AI description', 'AI description is not a zh_CN LocaleString.');
 jg_smoke_assert(($first_data['timeline'][0]['links'][0]['type'] ?? '') === 'website', 'Timeline links are not structured.');
 jg_smoke_assert(($first_data['diary'][0]['images'][0]['mediaId'] ?? 0) === $media_id, 'Diary MediaRef is invalid.');
+jg_smoke_assert(str_contains($first_data['diary'][0]['contentHtml'] ?? '', $intermediate_media_url), 'WordPress intermediate image URL was not preserved in diary content.');
 jg_smoke_assert(($first_data['albums'][0]['photos'][0]['src'] ?? '') === wp_get_attachment_url($media_id), 'Album MediaRef is invalid.');
 jg_smoke_assert(!str_contains($first_data['timeline'][0]['contentHtml'], 'bad()'), 'Timeline contentHtml was not sanitized.');
 jg_smoke_assert(!str_contains($first_data['diary'][0]['contentHtml'], 'bad()'), 'Diary contentHtml was not sanitized.');

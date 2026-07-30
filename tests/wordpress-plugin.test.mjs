@@ -86,15 +86,15 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.4.0 publishes schemaVersion 4 and deterministic ordering", async () => {
+test("version 0.4.1 publishes schemaVersion 4 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.4\.0/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.4\.0'/);
-	assert.match(readme, /Stable tag:\s*0\.4\.0/);
+	assert.match(entry, /Version:\s*0\.4\.1/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.4\.1'/);
+	assert.match(readme, /Stable tag:\s*0\.4\.1/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*4/);
 	assert.match(
 		snapshot,

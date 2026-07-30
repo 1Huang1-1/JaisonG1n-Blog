@@ -91,8 +91,8 @@ const galleryImages = item.images.filter((image) => {
 			<h2 id="diary-gallery-title" class="mb-4 text-xl font-semibold text-black/85 dark:text-white/85">{i18n(I18nKey.diaryImage)}</h2>
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 				{galleryImages.map((image, index) => (
-					<a href={getImageUrl(image)} data-fancybox={`diary-gallery-${item.id}`} data-caption={image.alt || displayTitle} class="block overflow-hidden rounded-xl focus-visible:outline-2 focus-visible:outline-(--primary)">
-						<img src={getImageUrl(image)} alt={image.alt || `${displayTitle} ${i18n(I18nKey.diaryImage)} ${index + 1}`} width={image.width} height={image.height} loading="lazy" decoding="async" class="aspect-video h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02]" />
+					<a href={getImageUrl(image)} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-xl focus-visible:outline-2 focus-visible:outline-(--primary)">
+						<img src={getImageUrl(image)} alt={image.alt || `${displayTitle} ${i18n(I18nKey.diaryImage)} ${index + 1}`} width={image.width} height={image.height} loading="lazy" decoding="async" class="h-auto w-full rounded-xl object-contain transition-transform duration-300 hover:scale-[1.02]" />
 					</a>
 				))}
 			</div>
