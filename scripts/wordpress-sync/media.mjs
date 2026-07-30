@@ -181,7 +181,7 @@ export class MediaMirror {
 		this.state = { totalBytes: 0, requestedFiles: 0 };
 	}
 
-	async #request(url) {
+	async #request(url, accept) {
 		let current = validateMediaUrl(url, this.allowedHost);
 		for (let redirects = 0; ; redirects += 1) {
 			if (redirects > this.limits.maxRedirects) throw new Error(`Media exceeded ${this.limits.maxRedirects} redirects`);
@@ -200,7 +200,7 @@ export class MediaMirror {
 				response = await this.requestImpl(current, {
 					dispatcher,
 					method: "GET",
-					headers: { Accept: ALLOWED_IMAGE_MIME_TYPES.join(", ") },
+					headers: { Accept: accept },
 					headersTimeout: this.limits.headersTimeoutMs,
 					bodyTimeout: this.limits.bodyTimeoutMs,
 					maxRedirections: 0,
@@ -234,7 +234,11 @@ export class MediaMirror {
 		this.state.requestedFiles += 1;
 		if (this.state.requestedFiles > this.limits.maxFiles) throw new Error(`Media batch exceeds ${this.limits.maxFiles} files`);
 
-		const { response, dispatcher } = await this.#request(normalized);
+		const manifestMime = normalizedMime(manifest?.mimeType);
+		const accept = MIME_EXTENSION.has(manifestMime)
+			? manifestMime
+			: ALLOWED_IMAGE_MIME_TYPES.join(", ");
+		const { response, dispatcher } = await this.#request(normalized, accept);
 		let buffer;
 		try {
 			const contentLength = Number.parseInt(String(response.headers["content-length"] ?? ""), 10);

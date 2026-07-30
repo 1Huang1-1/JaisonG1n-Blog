@@ -43,6 +43,12 @@ const PNG = await sharp({
 	.png()
 	.toBuffer();
 
+const WEBP = await sharp({
+	create: { width: 2, height: 3, channels: 4, background: "#ff0000ff" },
+})
+	.webp()
+	.toBuffer();
+
 function project(overrides = {}) {
 	return {
 		id: "project-one",
@@ -549,6 +555,45 @@ test("manifest MIME must match while inline-only media needs response compatibil
 			"https://cms.example/inline.png",
 		);
 		assert.equal(inline.mimeType, "image/png");
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
+test("manifest media requests its declared MIME to prevent CDN format conversion", async () => {
+	const root = await mkdtemp(path.join(os.tmpdir(), "media-manifest-accept-"));
+	let receivedAccept = "";
+	try {
+		const mirror = new MediaMirror({
+			allowedHost: "cms.example",
+			outputDir: root,
+			resolver: async () => [{ address: "93.184.216.34", family: 4 }],
+			dispatcherFactory: async () => ({ close: async () => {} }),
+			requestImpl: async (_url, options) => {
+				receivedAccept = options.headers.Accept;
+				const isPngRequest = receivedAccept === "image/png";
+				const body = isPngRequest ? PNG : WEBP;
+				return {
+					statusCode: 200,
+					headers: {
+						"content-type": isPngRequest ? "image/png" : "image/webp",
+						"content-length": String(body.length),
+					},
+					body: responseBody(body),
+				};
+			},
+		});
+		const media = await mirror.mirror("https://cms.example/diary-image.png", {
+			manifest: {
+				id: 1,
+				mimeType: "image/png",
+				alt: "",
+				width: 2,
+				height: 3,
+			},
+		});
+		assert.equal(receivedAccept, "image/png");
+		assert.equal(media.mimeType, "image/png");
 	} finally {
 		await rm(root, { recursive: true, force: true });
 	}
