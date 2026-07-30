@@ -100,7 +100,7 @@ export const skillSchema = z
 		id: slug,
 		name: requiredText(500),
 		description: boundedText(20_000),
-		icon: boundedText(300),
+		icon: boundedText(300).default(""),
 		category: z.enum(["frontend", "backend", "database", "tools", "other"]),
 		level: z.enum(["beginner", "intermediate", "advanced", "expert"]),
 		experience: z
