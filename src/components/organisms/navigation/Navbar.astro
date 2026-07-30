@@ -22,14 +22,14 @@ const isHomePage = Astro.url.pathname === "/" || Astro.url.pathname === "";
 
 // featurePage URL -> config key mapping
 const featurePageUrlMap: Record<string, string> = {
-	"/anime/": "anime",
+	"/radar/": "radar",
+	"/learning/": "learning",
 	"/diary/": "diary",
 	"/friends/": "friends",
 	"/projects/": "projects",
 	"/skills/": "skills",
 	"/timeline/": "timeline",
 	"/albums/": "albums",
-	"/devices/": "devices",
 };
 
 function isFeaturePageDisabled(url: string): boolean {

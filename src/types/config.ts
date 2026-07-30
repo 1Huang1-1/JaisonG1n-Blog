@@ -33,14 +33,14 @@ export interface SiteConfig {
 
 	// 特色页面开关配置
 	featurePages: {
-		anime: boolean; // 番剧页面开关
+		radar: boolean;
+		learning: boolean;
 		diary: boolean; // 日记页面开关
 		friends: boolean; // 友链页面开关
 		projects: boolean; // 项目页面开关
 		skills: boolean; // 技能页面开关
 		timeline: boolean; // 时间线页面开关
 		albums: boolean; // 相册页面开关
-		devices: boolean; // 设备页面开关
 		aiTools: boolean; // AI 工具页面开关
 	};
 
@@ -82,11 +82,6 @@ export interface SiteConfig {
 		fetchOnDev?: boolean; // 是否在开发环境下获取 Bilibili 数据
 		coverMirror?: string; // 封面图片镜像源（可选，默认为空字符串）
 		useWebp?: boolean; // 是否使用WebP格式（默认 true）
-	};
-
-	// 添加番剧页面配置
-	anime?: {
-		mode?: "bangumi" | "local" | "bilibili"; // 番剧页面模式
 	};
 
 	// 日记页面 Memos API 地址，客户端 fetch 获取动态数据
@@ -194,13 +189,14 @@ export enum LinkPreset {
 	Archive = 1,
 	About = 2,
 	Friends = 3,
-	Anime = 4,
-	Diary = 5,
-	Albums = 6,
-	Projects = 7,
-	Skills = 8,
-	Timeline = 9,
-	AITools = 10,
+	Radar = 4,
+	Learning = 5,
+	Diary = 6,
+	Albums = 7,
+	Projects = 8,
+	Skills = 9,
+	Timeline = 10,
+	AITools = 11,
 }
 
 export interface NavBarLink {

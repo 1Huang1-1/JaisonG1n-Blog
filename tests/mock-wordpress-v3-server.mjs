@@ -1,0 +1,43 @@
+import http from "node:http";
+
+const post = {
+	id: 1,
+	status: "publish",
+	slug: "local-build-post",
+	date: "2026-07-29T00:00:00",
+	date_gmt: "2026-07-29T00:00:00",
+	modified: "2026-07-29T00:00:00",
+	modified_gmt: "2026-07-29T00:00:00",
+	sticky: false,
+	comment_status: "open",
+	title: { rendered: "Local build post" },
+	excerpt: { rendered: "Local build fixture" },
+	content: { rendered: "<p>Local build fixture.</p>" },
+	_embedded: { author: [{ name: "JaisonG1n" }], "wp:term": [], "wp:featuredmedia": [] },
+};
+
+const snapshot = {
+	schemaVersion: 3,
+	revision: "b".repeat(64),
+	generatedAt: "2026-07-29T00:00:00.000Z",
+	projects: [],
+	skills: [],
+	aiTools: [],
+	timeline: [],
+	friends: [],
+	announcements: [],
+	techRadar: [],
+	learningResources: [],
+	mediaManifest: [],
+};
+
+const server = http.createServer((request, response) => {
+	const url = new URL(request.url, "http://127.0.0.1");
+	const value = url.pathname.endsWith("/site-snapshot") ? snapshot : [post];
+	response.writeHead(200, { "content-type": "application/json", "x-wp-totalpages": "1" });
+	response.end(JSON.stringify(value));
+});
+
+server.listen(Number(process.env.MOCK_WP_PORT || 8787), "127.0.0.1", () => {
+	console.log(`mock wordpress listening on ${server.address().port}`);
+});

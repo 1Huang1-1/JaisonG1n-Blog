@@ -55,26 +55,8 @@ enum I18nKey {
 	friendsCopyLink = "friendsCopyLink",
 	friendsCopySuccess = "friendsCopySuccess",
 	friendsTags = "friendsTags",
-	anime = "anime",
 	diary = "diary",
 
-	// 番剧页面
-	animeTitle = "animeTitle",
-	animeSubtitle = "animeSubtitle",
-	animeStatusWatching = "animeStatusWatching",
-	animeStatusCompleted = "animeStatusCompleted",
-	animeStatusPlanned = "animeStatusPlanned",
-	animeStatusOnHold = "animeStatusOnHold",
-	animeStatusDropped = "animeStatusDropped",
-	animeFilterAll = "animeFilterAll",
-	animeYear = "animeYear",
-	animeStudio = "animeStudio",
-	animeEmpty = "animeEmpty",
-	animeEmptyBangumi = "animeEmptyBangumi",
-	animeEmptyBilibili = "animeEmptyBilibili",
-	animeEmptyLocal = "animeEmptyLocal",
-	animeConfigBilibili = "animeConfigBilibili",
-	animeConfigBangumi = "animeConfigBangumi",
 
 	// 短文页面
 	diarySubtitle = "diarySubtitle",
@@ -127,10 +109,17 @@ enum I18nKey {
 	albumsFilterAll = "albumsFilterAll",
 	albumsNoResults = "albumsNoResults",
 
-	// 设备页面
-	devices = "devices",
-	devicesSubtitle = "devicesSubtitle",
-	devicesViewDetails = "devicesViewDetails",
+	// 科技雷达与学习资料页面
+	radar = "radar",
+	learning = "learning",
+	radarSubtitle = "radarSubtitle",
+	learningSubtitle = "learningSubtitle",
+	radarEmpty = "radarEmpty",
+	learningEmpty = "learningEmpty",
+	filterDomain = "filterDomain",
+	filterStage = "filterStage",
+	filterType = "filterType",
+	filterStatus = "filterStatus",
 
 	// 项目展示页面
 	projects = "projects",

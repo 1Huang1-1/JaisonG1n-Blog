@@ -13,6 +13,7 @@ import {
 } from "./wordpress-sync/contracts.mjs";
 import { MediaMirror, rewriteStructuredMedia } from "./wordpress-sync/media.mjs";
 import { commitDirectoryTransaction } from "./wordpress-sync/transaction.mjs";
+import { resolvePostPath } from "./wordpress-sync/post-path.mjs";
 
 const DEFAULT_BASE_URL = "https://cms.jaisong1n.com";
 const DEFAULT_AUTHOR = "JaisonG1n";
@@ -272,6 +273,8 @@ async function readGeneratedBundle(generatedDir) {
 		timeline: await readJson("timeline.json"),
 		friends: await readJson("friends.json"),
 		announcements: await readJson("announcements.json"),
+		techRadar: await readJson("tech-radar.json"),
+		learningResources: await readJson("learning-resources.json"),
 	});
 }
 
@@ -283,26 +286,58 @@ export async function validateExistingGenerated(generatedDir, mediaDir) {
 	return bundle;
 }
 
-async function generateStructured({ snapshot, baseUrl, postsCount, generatedDir, mediaDir, mediaOptions }) {
+function enrichRelatedPost(value, posts, permalinkConfig) {
+	if (!value) return null;
+	const post = posts.find((candidate) => Number(candidate?.id) === Number(value.postId) && candidate?.status === "publish");
+	if (!post) return null;
+	const pathValue = resolvePostPath({
+		...post,
+		title: decodeHtml(post.title?.rendered),
+		alias: decodeSlug(post.slug),
+	}, permalinkConfig);
+	if (!pathValue) return null;
+	return {
+		postId: Number(post.id),
+		title: decodeHtml(post.title?.rendered) || `Post ${post.id}`,
+		slug: decodeSlug(post.slug),
+		path: pathValue,
+	};
+}
+
+function enrichStructuredRelations(rewritten, posts, permalinkConfig) {
+	return {
+		...rewritten,
+		techRadar: rewritten.techRadar.map((item) => ({ ...item, relatedPost: enrichRelatedPost(item.relatedPost, posts, permalinkConfig) })),
+		learningResources: rewritten.learningResources.map((item) => ({ ...item, relatedPost: enrichRelatedPost(item.relatedPost, posts, permalinkConfig) })),
+	};
+}
+
+async function generateStructured({ snapshot, baseUrl, posts, generatedDir, mediaDir, mediaOptions, permalinkConfig }) {
 	await mkdir(generatedDir, { recursive: true });
 	await mkdir(mediaDir, { recursive: true });
 	const allowedHost = new URL(baseUrl).hostname;
 	const mirror = new MediaMirror({ allowedHost, outputDir: mediaDir, ...mediaOptions });
-	const rewritten = await rewriteStructuredMedia(snapshot, mirror, baseUrl);
+	const rewritten = enrichStructuredRelations(
+		await rewriteStructuredMedia(snapshot, mirror, baseUrl),
+		posts,
+		permalinkConfig,
+	);
 	const meta = {
-		schemaVersion: 2,
+		schemaVersion: 3,
 		revision: snapshot.revision,
 		generatedAt: snapshot.generatedAt,
 		syncedAt: new Date().toISOString(),
 		sourceUrl: baseUrl,
 		counts: {
-			posts: postsCount,
+			posts: posts.length,
 			projects: rewritten.projects.length,
 			skills: rewritten.skills.length,
 			aiTools: rewritten.aiTools.length,
 			timeline: rewritten.timeline.length,
 			friends: rewritten.friends.length,
 			announcements: rewritten.announcements.length,
+			techRadar: rewritten.techRadar.length,
+			learningResources: rewritten.learningResources.length,
 			media: mirror.getRecords().length,
 		},
 		media: mirror.getRecords(),
@@ -316,6 +351,8 @@ async function generateStructured({ snapshot, baseUrl, postsCount, generatedDir,
 		writeJson(path.join(generatedDir, "timeline.json"), bundle.timeline),
 		writeJson(path.join(generatedDir, "friends.json"), bundle.friends),
 		writeJson(path.join(generatedDir, "announcements.json"), bundle.announcements),
+		writeJson(path.join(generatedDir, "tech-radar.json"), bundle.techRadar),
+		writeJson(path.join(generatedDir, "learning-resources.json"), bundle.learningResources),
 	]);
 	return bundle;
 }
@@ -328,6 +365,7 @@ export async function syncWordPress({
 	fetchImpl = fetch,
 	logger = console,
 	mediaOptions = {},
+	permalinkConfig = { permalinkEnabled: false, permalinkFormat: "%postname%" },
 	afterReplace,
 } = {}) {
 	const sourceUrl = normalizeBaseUrl(baseUrl);
@@ -358,10 +396,11 @@ export async function syncWordPress({
 			structuredBundle = await generateStructured({
 				snapshot,
 				baseUrl: sourceUrl,
-				postsCount: files.length,
+				posts,
 				generatedDir: staged.generated,
 				mediaDir: staged.media,
 				mediaOptions,
+				permalinkConfig,
 			});
 		} catch (error) {
 			structuredError = error;
@@ -369,7 +408,7 @@ export async function syncWordPress({
 				try {
 					structuredBundle = await validateExistingGenerated(targets.generated, targets.media);
 					structuredStatus = "stale";
-					logger.warn(`STALE WORDPRESS STRUCTURED CONTENT: ${error.message}`);
+					(logger.warn ?? logger.info)(`STALE WORDPRESS STRUCTURED CONTENT: ${error.message}`);
 				} catch (staleError) {
 					throw new AggregateError([error, staleError], "Structured sync failed and no valid stale snapshot is available");
 				}
@@ -377,7 +416,7 @@ export async function syncWordPress({
 				throw error;
 			} else {
 				structuredStatus = "unavailable";
-				logger.warn(`WordPress structured sync skipped after warning: ${error.message}`);
+				(logger.warn ?? logger.info)(`WordPress structured sync skipped after warning: ${error.message}`);
 			}
 		}
 
@@ -394,7 +433,7 @@ export async function syncWordPress({
 		committed = true;
 		logger.info(`WordPress article sync complete: ${files.length} article(s)`);
 		if (structuredBundle) {
-			logger.info(`WordPress structured sync ${structuredStatus}: projects=${structuredBundle.projects.length}, skills=${structuredBundle.skills.length}, aiTools=${structuredBundle.aiTools.length}, timeline=${structuredBundle.timeline.length}, friends=${structuredBundle.friends.length}, announcements=${structuredBundle.announcements.length}`);
+			logger.info(`WordPress structured sync ${structuredStatus}: projects=${structuredBundle.projects.length}, skills=${structuredBundle.skills.length}, aiTools=${structuredBundle.aiTools.length}, timeline=${structuredBundle.timeline.length}, friends=${structuredBundle.friends.length}, announcements=${structuredBundle.announcements.length}, techRadar=${structuredBundle.techRadar.length}, learningResources=${structuredBundle.learningResources.length}`);
 		}
 		return {
 			count: files.length,

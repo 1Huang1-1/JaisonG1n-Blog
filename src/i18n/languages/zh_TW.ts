@@ -57,33 +57,18 @@ export const zh_TW: Translation = {
 	[Key.author]: "作者",
 	[Key.publishedAt]: "發布於",
 	[Key.license]: "許可協議",
-	[Key.anime]: "追番",
 	[Key.diary]: "日記",
 
-	// 設備頁面
-	[Key.devices]: "我的設備",
-	[Key.devicesSubtitle]: "這裡展示了我日常使用的各類設備",
-	[Key.devicesViewDetails]: "查看詳情",
-
-	// 番劇頁面
-	[Key.animeTitle]: "我的追番記錄",
-	[Key.animeSubtitle]: "記錄我的二次元之旅",
-	[Key.animeStatusWatching]: "在看",
-	[Key.animeStatusCompleted]: "看過",
-	[Key.animeStatusPlanned]: "想看",
-	[Key.animeStatusOnHold]: "擱置",
-	[Key.animeStatusDropped]: "拋棄",
-	[Key.animeFilterAll]: "全部",
-	[Key.animeYear]: "年份",
-	[Key.animeStudio]: "製作",
-	[Key.animeEmpty]: "暫無追番資料",
-	[Key.animeEmptyBangumi]: "請檢查 Bangumi 設定或網路連線",
-	[Key.animeEmptyBilibili]: "請檢查 Bilibili 設定或網路連線",
-	[Key.animeEmptyLocal]: "請在 src/data/anime.ts 檔案中新增番劇資訊",
-	[Key.animeConfigBilibili]:
-		"請在 src/config/siteConfig.ts 檔案中設定您的 Bilibili vmid",
-	[Key.animeConfigBangumi]:
-		"請在 src/config/siteConfig.ts 檔案中設定您的 Bangumi userId",
+	[Key.radar]: "科技雷達",
+	[Key.learning]: "學習資料庫",
+	[Key.radarSubtitle]: "記錄技術趨勢與個人採用判斷",
+	[Key.learningSubtitle]: "整理書籍、課程、論文與文件",
+	[Key.radarEmpty]: "暫無科技雷達記錄，新的技術觀察正在整理中。",
+	[Key.learningEmpty]: "暫無學習資料，新的學習計劃正在整理中。",
+	[Key.filterDomain]: "領域",
+	[Key.filterStage]: "階段",
+	[Key.filterType]: "類型",
+	[Key.filterStatus]: "狀態",
 
 	// 短文頁面
 	[Key.diarySubtitle]: "隨時隨地，分享生活",

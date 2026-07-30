@@ -18,7 +18,8 @@ import { profileConfig } from "./profileConfig";
  *     LinkPreset.Archive    → 归档
  *     LinkPreset.About      → 关于
  *     LinkPreset.Friends    → 友链
- *     LinkPreset.Anime      → 番剧
+ *     LinkPreset.Radar      → 科技雷达
+ *     LinkPreset.Learning   → 学习资料库
  *     LinkPreset.Diary      → 日记
  *     LinkPreset.Albums     → 相册
  *     LinkPreset.Projects   → 项目
@@ -152,9 +153,9 @@ export const navBarConfig: NavBarConfig = {
 			icon: "material-symbols:person",
 			children: [
 				{
-					name: "Anime",
-					url: "/anime/",
-					icon: "material-symbols:movie",
+					name: "Radar",
+					url: "/radar/",
+					icon: "material-symbols:radar",
 				},
 				{
 					name: "Diary",
@@ -167,9 +168,9 @@ export const navBarConfig: NavBarConfig = {
 					icon: "material-symbols:photo-library",
 				},
 				{
-					name: "Devices",
-					url: "/devices/",
-					icon: "material-symbols:devices",
+					name: "Learning",
+					url: "/learning/",
+					icon: "material-symbols:menu-book",
 					external: false, // 内部链接，当前页导航
 				},
 			],

@@ -57,31 +57,7 @@ export const en: Translation = {
 	[Key.author]: "Author",
 	[Key.publishedAt]: "Published at",
 	[Key.license]: "License",
-	[Key.anime]: "Anime",
 	[Key.diary]: "Diary",
-
-	// Anime Page
-	[Key.animeTitle]: "My Anime List",
-	[Key.animeSubtitle]: "Record my anime journey",
-	[Key.animeStatusWatching]: "Watching",
-	[Key.animeStatusCompleted]: "Completed",
-	[Key.animeStatusPlanned]: "Planned",
-	[Key.animeStatusOnHold]: "On Hold",
-	[Key.animeStatusDropped]: "Dropped",
-	[Key.animeFilterAll]: "All",
-	[Key.animeYear]: "Year",
-	[Key.animeStudio]: "Studio",
-	[Key.animeEmpty]: "No anime data available",
-	[Key.animeEmptyBangumi]:
-		"Please check Bangumi configuration or network connection",
-	[Key.animeEmptyBilibili]:
-		"Please check Bilibili configuration or network connection",
-	[Key.animeEmptyLocal]:
-		"Please add anime information in src/data/anime.ts file",
-	[Key.animeConfigBilibili]:
-		"Please set your Bilibili vmid in the src/config/siteConfig.ts file",
-	[Key.animeConfigBangumi]:
-		"Please set your Bangumi userId in the src/config/siteConfig.ts file",
 
 	// Diary Page
 	[Key.diarySubtitle]: "Share life, anytime, anywhere",
@@ -132,10 +108,16 @@ export const en: Translation = {
 		"No albums have been created yet. Go add some beautiful memories!",
 	[Key.albumsBackToList]: "Back to Albums",
 
-	// Devices Page
-	[Key.devices]: "My Devices",
-	[Key.devicesSubtitle]: "Here are the devices I use in my daily life",
-	[Key.devicesViewDetails]: "View Details",
+	[Key.radar]: "Tech Radar",
+	[Key.learning]: "Learning Resources",
+	[Key.radarSubtitle]: "Track technology trends and adoption decisions",
+	[Key.learningSubtitle]: "Curate books, courses, papers, and docs",
+	[Key.radarEmpty]: "No technology radar records yet.",
+	[Key.learningEmpty]: "No learning resources yet.",
+	[Key.filterDomain]: "Domain",
+	[Key.filterStage]: "Stage",
+	[Key.filterType]: "Type",
+	[Key.filterStatus]: "Status",
 	[Key.albumsPhotoCount]: "photo",
 	[Key.albumsPhotosCount]: "photos",
 	[Key.albumsFilterAll]: "All",

@@ -8,6 +8,8 @@ import { skillsData as legacySkills } from "./skills";
 import { timelineData as legacyTimeline } from "./timeline";
 import { friendsData as legacyFriends } from "./friends";
 import { announcementConfig as legacyAnnouncement } from "../config/announcementConfig";
+import { techRadarData as legacyTechRadar } from "./tech-radar";
+import { learningResourcesData as legacyLearningResources } from "./learning-resources";
 
 export interface StructuredContent {
 	source: "legacy" | "wordpress";
@@ -18,6 +20,8 @@ export interface StructuredContent {
 	timeline: GeneratedBundle["timeline"] | typeof legacyTimeline;
 	friends: GeneratedBundle["friends"] | typeof legacyFriends;
 	announcements: GeneratedBundle["announcements"] | typeof legacyAnnouncement[];
+	techRadar: GeneratedBundle["techRadar"] | typeof legacyTechRadar;
+	learningResources: GeneratedBundle["learningResources"] | typeof legacyLearningResources;
 }
 
 interface LoadOptions {
@@ -49,6 +53,8 @@ export function loadStructuredContent(
 			timeline: legacyTimeline,
 			friends: legacyFriends,
 			announcements: legacyAnnouncement.content ? [legacyAnnouncement] : [],
+			techRadar: legacyTechRadar,
+			learningResources: legacyLearningResources,
 		},
 		generatedDir: options?.generatedDir ?? defaultGeneratedDir,
 		readText:

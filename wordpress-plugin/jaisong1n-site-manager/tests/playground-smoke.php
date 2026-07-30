@@ -28,12 +28,12 @@ function jg_create_item(string $post_type, string $slug, string $content, int $m
 function jg_create_image_attachment(): int {
 	$upload = wp_upload_dir(null, true, true);
 	wp_mkdir_p($upload['path']);
-	$file = trailingslashit($upload['path']) . 'jg-schema-v2.png';
+	$file = trailingslashit($upload['path']) . 'jg-schema-v3.png';
 	$png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=', true);
 	jg_smoke_assert(is_string($png) && file_put_contents($file, $png) !== false, 'Could not create media fixture.');
 	$attachment_id = wp_insert_attachment(array(
 		'post_mime_type' => 'image/png',
-		'post_title' => 'Schema v2 image',
+		'post_title' => 'Schema v3 image',
 		'post_status' => 'inherit',
 		'guid' => trailingslashit($upload['url']) . 'jg-schema-v2.png',
 	), $file, 0, true);
@@ -75,7 +75,8 @@ foreach (array_keys(JG_Content_Types::definitions()) as $post_type) {
 	jg_smoke_assert($object instanceof WP_Post_Type, 'Missing post type ' . $post_type . '.');
 	jg_smoke_assert(!$object->publicly_queryable, $post_type . ' is publicly queryable.');
 	jg_smoke_assert($object->exclude_from_search, $post_type . ' is included in search.');
-	jg_smoke_assert(!$object->has_archive && $object->show_ui && $object->show_in_rest, $post_type . ' headless flags are incorrect.');
+	$expected_ui = in_array($post_type, array('jg_device', 'jg_anime'), true) ? false : true;
+	jg_smoke_assert(!$object->has_archive && $object->show_ui === $expected_ui && $object->show_in_rest, $post_type . ' headless flags are incorrect.');
 }
 
 $hosts = JG_Content_Policy::sanitize_host_list(array('cms.example.com', 'localhost', '127.0.0.1', '10.0.0.1', 'media.local'));
@@ -171,6 +172,33 @@ update_post_meta($anime_id, '_jg_rating', 8.5);
 update_post_meta($anime_id, '_jg_progress', 3);
 update_post_meta($anime_id, '_jg_total_episodes', 12);
 
+$related_post_id = jg_create_item('post', 'radar-related-post', 'Analysis article');
+$radar_id = jg_create_item('jg_tech_radar', 'radar-one', 'Radar description', -1);
+set_post_thumbnail($radar_id, $media_id);
+update_post_meta($radar_id, '_jg_icon', 'simple-icons:openai');
+update_post_meta($radar_id, '_jg_domain', 'ai');
+update_post_meta($radar_id, '_jg_stage', 'adopt');
+update_post_meta($radar_id, '_jg_trend', 'rising');
+update_post_meta($radar_id, '_jg_maturity', 80);
+update_post_meta($radar_id, '_jg_tags', 'AI,Infra');
+update_post_meta($radar_id, '_jg_official_url', 'https://example.com/ai');
+update_post_meta($radar_id, '_jg_source_urls', array(array('label' => 'Source', 'url' => 'https://example.com/source')));
+update_post_meta($radar_id, '_jg_first_observed_at', '2025-01-01');
+update_post_meta($radar_id, '_jg_last_reviewed_at', '2026-01-01');
+update_post_meta($radar_id, '_jg_related_post_id', $related_post_id);
+$learning_id = jg_create_item('jg_learning_resource', 'resource-one', 'Resource description');
+update_post_meta($learning_id, '_jg_icon', 'material-symbols:menu-book');
+update_post_meta($learning_id, '_jg_type', 'book');
+update_post_meta($learning_id, '_jg_status', 'learning');
+update_post_meta($learning_id, '_jg_author', 'Author');
+update_post_meta($learning_id, '_jg_published_year', 2026);
+update_post_meta($learning_id, '_jg_rating', 8.5);
+update_post_meta($learning_id, '_jg_progress', 3);
+update_post_meta($learning_id, '_jg_total_units', 10);
+update_post_meta($learning_id, '_jg_source_url', 'https://example.com/book');
+update_post_meta($learning_id, '_jg_started_at', '2026-01-01');
+update_post_meta($learning_id, '_jg_related_post_id', $related_post_id);
+
 $announcement_id = jg_create_item('jg_announcement', 'announcement-one', 'Announcement content');
 update_post_meta($announcement_id, '_jg_closable', true);
 update_post_meta($announcement_id, '_jg_link_enable', true);
@@ -205,9 +233,9 @@ jg_smoke_assert(
 	$first_response->get_status() === 200,
 	'Snapshot did not return HTTP 200: status=' . $first_response->get_status() . ' data=' . wp_json_encode($first_data)
 );
-jg_smoke_assert(($first_data['schemaVersion'] ?? null) === 2, 'Unexpected snapshot schema version.');
+jg_smoke_assert(($first_data['schemaVersion'] ?? null) === 3, 'Unexpected snapshot schema version.');
 jg_smoke_assert(count($first_data['projects'] ?? array()) === 3, 'Draft filtering or project count is incorrect.');
-foreach (array('skills', 'aiTools', 'timeline', 'devices', 'diary', 'albums', 'anime') as $collection) {
+foreach (array('skills', 'aiTools', 'timeline', 'techRadar', 'learningResources', 'diary', 'albums') as $collection) {
 	jg_smoke_assert(count($first_data[$collection] ?? array()) === 1, 'Draft filtering failed for ' . $collection . '.');
 }
 jg_smoke_assert(count($first_data['friends'] ?? array()) === 2, 'Friend fixtures were not published correctly.');
@@ -222,13 +250,14 @@ jg_smoke_assert(!str_contains($first_data['projects'][0]['contentHtml'], 'bad()'
 jg_smoke_assert(($first_data['projects'][0]['imageMedia']['mimeType'] ?? '') === 'image/png', 'Project media object is invalid.');
 jg_smoke_assert(($first_data['aiTools'][0]['description']['zh_CN'] ?? '') === 'AI description', 'AI description is not a zh_CN LocaleString.');
 jg_smoke_assert(($first_data['timeline'][0]['links'][0]['type'] ?? '') === 'website', 'Timeline links are not structured.');
-jg_smoke_assert(($first_data['devices'][0]['specs'][1]['value'] ?? '') === '1 TB', 'Device specs are not structured.');
 jg_smoke_assert(($first_data['diary'][0]['images'][0]['mediaId'] ?? 0) === $media_id, 'Diary MediaRef is invalid.');
 jg_smoke_assert(($first_data['albums'][0]['photos'][0]['src'] ?? '') === wp_get_attachment_url($media_id), 'Album MediaRef is invalid.');
 jg_smoke_assert(!str_contains($first_data['timeline'][0]['contentHtml'], 'bad()'), 'Timeline contentHtml was not sanitized.');
 jg_smoke_assert(!str_contains($first_data['diary'][0]['contentHtml'], 'bad()'), 'Diary contentHtml was not sanitized.');
 jg_smoke_assert(!str_contains($first_data['albums'][0]['contentHtml'], 'bad()'), 'Album contentHtml was not sanitized.');
-jg_smoke_assert(($first_data['anime'][0]['status'] ?? '') === 'onhold', 'Extended anime status was not preserved.');
+jg_smoke_assert(($first_data['techRadar'][0]['stage'] ?? '') === 'adopt', 'Tech Radar stage was not preserved.');
+jg_smoke_assert(($first_data['techRadar'][0]['relatedPost']['postId'] ?? 0) === $related_post_id, 'Tech Radar related post was not preserved.');
+jg_smoke_assert(($first_data['learningResources'][0]['type'] ?? '') === 'book', 'Learning resource type was not preserved.');
 jg_smoke_assert(($first_data['announcements'][0]['link']['enable'] ?? false) === true, 'Announcement link enable flag is missing.');
 jg_smoke_assert(($first_data['announcements'][0]['link']['url'] ?? '') === '/projects/?type=web#latest', 'Internal announcement link was not preserved.');
 jg_smoke_assert(($first_data['announcements'][1]['closable'] ?? true) === false, 'Non-closable announcement was not preserved.');

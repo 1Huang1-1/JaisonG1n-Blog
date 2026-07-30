@@ -45,7 +45,7 @@ final class JG_Settings {
 			'pio_enabled' => false,
 			'pio_model_url' => '',
 			'pio_position' => 'right',
-			'feature_pages' => array_fill_keys(array('anime', 'diary', 'friends', 'projects', 'skills', 'timeline', 'albums', 'devices', 'aiTools'), true),
+			'feature_pages' => array_fill_keys(array('radar', 'learning', 'diary', 'friends', 'projects', 'skills', 'timeline', 'albums', 'aiTools'), true),
 			'cleanup_on_uninstall' => false,
 		);
 	}

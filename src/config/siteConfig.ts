@@ -18,14 +18,14 @@ export const siteConfig: SiteConfig = {
 
 	// 特色页面开关配置（关闭未使用的页面有助于提升 SEO，关闭后请记得在 navbarConfig 中移除对应链接）
 	featurePages: {
-		anime: true, // 番剧页面开关
+		radar: true,
+		learning: true,
 		diary: true, // 日记页面开关
 		friends: true, // 友链页面开关
 		projects: true, // 项目页面开关
 		skills: true, // 技能页面开关
 		timeline: true, // 时间线页面开关
 		albums: true, // 相册页面开关
-		devices: true, // 设备页面开关
 		aiTools: true, // AI 工具页面开关
 	},
 
@@ -63,10 +63,6 @@ export const siteConfig: SiteConfig = {
 		// 2. 远程构建：请在 GitHub 仓库 Settings -> Secrets 中添加 BILI_SESSDATA
 		// 注意：SESSDATA 为账号凭证，为防止泄露，切记不可使用硬编码。
 		// 安全提示：如 SESSDATA 已泄露，请打开 B站手机端 —— 我的 —— 设置 —— 安全隐私 —— 登陆设备管理 —— 一键退登，销毁已泄露的账号凭证
-	},
-
-	anime: {
-		mode: "local", // 番剧页面模式："bangumi" 使用Bangumi API，"local" 使用本地配置，"bilibili" 使用Bilibili API
 	},
 
 	// 日记页面 Memos API 地址，留空则使用静态数据

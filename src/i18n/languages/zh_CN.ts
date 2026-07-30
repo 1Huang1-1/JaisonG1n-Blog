@@ -57,30 +57,8 @@ export const zh_CN: Translation = {
 	[Key.author]: "作者",
 	[Key.publishedAt]: "发布于",
 	[Key.license]: "许可协议",
-	[Key.anime]: "追番",
 	[Key.diary]: "日记",
 
-	// 番剧页面
-	[Key.animeTitle]: "我的追番记录",
-	[Key.animeSubtitle]: "记录我的二次元之旅",
-	[Key.animeStatusWatching]: "在看",
-	[Key.animeStatusCompleted]: "看过",
-	[Key.animeStatusPlanned]: "想看",
-	[Key.animeStatusOnHold]: "搁置",
-	[Key.animeStatusDropped]: "抛弃",
-	[Key.animeFilterAll]: "全部",
-	[Key.animeYear]: "年份",
-	[Key.animeStudio]: "制作",
-	[Key.animeEmpty]: "暂无追番数据",
-	[Key.animeEmptyBangumi]: "请检查 Bangumi 配置或网络连接",
-	[Key.animeEmptyBilibili]: "请检查 Bilibili 配置或网络连接",
-	[Key.animeEmptyLocal]: "请在 src/data/anime.ts 文件中添加番剧信息",
-	[Key.animeConfigBilibili]:
-		"请在 src/config/siteConfig.ts 文件中设置您的 Bilibili vmid",
-	[Key.animeConfigBangumi]:
-		"请在 src/config/siteConfig.ts 文件中设置您的 Bangumi userId",
-
-	// 短文页面
 	[Key.diarySubtitle]: "随时随地，分享生活",
 	[Key.diaryNoResults]: "没有匹配的日记",
 	[Key.diaryCount]: "条日记",
@@ -131,10 +109,16 @@ export const zh_CN: Translation = {
 	[Key.albumsFilterAll]: "全部",
 	[Key.albumsNoResults]: "没有匹配的相册",
 
-	// 设备页面
-	[Key.devices]: "我的设备",
-	[Key.devicesSubtitle]: "这里展示了我日常使用的各类设备",
-	[Key.devicesViewDetails]: "查看详情",
+	[Key.radar]: "科技雷达",
+	[Key.learning]: "学习资料库",
+	[Key.radarSubtitle]: "记录技术趋势与个人采用判断",
+	[Key.learningSubtitle]: "整理书籍、课程、论文与文档",
+	[Key.radarEmpty]: "暂无科技雷达记录，新的技术观察正在整理中。",
+	[Key.learningEmpty]: "暂无学习资料，新的学习计划正在整理中。",
+	[Key.filterDomain]: "领域",
+	[Key.filterStage]: "阶段",
+	[Key.filterType]: "类型",
+	[Key.filterStatus]: "状态",
 
 	// 项目展示页面
 	[Key.projects]: "项目展示",

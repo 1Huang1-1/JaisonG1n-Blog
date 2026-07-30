@@ -1,0 +1,15 @@
+---
+import { Icon } from "astro-icon/components";
+
+const { image = "", icon = "", fallback = "material-symbols:category", alt = "" } = Astro.props as {
+	image?: string;
+	icon?: string;
+	fallback?: string;
+	alt?: string;
+};
+---
+
+<div class="resource-icon relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-(--btn-regular-bg) text-(--primary)">
+	{image && <img src={image} alt={alt} loading="lazy" class="h-full w-full object-cover" onerror="this.remove(); this.parentElement?.querySelector('[data-resource-fallback]')?.classList.remove('hidden')" />}
+	<Icon name={icon || fallback} data-resource-fallback class:list={["h-9 w-9", { hidden: Boolean(image) }]} />
+</div>

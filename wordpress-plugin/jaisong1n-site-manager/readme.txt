@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.2.4
+Stable tag: 0.3.0
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -24,6 +24,12 @@ The plugin never stores GitHub tokens in WordPress. Define JG_GITHUB_TOKEN in wp
 Deactivation retains all data. Normal uninstall removes plugin-added role capabilities but retains content and settings. Destructive data cleanup runs only when an administrator explicitly enables it before uninstalling.
 
 == Changelog ==
+
+= 0.3.0 =
+
+* Adds the Tech Radar and Learning Resources headless content types and schemaVersion 3 snapshot collections.
+* Keeps legacy device and anime records hidden and intact; they are not migrated or exposed in the v3 snapshot.
+* Adds structured related post IDs, source links, dates, progress and rating fields for the new content types.
 
 = 0.2.4 =
 

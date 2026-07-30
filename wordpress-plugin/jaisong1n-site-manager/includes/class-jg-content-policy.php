@@ -37,6 +37,8 @@ final class JG_Content_Policy {
 		'og',
 		'posts',
 		'projects',
+		'learning',
+		'radar',
 		'robots.txt',
 		'rss',
 		'sitemap-index',
@@ -45,7 +47,7 @@ final class JG_Content_Policy {
 	);
 
 	public static function public_post_types(): array {
-		return array_merge(array('page'), array_keys(JG_Content_Types::definitions()));
+		return JG_Content_Types::public_post_types();
 	}
 
 	public static function is_reserved_slug(string $slug): bool {

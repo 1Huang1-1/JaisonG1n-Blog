@@ -25,7 +25,7 @@ final class JG_Snapshot {
 
 		$this->register_settings_media($settings);
 		$base = array(
-			'schemaVersion' => 2,
+			'schemaVersion' => 3,
 			'site' => $settings['site'],
 			'profile' => $settings['profile'],
 			'appearance' => $settings['appearance'],
@@ -37,10 +37,10 @@ final class JG_Snapshot {
 			'aiTools' => $this->collection('jg_ai_tool'),
 			'timeline' => $this->collection('jg_timeline'),
 			'friends' => $this->collection('jg_friend'),
-			'devices' => $this->collection('jg_device'),
+			'techRadar' => $this->collection('jg_tech_radar'),
 			'diary' => $this->collection('jg_diary'),
 			'albums' => $this->collection('jg_album'),
-			'anime' => $this->collection('jg_anime'),
+			'learningResources' => $this->collection('jg_learning_resource'),
 			'announcements' => $this->collection('jg_announcement', JG_Content_Policy::MAX_ANNOUNCEMENTS),
 			'security' => $settings['security'],
 		);
@@ -138,12 +138,14 @@ final class JG_Snapshot {
 		}
 		$result = array();
 		foreach ($posts as $post) {
-			$result[] = $this->map_item($post);
+			$mapped = $this->map_item($post);
+			if (is_wp_error($mapped)) return $mapped;
+			$result[] = $mapped;
 		}
 		return $result;
 	}
 
-	private function map_item(WP_Post $post): array {
+	private function map_item(WP_Post $post) {
 		$title = $this->title($post);
 		$content_html = $this->content_html($post->post_content, $post->ID);
 		$description = $this->summary($post->post_excerpt, $content_html, $post);
@@ -219,6 +221,67 @@ final class JG_Snapshot {
 					'desc' => $description,
 					'siteurl' => $this->meta($post, 'site_url'),
 					'tags' => $this->csv($this->meta($post, 'tags')),
+				);
+			case 'jg_tech_radar':
+				$first = $this->meta($post, 'first_observed_at');
+				$last = $this->meta($post, 'last_reviewed_at');
+				if ($first !== '' && $last !== '' && $last < $first) {
+					return new WP_Error('jg_radar_date_order', 'Tech Radar review date cannot precede first observed date.', array('status' => 409));
+				}
+				$featured = $this->featured_media($post->ID);
+				return array(
+					'id' => $post->post_name,
+					'title' => $title,
+					'description' => $description,
+					'contentHtml' => $content_html,
+					'icon' => $this->meta($post, 'icon'),
+					'image' => $featured['url'],
+					'imageMedia' => $featured['media'],
+					'domain' => $this->meta($post, 'domain'),
+					'stage' => $this->meta($post, 'stage'),
+					'trend' => $this->meta($post, 'trend'),
+					'maturity' => (int) $this->meta($post, 'maturity'),
+					'tags' => $this->csv($this->meta($post, 'tags')),
+					'officialUrl' => $this->meta($post, 'official_url'),
+					'sourceUrls' => $this->structured_meta($post, 'source_urls'),
+					'firstObservedAt' => $first,
+					'lastReviewedAt' => $last,
+					'relatedPost' => $this->related_post($post),
+					'featured' => $this->bool_meta($post, 'featured'),
+				);
+			case 'jg_learning_resource':
+				$started = $this->meta($post, 'started_at');
+				$completed = $this->meta($post, 'completed_at');
+				if ($started !== '' && $completed !== '' && $completed < $started) {
+					return new WP_Error('jg_learning_date_order', 'Learning completion date cannot precede start date.', array('status' => 409));
+				}
+				$progress = (int) $this->meta($post, 'progress');
+				$total_units = (int) $this->meta($post, 'total_units');
+				if ($total_units > 0 && $progress > $total_units) {
+					return new WP_Error('jg_learning_progress', 'Learning progress cannot exceed total units.', array('status' => 409));
+				}
+				$featured = $this->featured_media($post->ID);
+				return array(
+					'id' => $post->post_name,
+					'title' => $title,
+					'description' => $description,
+					'contentHtml' => $content_html,
+					'icon' => $this->meta($post, 'icon'),
+					'cover' => $featured['url'],
+					'coverMedia' => $featured['media'],
+					'type' => $this->meta($post, 'type'),
+					'status' => $this->meta($post, 'status'),
+					'author' => $this->meta($post, 'author'),
+					'publishedYear' => $this->meta($post, 'published_year') === '' || (int) $this->meta($post, 'published_year') === 0 ? '' : (int) $this->meta($post, 'published_year'),
+					'rating' => (float) $this->meta($post, 'rating'),
+					'progress' => $progress,
+					'totalUnits' => $total_units,
+					'sourceUrl' => $this->meta($post, 'source_url'),
+					'tags' => $this->csv($this->meta($post, 'tags')),
+					'startedAt' => $started,
+					'completedAt' => $completed,
+					'relatedPost' => $this->related_post($post),
+					'featured' => $this->bool_meta($post, 'featured'),
 				);
 			case 'jg_device':
 				$featured = $this->featured_media($post->ID);
@@ -545,6 +608,16 @@ final class JG_Snapshot {
 			$value = JG_Content_Types::sanitize_field($value, $field);
 		}
 		return is_scalar($value) ? (string) $value : '';
+	}
+
+	private function related_post(WP_Post $post): ?array {
+		$related_id = absint($this->meta($post, 'related_post_id'));
+		if ($related_id <= 0) return null;
+		$related = get_post($related_id);
+		if (!$related instanceof WP_Post || $related->post_type !== 'post' || $related->post_status !== 'publish') {
+			return null;
+		}
+		return array('postId' => $related_id);
 	}
 
 	private function bool_meta(WP_Post $post, string $key, bool $default = false): bool {

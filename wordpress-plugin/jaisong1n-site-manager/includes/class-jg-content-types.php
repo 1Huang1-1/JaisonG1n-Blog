@@ -16,11 +16,13 @@ final class JG_Content_Types {
 			'jg_ai_tool' => array('single' => 'AI 工具', 'plural' => 'AI 工具', 'icon' => 'dashicons-superhero', 'thumbnail' => false),
 			'jg_timeline' => array('single' => '时间线', 'plural' => '时间线', 'icon' => 'dashicons-backup', 'thumbnail' => false),
 			'jg_friend' => array('single' => '友链', 'plural' => '友链', 'icon' => 'dashicons-admin-links', 'thumbnail' => true),
-			'jg_device' => array('single' => '设备', 'plural' => '设备', 'icon' => 'dashicons-smartphone', 'thumbnail' => true),
+			'jg_device' => array('single' => '设备', 'plural' => '设备', 'icon' => 'dashicons-smartphone', 'thumbnail' => true, 'deprecated' => true),
 			'jg_diary' => array('single' => '日记', 'plural' => '日记', 'icon' => 'dashicons-edit-page', 'thumbnail' => false),
 			'jg_album' => array('single' => '相册', 'plural' => '相册', 'icon' => 'dashicons-format-gallery', 'thumbnail' => true),
-			'jg_anime' => array('single' => '追番', 'plural' => '追番', 'icon' => 'dashicons-video-alt3', 'thumbnail' => true),
+			'jg_anime' => array('single' => '追番', 'plural' => '追番', 'icon' => 'dashicons-video-alt3', 'thumbnail' => true, 'deprecated' => true),
 			'jg_announcement' => array('single' => '公告', 'plural' => '公告', 'icon' => 'dashicons-megaphone', 'thumbnail' => false),
+			'jg_tech_radar' => array('single' => 'Tech Radar', 'plural' => 'Tech Radar', 'icon' => 'dashicons-chart-area', 'thumbnail' => true),
+			'jg_learning_resource' => array('single' => 'Learning Resource', 'plural' => 'Learning Resources', 'icon' => 'dashicons-book-alt', 'thumbnail' => true),
 		);
 	}
 
@@ -98,6 +100,36 @@ final class JG_Content_Types {
 				'progress' => self::number('观看进度', 0, 100000),
 				'total_episodes' => self::number('总集数', 0, 100000),
 			),
+			'jg_tech_radar' => array(
+				'icon' => self::text('Iconify icon'),
+				'domain' => self::select('Domain', array('ai' => 'AI', 'frontend' => 'Frontend', 'backend' => 'Backend', 'data' => 'Data', 'infrastructure' => 'Infrastructure', 'security' => 'Security', 'hardware' => 'Hardware', 'developer-tools' => 'Developer Tools', 'other' => 'Other')),
+				'stage' => self::select('Stage', array('adopt' => 'Adopt', 'trial' => 'Trial', 'assess' => 'Assess', 'hold' => 'Hold')),
+				'trend' => self::select('Trend', array('rising' => 'Rising', 'stable' => 'Stable', 'declining' => 'Declining', 'uncertain' => 'Uncertain')),
+				'maturity' => self::number('Maturity', 0, 100),
+				'tags' => self::text('Tags (comma separated)'),
+				'official_url' => self::url('Official URL'),
+				'source_urls' => self::source_urls_repeater('Source URLs'),
+				'first_observed_at' => self::date('First observed'),
+				'last_reviewed_at' => self::date('Last reviewed'),
+				'related_post_id' => self::post_id('Related post ID'),
+				'featured' => self::checkbox('Featured'),
+			),
+			'jg_learning_resource' => array(
+				'icon' => self::text('Iconify icon'),
+				'type' => self::select('Type', array('book' => 'Book', 'course' => 'Course', 'paper' => 'Paper', 'docs' => 'Docs', 'tutorial' => 'Tutorial', 'video' => 'Video', 'other' => 'Other')),
+				'status' => self::select('Status', array('planned' => 'Planned', 'learning' => 'Learning', 'completed' => 'Completed', 'paused' => 'Paused')),
+				'author' => self::text('Author'),
+				'published_year' => self::number('Published year', 0, 3000),
+				'rating' => self::number('Rating', 0, 10, '0.1'),
+				'progress' => self::number('Progress', 0, 100000),
+				'total_units' => self::number('Total units', 0, 100000),
+				'source_url' => self::url('Source URL'),
+				'tags' => self::text('Tags (comma separated)'),
+				'started_at' => self::date('Started'),
+				'completed_at' => self::date('Completed'),
+				'related_post_id' => self::post_id('Related post ID'),
+				'featured' => self::checkbox('Featured'),
+			),
 			'jg_announcement' => array(
 				'closable' => self::checkbox('允许关闭', true),
 				'link_enable' => self::checkbox('显示链接'),
@@ -127,7 +159,7 @@ final class JG_Content_Types {
 		foreach (self::definitions() as $post_type => $definition) {
 			$plural_capability = $post_type . 's';
 			$supports = array('title', 'editor', 'revisions', 'custom-fields');
-			if (in_array($post_type, array('jg_project', 'jg_timeline'), true)) {
+			if (in_array($post_type, array('jg_project', 'jg_timeline', 'jg_tech_radar', 'jg_learning_resource'), true)) {
 				$supports[] = 'excerpt';
 			}
 			if ($definition['thumbnail']) {
@@ -144,8 +176,8 @@ final class JG_Content_Types {
 				'public' => false,
 				'publicly_queryable' => false,
 				'exclude_from_search' => true,
-				'show_ui' => true,
-				'show_in_menu' => true,
+				'show_ui' => empty($definition['deprecated']),
+				'show_in_menu' => empty($definition['deprecated']),
 				'show_in_rest' => true,
 				'show_in_nav_menus' => false,
 				'menu_icon' => $definition['icon'],
@@ -163,7 +195,7 @@ final class JG_Content_Types {
 	private static function register_meta_fields(string $post_type): void {
 		$fields = self::field_definitions()[$post_type] ?? array();
 		foreach ($fields as $key => $field) {
-			$is_array = in_array($field['type'], array('specs_repeater', 'links_repeater', 'media_repeater'), true);
+			$is_array = in_array($field['type'], array('specs_repeater', 'links_repeater', 'source_urls_repeater', 'media_repeater'), true);
 			$type = $is_array ? 'array' : ($field['type'] === 'checkbox' ? 'boolean' : ($field['type'] === 'number' ? 'number' : 'string'));
 			$show_in_rest = $is_array ? array('schema' => $field['schema']) : true;
 			register_post_meta($post_type, '_jg_' . $key, array(
@@ -243,11 +275,12 @@ final class JG_Content_Types {
 				break;
 			case 'specs_repeater':
 			case 'links_repeater':
+			case 'source_urls_repeater':
 			case 'media_repeater':
 				self::render_repeater($key, $field, $value);
 				break;
 			default:
-				$input_type = $field['type'] === 'announcement_url' ? 'url' : $field['type'];
+				$input_type = $field['type'] === 'announcement_url' ? 'url' : ($field['type'] === 'post_id' ? 'number' : $field['type']);
 				$attributes = '';
 				foreach (array('min', 'max', 'step') as $attribute) {
 					if (isset($field[$attribute])) {
@@ -291,6 +324,9 @@ final class JG_Content_Types {
 				echo '<option value="' . esc_attr($value) . '" ' . selected((string) ($row['type'] ?? ''), $value, false) . '>' . esc_html($label) . '</option>';
 			}
 			echo '</select>';
+		} elseif ($type === 'source_urls_repeater') {
+			self::repeater_input($name, $index, 'label', 'Label', $row['label'] ?? '');
+			self::repeater_input($name, $index, 'url', 'https://', $row['url'] ?? '', 'url');
 		} else {
 			$media_id = absint($row['mediaId'] ?? 0);
 			echo '<input type="hidden" data-repeater-key="mediaId" name="' . esc_attr($name . '[' . $index . '][mediaId]') . '" value="' . esc_attr((string) $media_id) . '">';
@@ -435,6 +471,7 @@ final class JG_Content_Types {
 				if (isset($field['min'])) $number = max((float) $field['min'], $number);
 				if (isset($field['max'])) $number = min((float) $field['max'], $number);
 				return $number;
+			case 'post_id': return max(0, absint($value));
 			case 'url': return self::sanitize_http_url($value);
 			case 'announcement_url': return self::sanitize_announcement_url($value);
 			case 'date': return preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $value) ? (string) $value : '';
@@ -443,6 +480,7 @@ final class JG_Content_Types {
 			case 'select': return isset($field['options'][(string) $value]) ? (string) $value : (string) array_key_first($field['options']);
 			case 'specs_repeater': return self::sanitize_specs($value);
 			case 'links_repeater': return self::sanitize_links($value);
+			case 'source_urls_repeater': return self::sanitize_source_urls($value);
 			case 'media_repeater': return self::sanitize_media_rows($value);
 			default: return self::limited_text($value, 500);
 		}
@@ -507,6 +545,17 @@ final class JG_Content_Types {
 		return $rows;
 	}
 
+	private static function sanitize_source_urls($value): array {
+		$rows = array();
+		foreach (array_slice(is_array($value) ? $value : array(), 0, self::MAX_REPEATER_ROWS) as $row) {
+			if (!is_array($row)) continue;
+			$label = self::limited_text($row['label'] ?? '', 300);
+			$url = self::sanitize_http_url($row['url'] ?? '');
+			if ($label !== '' && $url !== '') $rows[] = array('label' => $label, 'url' => $url);
+		}
+		return $rows;
+	}
+
 	private static function sanitize_media_rows($value): array {
 		if (is_string($value)) {
 			$value = array_map('absint', array_filter(explode(',', $value)));
@@ -530,7 +579,10 @@ final class JG_Content_Types {
 		return mb_substr(sanitize_textarea_field((string) $value), 0, $length);
 	}
 
-	private static function public_post_types(): array { return array_merge(array('page'), array_keys(self::definitions())); }
+	public static function is_deprecated(string $post_type): bool { return !empty(self::definitions()[$post_type]['deprecated']); }
+	public static function public_post_types(): array {
+		return array_merge(array('page'), array_values(array_filter(array_keys(self::definitions()), static fn($type) => !self::is_deprecated($type))));
+	}
 	private static function text(string $label): array { return array('label' => $label, 'type' => 'text'); }
 	private static function textarea(string $label): array { return array('label' => $label, 'type' => 'textarea'); }
 	private static function url(string $label): array { return array('label' => $label, 'type' => 'url'); }
@@ -543,4 +595,6 @@ final class JG_Content_Types {
 	private static function specs_repeater(string $label): array { return array('label' => $label, 'type' => 'specs_repeater', 'schema' => array('type' => 'array', 'items' => array('type' => 'object', 'properties' => array('label' => array('type' => 'string'), 'value' => array('type' => 'string'))))); }
 	private static function links_repeater(string $label): array { return array('label' => $label, 'type' => 'links_repeater', 'schema' => array('type' => 'array', 'items' => array('type' => 'object', 'properties' => array('name' => array('type' => 'string'), 'url' => array('type' => 'string', 'format' => 'uri'), 'type' => array('type' => 'string', 'enum' => array('website', 'certificate', 'project', 'other')))))); }
 	private static function media_repeater(string $label): array { return array('label' => $label, 'type' => 'media_repeater', 'schema' => array('type' => 'array', 'items' => array('type' => 'object', 'properties' => array('mediaId' => array('type' => 'integer'))))); }
+	private static function source_urls_repeater(string $label): array { return array('label' => $label, 'type' => 'source_urls_repeater', 'schema' => array('type' => 'array', 'items' => array('type' => 'object', 'properties' => array('label' => array('type' => 'string'), 'url' => array('type' => 'string', 'format' => 'uri'))))); }
+	private static function post_id(string $label): array { return array('label' => $label, 'type' => 'post_id', 'min' => 0, 'max' => 2147483647); }
 }

@@ -65,6 +65,13 @@ const isoDate = boundedText(10).refine(isIsoDate, "Expected a valid YYYY-MM-DD d
 const optionalIsoDate = z.union([z.literal(""), isoDate]);
 const stringList = z.array(boundedText(300)).max(500);
 const localeZhCn = z.object({ zh_CN: boundedText(20_000) }).strict();
+const relatedPostRawSchema = z.object({ postId: z.number().int().positive() }).strict();
+const relatedPostSchema = z.object({
+	postId: z.number().int().positive(),
+	title: requiredText(500),
+	slug,
+	path: z.string().regex(/^\/[^\\\0]+\/$/u),
+}).strict();
 
 export const mediaObjectSchema = z
 	.object({
@@ -157,6 +164,70 @@ export const timelineSchema = z
 	})
 	.strict();
 
+const sourceUrlSchema = z.object({
+	label: requiredText(300),
+	url: boundedText(2_048).refine((value) => value !== "" && isHttpUrl(value), "Expected an HTTP(S) URL"),
+}).strict();
+const iconifyName = boundedText(300).refine(
+	(value) => value === "" || /^[a-z0-9-]+:[a-z0-9-]+$/i.test(value),
+	"Expected a safe Iconify icon name",
+);
+
+export const techRadarSchema = z.object({
+	id: slug,
+	title: requiredText(500),
+	description: boundedText(20_000),
+	contentHtml: boundedText(250_000),
+	icon: iconifyName,
+	image: optionalHttpUrl,
+	imageMedia: mediaObjectSchema.nullable(),
+	domain: z.enum(["ai", "frontend", "backend", "data", "infrastructure", "security", "hardware", "developer-tools", "other"]),
+	stage: z.enum(["adopt", "trial", "assess", "hold"]),
+	trend: z.enum(["rising", "stable", "declining", "uncertain"]),
+	maturity: z.number().int().min(0).max(100),
+	tags: stringList,
+	officialUrl: optionalHttpUrl,
+	sourceUrls: z.array(sourceUrlSchema).max(100),
+	firstObservedAt: optionalIsoDate,
+	lastReviewedAt: optionalIsoDate,
+	relatedPost: relatedPostRawSchema.nullable(),
+	featured: z.boolean(),
+}).strict().superRefine((value, ctx) => {
+	if (value.firstObservedAt && value.lastReviewedAt && value.lastReviewedAt < value.firstObservedAt) {
+		ctx.addIssue({ code: "custom", path: ["lastReviewedAt"], message: "lastReviewedAt cannot precede firstObservedAt" });
+	}
+});
+
+export const learningResourceSchema = z.object({
+	id: slug,
+	title: requiredText(500),
+	description: boundedText(20_000),
+	contentHtml: boundedText(250_000),
+	icon: iconifyName,
+	cover: optionalHttpUrl,
+	coverMedia: mediaObjectSchema.nullable(),
+	type: z.enum(["book", "course", "paper", "docs", "tutorial", "video", "other"]),
+	status: z.enum(["planned", "learning", "completed", "paused"]),
+	author: boundedText(500),
+	publishedYear: z.union([z.literal(""), z.number().int().min(1000).max(3000)]),
+	rating: z.number().finite().min(0).max(10).refine((value) => Number.isInteger(value * 10), "Rating must have at most one decimal"),
+	progress: z.number().int().min(0),
+	totalUnits: z.number().int().min(0),
+	sourceUrl: optionalHttpUrl,
+	tags: stringList,
+	startedAt: optionalIsoDate,
+	completedAt: optionalIsoDate,
+	relatedPost: relatedPostRawSchema.nullable(),
+	featured: z.boolean(),
+}).strict().superRefine((value, ctx) => {
+	if (value.totalUnits > 0 && value.progress > value.totalUnits) {
+		ctx.addIssue({ code: "custom", path: ["progress"], message: "progress cannot exceed totalUnits" });
+	}
+	if (value.startedAt && value.completedAt && value.completedAt < value.startedAt) {
+		ctx.addIssue({ code: "custom", path: ["completedAt"], message: "completedAt cannot precede startedAt" });
+	}
+});
+
 const uniqueIds = (items) => new Set(items.map((item) => item.id)).size === items.length;
 const collection = (schema) => z.array(schema).max(500).refine(uniqueIds, "Collection IDs must be unique");
 
@@ -164,6 +235,8 @@ export const projectsSchema = collection(projectSchema);
 export const skillsSchema = collection(skillSchema);
 export const aiToolsSchema = collection(aiToolSchema);
 export const timelineItemsSchema = collection(timelineSchema);
+export const techRadarItemsSchema = collection(techRadarSchema);
+export const learningResourceItemsSchema = collection(learningResourceSchema);
 
 export const friendSchema = z
 	.object({
@@ -200,7 +273,7 @@ export const announcementsSchema = z.array(announcementSchema).max(100);
 
 export const siteSnapshotSchema = z
 	.object({
-		schemaVersion: z.literal(2),
+		schemaVersion: z.literal(3),
 		revision: z.string().regex(/^[a-f0-9]{64}$/i),
 		generatedAt: boundedText(64).refine(isIsoDateTime, "Expected an ISO 8601 generatedAt value"),
 		projects: projectsSchema,
@@ -209,9 +282,18 @@ export const siteSnapshotSchema = z
 		timeline: timelineItemsSchema,
 		friends: friendsSchema,
 		announcements: announcementsSchema,
+		techRadar: techRadarItemsSchema,
+		learningResources: learningResourceItemsSchema,
 		mediaManifest: z.array(mediaObjectSchema).max(SYNC_LIMITS.maxFiles),
 	})
-	.passthrough();
+	.passthrough()
+	.superRefine((value, ctx) => {
+		for (const deprecated of ["devices", "anime"]) {
+			if (Object.prototype.hasOwnProperty.call(value, deprecated)) {
+				ctx.addIssue({ code: "custom", path: [deprecated], message: `${deprecated} is not part of schemaVersion 3` });
+			}
+		}
+	});
 
 const localMediaPath = z.string().regex(/^\/generated\/wordpress-media\/[a-f0-9]{64}\.(?:jpg|png|webp|gif|avif)$/);
 export const generatedMediaObjectSchema = mediaObjectSchema.extend({ url: localMediaPath }).strict();
@@ -229,6 +311,22 @@ export const generatedFriendSchema = friendSchema
 	})
 	.strict();
 export const generatedFriendsSchema = z.array(generatedFriendSchema).max(500);
+export const generatedTechRadarSchema = techRadarSchema
+	.safeExtend({
+		image: z.union([z.literal(""), localMediaPath]),
+		imageMedia: generatedMediaObjectSchema.nullable(),
+		relatedPost: relatedPostSchema.nullable(),
+	})
+	.strict();
+export const generatedLearningResourceSchema = learningResourceSchema
+	.safeExtend({
+		cover: z.union([z.literal(""), localMediaPath]),
+		coverMedia: generatedMediaObjectSchema.nullable(),
+		relatedPost: relatedPostSchema.nullable(),
+	})
+	.strict();
+export const generatedTechRadarItemsSchema = z.array(generatedTechRadarSchema).max(500);
+export const generatedLearningResourceItemsSchema = z.array(generatedLearningResourceSchema).max(500);
 
 export const mirroredMediaSchema = z
 	.object({
@@ -245,7 +343,7 @@ export const mirroredMediaSchema = z
 
 export const snapshotMetaSchema = z
 	.object({
-		schemaVersion: z.literal(2),
+		schemaVersion: z.literal(3),
 		revision: z.string().regex(/^[a-f0-9]{64}$/i),
 		generatedAt: boundedText(64).refine(isIsoDateTime),
 		syncedAt: boundedText(64).refine(isIsoDateTime),
@@ -259,6 +357,8 @@ export const snapshotMetaSchema = z
 				timeline: z.number().int().min(0),
 				friends: z.number().int().min(0),
 				announcements: z.number().int().min(0),
+				techRadar: z.number().int().min(0),
+				learningResources: z.number().int().min(0),
 				media: z.number().int().min(0),
 			})
 			.strict(),
@@ -288,6 +388,8 @@ export function parseGeneratedBundle(value) {
 		timeline: timelineItemsSchema.parse(value.timeline),
 		friends: generatedFriendsSchema.parse(value.friends),
 		announcements: announcementsSchema.parse(value.announcements),
+		techRadar: generatedTechRadarItemsSchema.parse(value.techRadar),
+		learningResources: generatedLearningResourceItemsSchema.parse(value.learningResources),
 	};
 	const { counts } = bundle.meta;
 	for (const [name, items] of Object.entries({
@@ -297,6 +399,8 @@ export function parseGeneratedBundle(value) {
 		timeline: bundle.timeline,
 		friends: bundle.friends,
 		announcements: bundle.announcements,
+		techRadar: bundle.techRadar,
+		learningResources: bundle.learningResources,
 	})) {
 		if (counts[name] !== items.length) throw new Error(`Generated WordPress ${name} count does not match snapshot metadata`);
 	}

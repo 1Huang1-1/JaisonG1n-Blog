@@ -25,12 +25,16 @@ export const projectSchema: z.ZodTypeAny;
 export const skillSchema: z.ZodTypeAny;
 export const aiToolSchema: z.ZodTypeAny;
 export const timelineSchema: z.ZodTypeAny;
+export const techRadarSchema: z.ZodTypeAny;
+export const learningResourceSchema: z.ZodTypeAny;
 export const friendSchema: z.ZodTypeAny;
 export const announcementSchema: z.ZodTypeAny;
 export const projectsSchema: z.ZodTypeAny;
 export const skillsSchema: z.ZodTypeAny;
 export const aiToolsSchema: z.ZodTypeAny;
 export const timelineItemsSchema: z.ZodTypeAny;
+export const techRadarItemsSchema: z.ZodTypeAny;
+export const learningResourceItemsSchema: z.ZodTypeAny;
 export const friendsSchema: z.ZodTypeAny;
 export const announcementsSchema: z.ZodTypeAny;
 export const siteSnapshotSchema: z.ZodTypeAny;
@@ -38,6 +42,10 @@ export const generatedMediaObjectSchema: z.ZodTypeAny;
 export const generatedProjectSchema: z.ZodTypeAny;
 export const generatedFriendSchema: z.ZodTypeAny;
 export const generatedFriendsSchema: z.ZodTypeAny;
+export const generatedTechRadarSchema: z.ZodTypeAny;
+export const generatedLearningResourceSchema: z.ZodTypeAny;
+export const generatedTechRadarItemsSchema: z.ZodTypeAny;
+export const generatedLearningResourceItemsSchema: z.ZodTypeAny;
 export const mirroredMediaSchema: z.ZodTypeAny;
 export const snapshotMetaSchema: z.ZodTypeAny;
 export const generatedProjectsSchema: z.ZodTypeAny;
@@ -127,13 +135,64 @@ export interface GeneratedAnnouncement {
 	link: { enable: boolean; text: string; url: string; external: boolean };
 }
 
+export interface GeneratedRelatedPost {
+	postId: number;
+	title: string;
+	slug: string;
+	path: string;
+}
+
+export interface GeneratedTechRadar {
+	id: string;
+	title: string;
+	description: string;
+	contentHtml: string;
+	icon: string;
+	image: string;
+	imageMedia: GeneratedMediaObject | null;
+	domain: "ai" | "frontend" | "backend" | "data" | "infrastructure" | "security" | "hardware" | "developer-tools" | "other";
+	stage: "adopt" | "trial" | "assess" | "hold";
+	trend: "rising" | "stable" | "declining" | "uncertain";
+	maturity: number;
+	tags: string[];
+	officialUrl: string;
+	sourceUrls: Array<{ label: string; url: string }>;
+	firstObservedAt: string;
+	lastReviewedAt: string;
+	relatedPost: GeneratedRelatedPost | null;
+	featured: boolean;
+}
+
+export interface GeneratedLearningResource {
+	id: string;
+	title: string;
+	description: string;
+	contentHtml: string;
+	icon: string;
+	cover: string;
+	coverMedia: GeneratedMediaObject | null;
+	type: "book" | "course" | "paper" | "docs" | "tutorial" | "video" | "other";
+	status: "planned" | "learning" | "completed" | "paused";
+	author: string;
+	publishedYear: "" | number;
+	rating: number;
+	progress: number;
+	totalUnits: number;
+	sourceUrl: string;
+	tags: string[];
+	startedAt: string;
+	completedAt: string;
+	relatedPost: GeneratedRelatedPost | null;
+	featured: boolean;
+}
+
 export interface SnapshotMeta {
-	schemaVersion: 2;
+	schemaVersion: 3;
 	revision: string;
 	generatedAt: string;
 	syncedAt: string;
 	sourceUrl: string;
-	counts: { posts: number; projects: number; skills: number; aiTools: number; timeline: number; friends: number; announcements: number; media: number };
+	counts: { posts: number; projects: number; skills: number; aiTools: number; timeline: number; friends: number; announcements: number; techRadar: number; learningResources: number; media: number };
 	media: unknown[];
 }
 
@@ -145,11 +204,13 @@ export interface GeneratedBundle {
 	timeline: GeneratedTimelineItem[];
 	friends: GeneratedFriend[];
 	announcements: GeneratedAnnouncement[];
+	techRadar: GeneratedTechRadar[];
+	learningResources: GeneratedLearningResource[];
 }
 
 export function parseStructuredContentFlag(value: string | undefined): boolean;
 export function parseSiteSnapshot(value: unknown): Record<string, unknown> & {
-	schemaVersion: 2;
+	schemaVersion: 3;
 	revision: string;
 	generatedAt: string;
 	projects: GeneratedProject[];
@@ -158,6 +219,8 @@ export function parseSiteSnapshot(value: unknown): Record<string, unknown> & {
 	timeline: GeneratedTimelineItem[];
 	friends: GeneratedFriend[];
 	announcements: GeneratedAnnouncement[];
+	techRadar: GeneratedTechRadar[];
+	learningResources: GeneratedLearningResource[];
 	mediaManifest: Array<{
 		id: number;
 		url: string;

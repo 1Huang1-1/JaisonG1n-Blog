@@ -59,10 +59,10 @@ $active_after = get_option('active_plugins', array());
 jg_upgrade_assert($active_after === $active_before, 'active_plugins changed during same-directory replacement.');
 jg_upgrade_assert(is_readable($main_file), 'Replacement main plugin file is not readable.');
 $replacement_validation = validate_plugin($basename);
-jg_upgrade_assert($replacement_validation === 0, '0.2.4 validate_plugin failed: ' . wp_json_encode($replacement_validation));
+jg_upgrade_assert($replacement_validation === 0, '0.3.0 validate_plugin failed: ' . wp_json_encode($replacement_validation));
 
 require $main_file;
-jg_upgrade_assert(defined('JG_SITE_MANAGER_VERSION') && JG_SITE_MANAGER_VERSION === '0.2.4', '0.2.4 plugin did not load.');
+jg_upgrade_assert(defined('JG_SITE_MANAGER_VERSION') && JG_SITE_MANAGER_VERSION === '0.3.0', '0.3.0 plugin did not load.');
 JG_Site_Manager::init();
 JG_Content_Types::register();
 JG_REST::register_routes();
@@ -72,7 +72,7 @@ jg_upgrade_assert(JG_Settings::get()['site_title'] === 'Upgrade preserved', 'Plu
 $snapshot_response = rest_do_request(new WP_REST_Request('GET', '/jaisong1n/v1/site-snapshot'));
 $snapshot = $snapshot_response->get_data();
 jg_upgrade_assert($snapshot_response->get_status() === 200, 'Snapshot failed after upgrade: ' . wp_json_encode($snapshot));
-jg_upgrade_assert(($snapshot['schemaVersion'] ?? null) === 2, 'schemaVersion changed during packaging-only upgrade.');
+jg_upgrade_assert(($snapshot['schemaVersion'] ?? null) === 3, 'schemaVersion is not v3 after upgrade.');
 
 echo wp_json_encode(array(
 	'ok' => true,

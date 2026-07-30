@@ -348,5 +348,48 @@ export async function rewriteStructuredMedia(snapshot, mirror, baseUrl) {
 		}
 		friends.push({ ...friend, imgurl, avatarMedia });
 	}
-	return { projects, skills: snapshot.skills, aiTools: snapshot.aiTools, timeline, friends, announcements: snapshot.announcements };
+	const techRadar = [];
+	for (const item of snapshot.techRadar) {
+		let image = "";
+		let imageMedia = null;
+		if (item.image) {
+			const manifest = item.imageMedia ?? manifestByUrl.get(new URL(item.image).href) ?? null;
+			const mirrored = await mirror.mirror(item.image, { manifest, alt: item.title });
+			image = mirrored.url;
+			if (item.imageMedia) imageMedia = { ...item.imageMedia, url: mirrored.url };
+		}
+		techRadar.push({
+			...item,
+			image,
+			imageMedia,
+			contentHtml: await rewriteContentHtml(item.contentHtml, { baseUrl, manifestByUrl, mirror: (url, options) => mirror.mirror(url, options) }),
+		});
+	}
+	const learningResources = [];
+	for (const item of snapshot.learningResources) {
+		let cover = "";
+		let coverMedia = null;
+		if (item.cover) {
+			const manifest = item.coverMedia ?? manifestByUrl.get(new URL(item.cover).href) ?? null;
+			const mirrored = await mirror.mirror(item.cover, { manifest, alt: item.title });
+			cover = mirrored.url;
+			if (item.coverMedia) coverMedia = { ...item.coverMedia, url: mirrored.url };
+		}
+		learningResources.push({
+			...item,
+			cover,
+			coverMedia,
+			contentHtml: await rewriteContentHtml(item.contentHtml, { baseUrl, manifestByUrl, mirror: (url, options) => mirror.mirror(url, options) }),
+		});
+	}
+	return {
+		projects,
+		skills: snapshot.skills,
+		aiTools: snapshot.aiTools,
+		timeline,
+		friends,
+		announcements: snapshot.announcements,
+		techRadar,
+		learningResources,
+	};
 }

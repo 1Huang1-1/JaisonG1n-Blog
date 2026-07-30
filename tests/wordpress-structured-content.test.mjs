@@ -135,7 +135,7 @@ function announcement(overrides = {}) {
 
 function snapshot(overrides = {}) {
 	return {
-		schemaVersion: 2,
+		schemaVersion: 3,
 		revision: "a".repeat(64),
 		generatedAt: "2026-07-29T00:00:00+00:00",
 		projects: [],
@@ -145,7 +145,8 @@ function snapshot(overrides = {}) {
 		mediaManifest: [],
 		friends: [],
 		announcements: [],
-		devices: [],
+		techRadar: [],
+		learningResources: [],
 		albums: [],
 		...overrides,
 	};
@@ -154,7 +155,7 @@ function snapshot(overrides = {}) {
 function generatedBundle(overrides = {}) {
 	const bundle = {
 		meta: {
-			schemaVersion: 2,
+			schemaVersion: 3,
 			revision: "a".repeat(64),
 			generatedAt: "2026-07-29T00:00:00+00:00",
 			syncedAt: "2026-07-29T00:01:00.000Z",
@@ -167,6 +168,8 @@ function generatedBundle(overrides = {}) {
 				timeline: 0,
 				friends: 0,
 				announcements: 0,
+				techRadar: 0,
+				learningResources: 0,
 				media: 0,
 			},
 			media: [],
@@ -177,6 +180,8 @@ function generatedBundle(overrides = {}) {
 		timeline: [],
 		friends: [],
 		announcements: [],
+		techRadar: [],
+		learningResources: [],
 		...overrides,
 	};
 	bundle.meta.counts = {
@@ -187,6 +192,8 @@ function generatedBundle(overrides = {}) {
 		timeline: bundle.timeline.length,
 		friends: bundle.friends.length,
 		announcements: bundle.announcements.length,
+		techRadar: bundle.techRadar.length,
+		learningResources: bundle.learningResources.length,
 	};
 	return bundle;
 }
@@ -200,6 +207,8 @@ function generatedFiles(bundle) {
 		["timeline.json", JSON.stringify(bundle.timeline)],
 		["friends.json", JSON.stringify(bundle.friends)],
 		["announcements.json", JSON.stringify(bundle.announcements)],
+		["tech-radar.json", JSON.stringify(bundle.techRadar)],
+		["learning-resources.json", JSON.stringify(bundle.learningResources)],
 	]);
 }
 
@@ -343,8 +352,8 @@ test("snapshot permits unconsumed top-level collections but selected records are
 		/Invalid option/i,
 	);
 	assert.throws(
-		() => parseSiteSnapshot(snapshot({ schemaVersion: 3 })),
-		/Invalid input/i,
+		() => parseSiteSnapshot(snapshot({ schemaVersion: 2 })),
+		/schemaVersion/i,
 	);
 });
 
@@ -918,6 +927,8 @@ test("full sync writes mapped fixture JSON and deduplicated local media", async 
 		timeline: 1,
 		friends: 0,
 		announcements: 0,
+		techRadar: 0,
+		learningResources: 0,
 		media: 2,
 	});
 		const projects = JSON.parse(

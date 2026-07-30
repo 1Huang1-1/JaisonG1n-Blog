@@ -26,6 +26,8 @@ export function loadStructuredContentSource({
 		timeline: readJson("timeline.json"),
 		friends: readJson("friends.json"),
 		announcements: readJson("announcements.json"),
+		techRadar: readJson("tech-radar.json"),
+		learningResources: readJson("learning-resources.json"),
 	});
 	return { source: "wordpress", ...bundle };
 }

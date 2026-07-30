@@ -57,31 +57,7 @@ export const ja: Translation = {
 	[Key.author]: "著者",
 	[Key.publishedAt]: "公開日",
 	[Key.license]: "ライセンス",
-	[Key.anime]: "視聴したアニメ",
 	[Key.diary]: "日記",
-
-	// アニメページ
-	[Key.animeTitle]: "視聴したアニメ",
-	[Key.animeSubtitle]: "アニメの旅の記録です",
-	[Key.animeStatusWatching]: "視聴中",
-	[Key.animeStatusCompleted]: "完了",
-	[Key.animeStatusPlanned]: "検討中",
-	[Key.animeStatusOnHold]: "保留中",
-	[Key.animeStatusDropped]: "中断",
-	[Key.animeFilterAll]: "すべて",
-	[Key.animeYear]: "年",
-	[Key.animeStudio]: "スタジオ",
-	[Key.animeEmpty]: "アニメのデータはありません",
-	[Key.animeEmptyBangumi]:
-		"Bangumiの構成またはネットワークの接続を確認してください",
-	[Key.animeEmptyBilibili]:
-		"Bilibiliの構成またはネットワークの接続を確認してください",
-	[Key.animeEmptyLocal]:
-		"src/data/anime.tsファイルにアニメの情報を追加してください",
-	[Key.animeConfigBilibili]:
-		"src/config/siteConfig.tsファイルにBilibiliのvmidを設定してください",
-	[Key.animeConfigBangumi]:
-		"src/config/siteConfig.tsファイルにBangumiのユーザーIDを設定してください",
 
 	// 日記ページ
 	[Key.diarySubtitle]: "いつでも、どこでも生活を共有",
@@ -133,10 +109,16 @@ export const ja: Translation = {
 		"まだアルバムが作成されていません。美しい思い出を追加しましょう!",
 	[Key.albumsBackToList]: "アルバムに戻る",
 
-	// デバイスページ
-	[Key.devices]: "デバイス",
-	[Key.devicesSubtitle]: "日常的に使用しているデバイスを紹介",
-	[Key.devicesViewDetails]: "詳細を表示",
+	[Key.radar]: "テックレーダー",
+	[Key.learning]: "学習リソース",
+	[Key.radarSubtitle]: "技術トレンドと採用判断を記録",
+	[Key.learningSubtitle]: "書籍、講座、論文、ドキュメントを整理",
+	[Key.radarEmpty]: "テックレーダーの記録はまだありません。",
+	[Key.learningEmpty]: "学習リソースはまだありません。",
+	[Key.filterDomain]: "分野",
+	[Key.filterStage]: "段階",
+	[Key.filterType]: "種類",
+	[Key.filterStatus]: "状態",
 	[Key.albumsPhotoCount]: "件の写真",
 	[Key.albumsPhotosCount]: "件の写真",
 	[Key.albumsFilterAll]: "すべて",
