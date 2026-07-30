@@ -6,6 +6,8 @@ import type { MomentCardProps } from "./types";
 const { moment, title, detailHref, viewLabel, moodLabel, imageLabel } =
 	Astro.props as MomentCardProps;
 const previewImages = moment.images.slice(0, 3);
+const getImageUrl = (image: (typeof moment.images)[number]) =>
+	image.src || image.url || "";
 const dateLabel = new Date(`${moment.date}T00:00:00Z`).toLocaleDateString(
 	"zh-CN",
 	{
@@ -26,8 +28,8 @@ const dateLabel = new Date(`${moment.date}T00:00:00Z`).toLocaleDateString(
 		{previewImages.length > 0 && (
 			<div class:list={["diary-images mb-3 grid gap-2", `diary-images-${previewImages.length}`]}>
 				{previewImages.map((image, imageIndex) => (
-					<a href={image.url} data-fancybox={`diary-${moment.id}`} data-caption={image.alt || title} class="block overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-(--primary)">
-						<img src={image.url} alt={image.alt || `${title} ${imageLabel} ${imageIndex + 1}`} width={image.width} height={image.height} loading="lazy" decoding="async" class="aspect-square h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
+					<a href={getImageUrl(image)} data-fancybox={`diary-${moment.id}`} data-caption={image.alt || title} class="block overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-(--primary)">
+						<img src={getImageUrl(image)} alt={image.alt || `${title} ${imageLabel} ${imageIndex + 1}`} width={image.width} height={image.height} loading="lazy" decoding="async" class="aspect-square h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
 					</a>
 				))}
 			</div>

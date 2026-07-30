@@ -1,5 +1,7 @@
 export interface DiaryImage {
-	url: string;
+	/** Legacy local data uses url; generated WordPress data uses src. */
+	url?: string;
+	src?: string;
 	alt: string;
 	width: number;
 	height: number;

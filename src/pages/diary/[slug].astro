@@ -2,7 +2,7 @@
 import { Icon } from "astro-icon/components";
 import StructuredHtmlContent from "../../components/misc/StructuredHtmlContent.astro";
 import { siteConfig } from "../../config";
-import type { DiaryItem } from "../../data/diary";
+import type { DiaryImage, DiaryItem } from "../../data/diary";
 import { sortDiary } from "../../data/diary";
 import { loadStructuredContent } from "../../data/structured-content";
 import I18nKey from "../../i18n/i18nKey";
@@ -58,9 +58,12 @@ const dateLabel = new Date(`${item.date}T00:00:00Z`).toLocaleDateString(
 const moodLabel = item.mood
 	? i18n(moodLabels[item.mood] ?? I18nKey.diaryMoodOther)
 	: "";
-const galleryImages = item.images.filter(
-	(image) => !prepared.html.includes(`src="${image.url}"`),
-);
+const getImageUrl = (image: DiaryImage | null | undefined) =>
+	image?.src || image?.url || "";
+const galleryImages = item.images.filter((image) => {
+	const imageUrl = getImageUrl(image);
+	return imageUrl && !prepared.html.includes(`src="${imageUrl}"`);
+});
 ---
 
 <ContentDetailLayout
@@ -71,7 +74,7 @@ const galleryImages = item.images.filter(
 	sectionHref="/diary/"
 	backLabel={i18n(I18nKey.diaryBackToList)}
 	headings={prepared.headings}
-	cover={item.coverImage?.url || undefined}
+	cover={getImageUrl(item.coverImage) || undefined}
 	coverAlt={item.coverImage?.alt || displayTitle}
 >
 	<div slot="meta" class="flex flex-wrap items-center gap-3 text-sm text-black/65 dark:text-white/65">
@@ -88,8 +91,8 @@ const galleryImages = item.images.filter(
 			<h2 id="diary-gallery-title" class="mb-4 text-xl font-semibold text-black/85 dark:text-white/85">{i18n(I18nKey.diaryImage)}</h2>
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 				{galleryImages.map((image, index) => (
-					<a href={image.url} data-fancybox={`diary-gallery-${item.id}`} data-caption={image.alt || displayTitle} class="block overflow-hidden rounded-xl focus-visible:outline-2 focus-visible:outline-(--primary)">
-						<img src={image.url} alt={image.alt || `${displayTitle} ${i18n(I18nKey.diaryImage)} ${index + 1}`} width={image.width} height={image.height} loading="lazy" decoding="async" class="aspect-video h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02]" />
+					<a href={getImageUrl(image)} data-fancybox={`diary-gallery-${item.id}`} data-caption={image.alt || displayTitle} class="block overflow-hidden rounded-xl focus-visible:outline-2 focus-visible:outline-(--primary)">
+						<img src={getImageUrl(image)} alt={image.alt || `${displayTitle} ${i18n(I18nKey.diaryImage)} ${index + 1}`} width={image.width} height={image.height} loading="lazy" decoding="async" class="aspect-video h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02]" />
 					</a>
 				))}
 			</div>
