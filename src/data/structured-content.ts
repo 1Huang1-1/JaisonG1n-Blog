@@ -6,6 +6,8 @@ import { aiToolsData as legacyAiTools } from "./ai-tools";
 import { projectsData as legacyProjects } from "./projects";
 import { skillsData as legacySkills } from "./skills";
 import { timelineData as legacyTimeline } from "./timeline";
+import { friendsData as legacyFriends } from "./friends";
+import { announcementConfig as legacyAnnouncement } from "../config/announcementConfig";
 
 export interface StructuredContent {
 	source: "legacy" | "wordpress";
@@ -14,6 +16,8 @@ export interface StructuredContent {
 	skills: GeneratedBundle["skills"] | typeof legacySkills;
 	aiTools: GeneratedBundle["aiTools"] | typeof legacyAiTools;
 	timeline: GeneratedBundle["timeline"] | typeof legacyTimeline;
+	friends: GeneratedBundle["friends"] | typeof legacyFriends;
+	announcements: GeneratedBundle["announcements"] | typeof legacyAnnouncement[];
 }
 
 interface LoadOptions {
@@ -43,6 +47,8 @@ export function loadStructuredContent(
 			skills: legacySkills,
 			aiTools: legacyAiTools,
 			timeline: legacyTimeline,
+			friends: legacyFriends,
+			announcements: legacyAnnouncement.content ? [legacyAnnouncement] : [],
 		},
 		generatedDir: options?.generatedDir ?? defaultGeneratedDir,
 		readText:

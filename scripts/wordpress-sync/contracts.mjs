@@ -37,6 +37,19 @@ function isHttpUrl(value) {
 	}
 }
 
+function isSafeSitePath(value) {
+	if (value === "") return true;
+	if (typeof value !== "string" || /[\\\r\n]/u.test(value)) return false;
+	try {
+		const decoded = decodeURIComponent(value);
+		if (/^[a-z][a-z0-9+.-]*:/iu.test(decoded) || decoded.startsWith("//")) return false;
+		const url = new URL(value, "https://jaisong1n.invalid");
+		return url.origin === "https://jaisong1n.invalid" && url.pathname.startsWith("/");
+	} catch {
+		return false;
+	}
+}
+
 function isIsoDate(value) {
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
 	const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -152,6 +165,38 @@ export const skillsSchema = collection(skillSchema);
 export const aiToolsSchema = collection(aiToolSchema);
 export const timelineItemsSchema = collection(timelineSchema);
 
+export const friendSchema = z
+	.object({
+		title: requiredText(500),
+		imgurl: optionalHttpUrl,
+		avatarMedia: mediaObjectSchema.nullable(),
+		desc: boundedText(20_000),
+		siteurl: boundedText(2_048).refine((value) => value !== "" && isHttpUrl(value), "Expected an HTTP(S) URL"),
+		tags: stringList,
+	})
+	.strict();
+
+const announcementLinkSchema = z
+	.object({
+		enable: z.boolean(),
+		text: boundedText(500),
+		url: boundedText(2_048).refine((value) => isHttpUrl(value) || isSafeSitePath(value), "Expected a safe HTTP(S) URL or root-relative site path"),
+		external: z.boolean(),
+	})
+	.strict();
+
+export const announcementSchema = z
+	.object({
+		title: boundedText(500),
+		content: boundedText(20_000),
+		closable: z.boolean(),
+		link: announcementLinkSchema,
+	})
+	.strict();
+
+export const friendsSchema = z.array(friendSchema).max(500);
+export const announcementsSchema = z.array(announcementSchema).max(100);
+
 export const siteSnapshotSchema = z
 	.object({
 		schemaVersion: z.literal(2),
@@ -161,6 +206,8 @@ export const siteSnapshotSchema = z
 		skills: skillsSchema,
 		aiTools: aiToolsSchema,
 		timeline: timelineItemsSchema,
+		friends: friendsSchema,
+		announcements: announcementsSchema,
 		mediaManifest: z.array(mediaObjectSchema).max(SYNC_LIMITS.maxFiles),
 	})
 	.passthrough();
@@ -173,6 +220,14 @@ export const generatedProjectSchema = projectSchema
 		imageMedia: generatedMediaObjectSchema.nullable(),
 	})
 	.strict();
+
+export const generatedFriendSchema = friendSchema
+	.extend({
+		imgurl: z.union([z.literal(""), localMediaPath]),
+		avatarMedia: generatedMediaObjectSchema.nullable(),
+	})
+	.strict();
+export const generatedFriendsSchema = z.array(generatedFriendSchema).max(500);
 
 export const mirroredMediaSchema = z
 	.object({
@@ -201,6 +256,8 @@ export const snapshotMetaSchema = z
 				skills: z.number().int().min(0),
 				aiTools: z.number().int().min(0),
 				timeline: z.number().int().min(0),
+				friends: z.number().int().min(0),
+				announcements: z.number().int().min(0),
 				media: z.number().int().min(0),
 			})
 			.strict(),
@@ -222,11 +279,25 @@ export function parseSiteSnapshot(value) {
 }
 
 export function parseGeneratedBundle(value) {
-	return {
+	const bundle = {
 		meta: snapshotMetaSchema.parse(value.meta),
 		projects: generatedProjectsSchema.parse(value.projects),
 		skills: skillsSchema.parse(value.skills),
 		aiTools: aiToolsSchema.parse(value.aiTools),
 		timeline: timelineItemsSchema.parse(value.timeline),
+		friends: generatedFriendsSchema.parse(value.friends),
+		announcements: announcementsSchema.parse(value.announcements),
 	};
+	const { counts } = bundle.meta;
+	for (const [name, items] of Object.entries({
+		projects: bundle.projects,
+		skills: bundle.skills,
+		aiTools: bundle.aiTools,
+		timeline: bundle.timeline,
+		friends: bundle.friends,
+		announcements: bundle.announcements,
+	})) {
+		if (counts[name] !== items.length) throw new Error(`Generated WordPress ${name} count does not match snapshot metadata`);
+	}
+	return bundle;
 }

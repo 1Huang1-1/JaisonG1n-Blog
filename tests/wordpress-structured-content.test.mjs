@@ -31,6 +31,7 @@ import {
 	validateMediaUrl,
 } from "../scripts/wordpress-sync/media.mjs";
 import { commitDirectoryTransaction } from "../scripts/wordpress-sync/transaction.mjs";
+import { adaptAnnouncements, adaptFriends, announcementDismissKey } from "../scripts/wordpress-sync/view-models.mjs";
 
 const PNG = await sharp({
 	create: { width: 2, height: 3, channels: 4, background: "#ff0000ff" },
@@ -109,6 +110,28 @@ function timeline(overrides = {}) {
 	};
 }
 
+function friend(overrides = {}) {
+	return {
+		title: "Friend One",
+		imgurl: "",
+		avatarMedia: null,
+		desc: "Friend description",
+		siteurl: "https://friend.example",
+		tags: ["blog"],
+		...overrides,
+	};
+}
+
+function announcement(overrides = {}) {
+	return {
+		title: "Notice",
+		content: "Announcement content",
+		closable: true,
+		link: { enable: true, text: "About", url: "/about/", external: false },
+		...overrides,
+	};
+}
+
 function snapshot(overrides = {}) {
 	return {
 		schemaVersion: 2,
@@ -120,6 +143,7 @@ function snapshot(overrides = {}) {
 		timeline: [],
 		mediaManifest: [],
 		friends: [],
+		announcements: [],
 		devices: [],
 		albums: [],
 		...overrides,
@@ -127,7 +151,7 @@ function snapshot(overrides = {}) {
 }
 
 function generatedBundle(overrides = {}) {
-	return {
+	const bundle = {
 		meta: {
 			schemaVersion: 2,
 			revision: "a".repeat(64),
@@ -140,6 +164,8 @@ function generatedBundle(overrides = {}) {
 				skills: 0,
 				aiTools: 0,
 				timeline: 0,
+				friends: 0,
+				announcements: 0,
 				media: 0,
 			},
 			media: [],
@@ -148,8 +174,20 @@ function generatedBundle(overrides = {}) {
 		skills: [],
 		aiTools: [],
 		timeline: [],
+		friends: [],
+		announcements: [],
 		...overrides,
 	};
+	bundle.meta.counts = {
+		...bundle.meta.counts,
+		projects: bundle.projects.length,
+		skills: bundle.skills.length,
+		aiTools: bundle.aiTools.length,
+		timeline: bundle.timeline.length,
+		friends: bundle.friends.length,
+		announcements: bundle.announcements.length,
+	};
+	return bundle;
 }
 
 function generatedFiles(bundle) {
@@ -159,6 +197,8 @@ function generatedFiles(bundle) {
 		["skills.json", JSON.stringify(bundle.skills)],
 		["ai-tools.json", JSON.stringify(bundle.aiTools)],
 		["timeline.json", JSON.stringify(bundle.timeline)],
+		["friends.json", JSON.stringify(bundle.friends)],
+		["announcements.json", JSON.stringify(bundle.announcements)],
 	]);
 }
 
@@ -203,6 +243,17 @@ test("structured flag accepts only exact lowercase values", () => {
 		() => parseStructuredContentFlag("TRUE"),
 		/exactly 'true' or 'false'/,
 	);
+});
+
+test("friend and announcement view models preserve deterministic source data", () => {
+	const friends = adaptFriends([friend({ avatarMedia: { url: "/generated/wordpress-media/" + "a".repeat(64) + ".png" } }), friend({ title: "No avatar", imgurl: "" })]);
+	assert.equal(friends[0].avatar, `/generated/wordpress-media/${"a".repeat(64)}.png`);
+	assert.equal(friends[1].avatar, "");
+	const [item] = adaptAnnouncements([announcement({ content: "Line one\r\nLine two" })]);
+	assert.equal(item.content, "Line one\nLine two");
+	assert.match(item.dismissKey, /^[a-f0-9]{20}$/);
+	assert.equal(item.dismissKey, announcementDismissKey(item));
+	assert.notEqual(item.dismissKey, adaptAnnouncements([announcement({ content: "Changed" })])[0].dismissKey);
 });
 
 test("gateway does not touch generated files while disabled", () => {
@@ -858,14 +909,16 @@ test("full sync writes mapped fixture JSON and deduplicated local media", async 
 			},
 			logger: { info() {}, error() {}, warn() {} },
 		});
-		assert.deepEqual(result.structured.counts, {
-			posts: 1,
-			projects: 1,
-			skills: 1,
-			aiTools: 1,
-			timeline: 1,
-			media: 2,
-		});
+	assert.deepEqual(result.structured.counts, {
+		posts: 1,
+		projects: 1,
+		skills: 1,
+		aiTools: 1,
+		timeline: 1,
+		friends: 0,
+		announcements: 0,
+		media: 2,
+	});
 		const projects = JSON.parse(
 			await readFile(
 				path.join(root, "src/generated/wordpress/projects.json"),

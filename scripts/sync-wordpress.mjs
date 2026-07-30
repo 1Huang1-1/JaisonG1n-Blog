@@ -270,6 +270,8 @@ async function readGeneratedBundle(generatedDir) {
 		skills: await readJson("skills.json"),
 		aiTools: await readJson("ai-tools.json"),
 		timeline: await readJson("timeline.json"),
+		friends: await readJson("friends.json"),
+		announcements: await readJson("announcements.json"),
 	});
 }
 
@@ -299,6 +301,8 @@ async function generateStructured({ snapshot, baseUrl, postsCount, generatedDir,
 			skills: rewritten.skills.length,
 			aiTools: rewritten.aiTools.length,
 			timeline: rewritten.timeline.length,
+			friends: rewritten.friends.length,
+			announcements: rewritten.announcements.length,
 			media: mirror.getRecords().length,
 		},
 		media: mirror.getRecords(),
@@ -310,6 +314,8 @@ async function generateStructured({ snapshot, baseUrl, postsCount, generatedDir,
 		writeJson(path.join(generatedDir, "skills.json"), bundle.skills),
 		writeJson(path.join(generatedDir, "ai-tools.json"), bundle.aiTools),
 		writeJson(path.join(generatedDir, "timeline.json"), bundle.timeline),
+		writeJson(path.join(generatedDir, "friends.json"), bundle.friends),
+		writeJson(path.join(generatedDir, "announcements.json"), bundle.announcements),
 	]);
 	return bundle;
 }
@@ -388,7 +394,7 @@ export async function syncWordPress({
 		committed = true;
 		logger.info(`WordPress article sync complete: ${files.length} article(s)`);
 		if (structuredBundle) {
-			logger.info(`WordPress structured sync ${structuredStatus}: projects=${structuredBundle.projects.length}, skills=${structuredBundle.skills.length}, aiTools=${structuredBundle.aiTools.length}, timeline=${structuredBundle.timeline.length}`);
+			logger.info(`WordPress structured sync ${structuredStatus}: projects=${structuredBundle.projects.length}, skills=${structuredBundle.skills.length}, aiTools=${structuredBundle.aiTools.length}, timeline=${structuredBundle.timeline.length}, friends=${structuredBundle.friends.length}, announcements=${structuredBundle.announcements.length}`);
 		}
 		return {
 			count: files.length,

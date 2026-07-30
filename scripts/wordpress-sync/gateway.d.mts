@@ -5,6 +5,8 @@ export function loadStructuredContentSource<TLegacy extends {
 	skills: unknown[];
 	aiTools: unknown[];
 	timeline: unknown[];
+	friends: unknown[];
+	announcements: unknown[];
 }>(options: {
 	enabledValue: string | undefined;
 	legacy: TLegacy;

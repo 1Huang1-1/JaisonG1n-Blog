@@ -145,6 +145,8 @@ update_post_meta($timeline_id, '_jg_links', array(array('name' => 'Website', 'ur
 $friend_id = jg_create_item('jg_friend', 'friend-one', 'Friend description');
 set_post_thumbnail($friend_id, $media_id);
 update_post_meta($friend_id, '_jg_site_url', 'https://example.com');
+$friend_without_avatar = jg_create_item('jg_friend', 'friend-two', 'Friend without avatar');
+update_post_meta($friend_without_avatar, '_jg_site_url', 'https://friend.example.com');
 
 $device_id = jg_create_item('jg_device', 'device-one', 'Device description');
 set_post_thumbnail($device_id, $media_id);
@@ -172,7 +174,21 @@ $announcement_id = jg_create_item('jg_announcement', 'announcement-one', 'Announ
 update_post_meta($announcement_id, '_jg_closable', true);
 update_post_meta($announcement_id, '_jg_link_enable', true);
 update_post_meta($announcement_id, '_jg_link_text', 'Details');
-update_post_meta($announcement_id, '_jg_link_url', 'https://example.com/details');
+$internal_announcement_url = JG_Content_Types::sanitize_field('/projects/?type=web#latest', $fields['jg_announcement']['link_url']);
+jg_smoke_assert($internal_announcement_url === '/projects/?type=web#latest', 'Safe root-relative announcement link was rejected.');
+update_post_meta($announcement_id, '_jg_link_url', $internal_announcement_url);
+$announcement_two = jg_create_item('jg_announcement', 'announcement-two', 'External non-closable notice');
+update_post_meta($announcement_two, '_jg_closable', false);
+update_post_meta($announcement_two, '_jg_link_enable', true);
+update_post_meta($announcement_two, '_jg_link_text', 'External');
+update_post_meta($announcement_two, '_jg_link_url', 'https://example.com/details');
+update_post_meta($announcement_two, '_jg_link_external', true);
+jg_smoke_assert(JG_Content_Types::sanitize_field('https://example.com/details', $fields['jg_announcement']['link_url']) === 'https://example.com/details', 'External announcement URL was rejected.');
+
+foreach (array('//evil.example.com', '/\\evil', 'javascript:alert(1)', 'data:text/plain,test', 'file:///tmp/test', '/%2f%2fevil.example.com', "/about/\r\nLocation: https://evil.example") as $unsafe_announcement_url) {
+	jg_smoke_assert(JG_Content_Types::sanitize_field($unsafe_announcement_url, $fields['jg_announcement']['link_url']) === '', 'Unsafe announcement URL was accepted.');
+}
+jg_smoke_assert(JG_Content_Types::sanitize_field('/about/', $fields['jg_friend']['site_url']) === '', 'Friend URL sanitizer was unexpectedly relaxed.');
 
 foreach (array_keys(JG_Content_Types::definitions()) as $post_type) {
 	jg_create_item($post_type, 'draft-' . str_replace('jg_', '', $post_type), 'Private draft fixture', 0, 'draft');
@@ -190,9 +206,11 @@ jg_smoke_assert(
 );
 jg_smoke_assert(($first_data['schemaVersion'] ?? null) === 2, 'Unexpected snapshot schema version.');
 jg_smoke_assert(count($first_data['projects'] ?? array()) === 3, 'Draft filtering or project count is incorrect.');
-foreach (array('skills', 'aiTools', 'timeline', 'friends', 'devices', 'diary', 'albums', 'anime', 'announcements') as $collection) {
+foreach (array('skills', 'aiTools', 'timeline', 'devices', 'diary', 'albums', 'anime') as $collection) {
 	jg_smoke_assert(count($first_data[$collection] ?? array()) === 1, 'Draft filtering failed for ' . $collection . '.');
 }
+jg_smoke_assert(count($first_data['friends'] ?? array()) === 2, 'Friend fixtures were not published correctly.');
+jg_smoke_assert(count($first_data['announcements'] ?? array()) === 2, 'Announcement fixtures were not published correctly.');
 jg_smoke_assert(array_column($first_data['projects'], 'id') === array('project-first', 'project-a', 'project-b'), 'Deterministic project ordering failed.');
 jg_smoke_assert(
 	$first_data['projects'][0]['description'] === 'Hello & world',
@@ -211,6 +229,9 @@ jg_smoke_assert(!str_contains($first_data['diary'][0]['contentHtml'], 'bad()'), 
 jg_smoke_assert(!str_contains($first_data['albums'][0]['contentHtml'], 'bad()'), 'Album contentHtml was not sanitized.');
 jg_smoke_assert(($first_data['anime'][0]['status'] ?? '') === 'onhold', 'Extended anime status was not preserved.');
 jg_smoke_assert(($first_data['announcements'][0]['link']['enable'] ?? false) === true, 'Announcement link enable flag is missing.');
+jg_smoke_assert(($first_data['announcements'][0]['link']['url'] ?? '') === '/projects/?type=web#latest', 'Internal announcement link was not preserved.');
+jg_smoke_assert(($first_data['announcements'][1]['closable'] ?? true) === false, 'Non-closable announcement was not preserved.');
+jg_smoke_assert(($first_data['friends'][1]['avatarMedia'] ?? null) === null, 'Friend without avatar unexpectedly has media.');
 jg_smoke_assert(count($first_data['mediaManifest'] ?? array()) === 1, 'Media manifest did not deduplicate attachments.');
 jg_smoke_assert(($first_data['mediaManifest'][0]['width'] ?? 0) === 1 && ($first_data['mediaManifest'][0]['height'] ?? 0) === 1, 'Media dimensions are invalid.');
 $snapshot_pages = array_values(array_filter($first_data['pages'], static fn($page) => ($page['slug'] ?? '') === 'snapshot-page'));

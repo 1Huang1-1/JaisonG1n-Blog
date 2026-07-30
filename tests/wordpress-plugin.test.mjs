@@ -82,20 +82,32 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.2.2 keeps schemaVersion 2 and deterministic ordering", async () => {
+test("version 0.2.3 keeps schemaVersion 2 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.2\.2/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.2\.2'/);
-	assert.match(readme, /Stable tag:\s*0\.2\.2/);
+	assert.match(entry, /Version:\s*0\.2\.3/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.2\.3'/);
+	assert.match(readme, /Stable tag:\s*0\.2\.3/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*2/);
 	assert.match(
 		snapshot,
 		/'orderby'\s*=>\s*array\('menu_order'\s*=>\s*'ASC',\s*'date'\s*=>\s*'DESC',\s*'ID'\s*=>\s*'ASC'\)/,
 	);
+});
+
+test("only announcement links opt into validated root-relative paths", async () => {
+	const source = await readFile(
+		path.join(pluginRoot, "includes/class-jg-content-types.php"),
+		"utf8",
+	);
+	assert.match(source, /'link_url'\s*=>\s*self::announcement_url/);
+	assert.match(source, /case 'announcement_url': return self::sanitize_announcement_url/);
+	assert.match(source, /case 'url': return self::sanitize_http_url/);
+	assert.match(source, /str_starts_with\(\$decoded, '\/\/'\)/);
+	assert.match(source, /rawurldecode/);
 });
 
 test("schema v2 fields use structured repeaters and normalized media", async () => {

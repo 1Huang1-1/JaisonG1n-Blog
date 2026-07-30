@@ -336,5 +336,17 @@ export async function rewriteStructuredMedia(snapshot, mirror, baseUrl) {
 			}),
 		});
 	}
-	return { projects, skills: snapshot.skills, aiTools: snapshot.aiTools, timeline };
+	const friends = [];
+	for (const friend of snapshot.friends) {
+		let imgurl = "";
+		let avatarMedia = null;
+		if (friend.imgurl) {
+			const manifest = friend.avatarMedia ?? manifestByUrl.get(new URL(friend.imgurl).href) ?? null;
+			const mirrored = await mirror.mirror(friend.imgurl, { manifest, alt: friend.title });
+			imgurl = mirrored.url;
+			if (friend.avatarMedia) avatarMedia = { ...friend.avatarMedia, url: mirrored.url };
+		}
+		friends.push({ ...friend, imgurl, avatarMedia });
+	}
+	return { projects, skills: snapshot.skills, aiTools: snapshot.aiTools, timeline, friends, announcements: snapshot.announcements };
 }

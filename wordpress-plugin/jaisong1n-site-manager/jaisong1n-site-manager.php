@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JaisonG1n Site Manager
  * Description: JaisonG1n 博客的内容、安全配置、公开快照与构建通知管理插件。
- * Version: 0.2.2
+ * Version: 0.2.3
  * Author: JaisonG1n
  * Requires at least: 6.5
  * Requires PHP: 8.1
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
-define('JG_SITE_MANAGER_VERSION', '0.2.2');
+define('JG_SITE_MANAGER_VERSION', '0.2.3');
 define('JG_SITE_MANAGER_FILE', __FILE__);
 define('JG_SITE_MANAGER_DIR', plugin_dir_path(__FILE__));
 define('JG_SITE_MANAGER_URL', plugin_dir_url(__FILE__));

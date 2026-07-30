@@ -41,7 +41,7 @@ export default defineConfig({
 			WORDPRESS_STRUCTURED_CONTENT_ENABLED: envField.enum({
 				values: ["true", "false"],
 				context: "server",
-				access: "public",
+				access: "secret",
 				optional: true,
 				default: "false",
 			}),

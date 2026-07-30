@@ -24,6 +24,8 @@ export function loadStructuredContentSource({
 		skills: readJson("skills.json"),
 		aiTools: readJson("ai-tools.json"),
 		timeline: readJson("timeline.json"),
+		friends: readJson("friends.json"),
+		announcements: readJson("announcements.json"),
 	});
 	return { source: "wordpress", ...bundle };
 }

@@ -62,6 +62,7 @@ function snapshot(overrides = {}) {
 		timeline: [],
 		mediaManifest: [],
 		friends: [],
+		announcements: [],
 		...overrides,
 	};
 }

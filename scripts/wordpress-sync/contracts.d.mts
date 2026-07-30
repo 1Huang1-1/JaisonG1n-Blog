@@ -25,13 +25,19 @@ export const projectSchema: z.ZodTypeAny;
 export const skillSchema: z.ZodTypeAny;
 export const aiToolSchema: z.ZodTypeAny;
 export const timelineSchema: z.ZodTypeAny;
+export const friendSchema: z.ZodTypeAny;
+export const announcementSchema: z.ZodTypeAny;
 export const projectsSchema: z.ZodTypeAny;
 export const skillsSchema: z.ZodTypeAny;
 export const aiToolsSchema: z.ZodTypeAny;
 export const timelineItemsSchema: z.ZodTypeAny;
+export const friendsSchema: z.ZodTypeAny;
+export const announcementsSchema: z.ZodTypeAny;
 export const siteSnapshotSchema: z.ZodTypeAny;
 export const generatedMediaObjectSchema: z.ZodTypeAny;
 export const generatedProjectSchema: z.ZodTypeAny;
+export const generatedFriendSchema: z.ZodTypeAny;
+export const generatedFriendsSchema: z.ZodTypeAny;
 export const mirroredMediaSchema: z.ZodTypeAny;
 export const snapshotMetaSchema: z.ZodTypeAny;
 export const generatedProjectsSchema: z.ZodTypeAny;
@@ -104,13 +110,29 @@ export interface GeneratedTimelineItem {
 	featured: boolean;
 }
 
+export interface GeneratedFriend {
+	title: string;
+	imgurl: string;
+	avatarMedia: GeneratedMediaObject | null;
+	desc: string;
+	siteurl: string;
+	tags: string[];
+}
+
+export interface GeneratedAnnouncement {
+	title: string;
+	content: string;
+	closable: boolean;
+	link: { enable: boolean; text: string; url: string; external: boolean };
+}
+
 export interface SnapshotMeta {
 	schemaVersion: 2;
 	revision: string;
 	generatedAt: string;
 	syncedAt: string;
 	sourceUrl: string;
-	counts: { posts: number; projects: number; skills: number; aiTools: number; timeline: number; media: number };
+	counts: { posts: number; projects: number; skills: number; aiTools: number; timeline: number; friends: number; announcements: number; media: number };
 	media: unknown[];
 }
 
@@ -120,6 +142,8 @@ export interface GeneratedBundle {
 	skills: GeneratedSkill[];
 	aiTools: GeneratedAITool[];
 	timeline: GeneratedTimelineItem[];
+	friends: GeneratedFriend[];
+	announcements: GeneratedAnnouncement[];
 }
 
 export function parseStructuredContentFlag(value: string | undefined): boolean;
@@ -131,6 +155,8 @@ export function parseSiteSnapshot(value: unknown): Record<string, unknown> & {
 	skills: GeneratedSkill[];
 	aiTools: GeneratedAITool[];
 	timeline: GeneratedTimelineItem[];
+	friends: GeneratedFriend[];
+	announcements: GeneratedAnnouncement[];
 	mediaManifest: Array<{
 		id: number;
 		url: string;

@@ -101,7 +101,7 @@ final class JG_Content_Types {
 				'closable' => self::checkbox('允许关闭', true),
 				'link_enable' => self::checkbox('显示链接'),
 				'link_text' => self::text('链接文字'),
-				'link_url' => self::url('链接地址'),
+				'link_url' => self::announcement_url('链接地址'),
 				'link_external' => self::checkbox('外部链接'),
 			),
 		);
@@ -246,13 +246,14 @@ final class JG_Content_Types {
 				self::render_repeater($key, $field, $value);
 				break;
 			default:
+				$input_type = $field['type'] === 'announcement_url' ? 'url' : $field['type'];
 				$attributes = '';
 				foreach (array('min', 'max', 'step') as $attribute) {
 					if (isset($field[$attribute])) {
 						$attributes .= ' ' . $attribute . '="' . esc_attr((string) $field[$attribute]) . '"';
 					}
 				}
-				echo '<input class="regular-text" type="' . esc_attr($field['type']) . '" id="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="' . esc_attr((string) $value) . '"' . $attributes . '>';
+				echo '<input class="regular-text" type="' . esc_attr($input_type) . '" id="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="' . esc_attr((string) $value) . '"' . $attributes . '>';
 		}
 		echo '</div>';
 	}
@@ -433,7 +434,8 @@ final class JG_Content_Types {
 				if (isset($field['min'])) $number = max((float) $field['min'], $number);
 				if (isset($field['max'])) $number = min((float) $field['max'], $number);
 				return $number;
-			case 'url': return esc_url_raw((string) $value, array('http', 'https'));
+			case 'url': return self::sanitize_http_url($value);
+			case 'announcement_url': return self::sanitize_announcement_url($value);
 			case 'date': return preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $value) ? (string) $value : '';
 			case 'color': return sanitize_hex_color((string) $value) ?: '';
 			case 'textarea': return self::limited_textarea($value, 10000);
@@ -443,6 +445,30 @@ final class JG_Content_Types {
 			case 'media_repeater': return self::sanitize_media_rows($value);
 			default: return self::limited_text($value, 500);
 		}
+	}
+
+	private static function sanitize_http_url($value): string {
+		$clean = esc_url_raw((string) $value, array('http', 'https'));
+		return in_array(strtolower((string) wp_parse_url($clean, PHP_URL_SCHEME)), array('http', 'https'), true) ? $clean : '';
+	}
+
+	private static function sanitize_announcement_url($value): string {
+		$raw = trim((string) $value);
+		if ($raw === '' || preg_match('/[\\\\\r\n]/', $raw)) return '';
+		$is_external = preg_match('/^https?:/i', $raw) === 1;
+		$decoded = $raw;
+		for ($index = 0; $index < 3; $index++) {
+			$next = rawurldecode($decoded);
+			if ($next === $decoded) break;
+			$decoded = $next;
+		}
+		if (preg_match('/[\\\\\r\n]/', $decoded) || str_starts_with($decoded, '//')) return '';
+		if ($is_external) return esc_url_raw($raw, array('http', 'https'));
+		if (preg_match('/^[a-z][a-z0-9+.-]*:/i', $decoded)) return '';
+		if (!str_starts_with($raw, '/') || str_starts_with($raw, '//')) return '';
+		$parts = wp_parse_url($raw);
+		if (!is_array($parts) || isset($parts['scheme'], $parts['host'], $parts['user'], $parts['pass']) || !isset($parts['path']) || !str_starts_with($parts['path'], '/')) return '';
+		return $raw;
 	}
 
 	private static function sanitize_specs($value): array {
@@ -473,7 +499,7 @@ final class JG_Content_Types {
 		foreach (array_slice(is_array($value) ? $value : array(), 0, self::MAX_REPEATER_ROWS) as $row) {
 			if (!is_array($row)) continue;
 			$name = self::limited_text($row['name'] ?? '', 300);
-			$url = esc_url_raw((string) ($row['url'] ?? ''), array('http', 'https'));
+			$url = self::sanitize_http_url($row['url'] ?? '');
 			$type = in_array((string) ($row['type'] ?? ''), $allowed, true) ? (string) $row['type'] : 'other';
 			if ($name !== '' && $url !== '') $rows[] = array('name' => $name, 'url' => $url, 'type' => $type);
 		}
@@ -507,6 +533,7 @@ final class JG_Content_Types {
 	private static function text(string $label): array { return array('label' => $label, 'type' => 'text'); }
 	private static function textarea(string $label): array { return array('label' => $label, 'type' => 'textarea'); }
 	private static function url(string $label): array { return array('label' => $label, 'type' => 'url'); }
+	private static function announcement_url(string $label): array { return array('label' => $label, 'type' => 'announcement_url'); }
 	private static function date(string $label): array { return array('label' => $label, 'type' => 'date'); }
 	private static function color(string $label): array { return array('label' => $label, 'type' => 'color'); }
 	private static function checkbox(string $label, bool $default = false): array { return array('label' => $label, 'type' => 'checkbox', 'default' => $default); }
