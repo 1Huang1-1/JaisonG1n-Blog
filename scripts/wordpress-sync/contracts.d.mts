@@ -112,6 +112,7 @@ export interface GeneratedTimelineItem {
 
 export interface GeneratedFriend {
 	title: string;
+	icon: string;
 	imgurl: string;
 	avatarMedia: GeneratedMediaObject | null;
 	desc: string;

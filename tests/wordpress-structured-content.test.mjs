@@ -113,6 +113,7 @@ function timeline(overrides = {}) {
 function friend(overrides = {}) {
 	return {
 		title: "Friend One",
+		icon: "simple-icons:github",
 		imgurl: "",
 		avatarMedia: null,
 		desc: "Friend description",

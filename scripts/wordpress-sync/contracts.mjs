@@ -168,6 +168,7 @@ export const timelineItemsSchema = collection(timelineSchema);
 export const friendSchema = z
 	.object({
 		title: requiredText(500),
+		icon: boundedText(300),
 		imgurl: optionalHttpUrl,
 		avatarMedia: mediaObjectSchema.nullable(),
 		desc: boundedText(20_000),

@@ -213,6 +213,7 @@ final class JG_Snapshot {
 				$featured = $this->featured_media($post->ID);
 				return array(
 					'title' => $title,
+					'icon' => $this->meta($post, 'icon'),
 					'imgurl' => $featured['url'],
 					'avatarMedia' => $featured['media'],
 					'desc' => $description,

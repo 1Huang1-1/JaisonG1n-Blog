@@ -1,9 +1,10 @@
 ---
 import I18nKey from "../../../i18n/i18nKey";
 import { i18n } from "../../../i18n/translation";
+import { Icon } from "astro-icon/components";
 
 interface Props {
-	friend: { name: string; url: string; avatar: string; description: string; tags: string[] };
+	friend: { name: string; icon: string; url: string; avatar: string; description: string; tags: string[] };
 }
 
 const { friend } = Astro.props;
@@ -16,7 +17,8 @@ const fallback = Array.from(friend.name.trim())[0]?.toUpperCase() || "?";
 		<div class="flex items-start gap-4 mb-4">
 			<div class="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-(--btn-regular-bg) ring-2 ring-transparent transition-all duration-300">
 				{friend.avatar && <img data-friend-avatar src={friend.avatar} alt={friend.name} class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300" loading="lazy" />}
-				<span class:list={["friend-avatar-fallback absolute inset-0 flex items-center justify-center text-xl font-bold text-(--primary)", friend.avatar ? "hidden" : ""]}>{fallback}</span>
+				{!friend.avatar && friend.icon && <Icon name={friend.icon} class="w-8 h-8 text-(--primary)" />}
+				{!friend.avatar && !friend.icon && <span class="friend-avatar-fallback absolute inset-0 flex items-center justify-center text-xl font-bold text-(--primary)">{fallback}</span>}
 			</div>
 			<div class="flex-1 min-w-0">
 				<h3 class="text-xl font-bold text-black/90 dark:text-white/90 mb-1 truncate group-hover:text-(--primary) transition-colors duration-200">{friend.name}</h3>

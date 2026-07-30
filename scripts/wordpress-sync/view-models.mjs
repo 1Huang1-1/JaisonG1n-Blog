@@ -22,6 +22,7 @@ export function announcementDismissKey(value) {
 export function adaptFriends(items) {
 	return items.map((friend) => ({
 		name: stableText(friend.title),
+		icon: stableText(friend.icon),
 		description: stableText(friend.desc),
 		avatar: friend.avatarMedia?.url || stableText(friend.imgurl),
 		url: friend.siteurl,

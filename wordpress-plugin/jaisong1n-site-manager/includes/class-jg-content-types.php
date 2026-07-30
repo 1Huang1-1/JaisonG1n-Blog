@@ -67,6 +67,7 @@ final class JG_Content_Types {
 				'featured' => self::checkbox('重点展示'),
 			),
 			'jg_friend' => array(
+				'icon' => self::text('Iconify 图标名（例如 simple-icons:github）'),
 				'site_url' => self::url('网站地址'),
 				'tags' => self::text('标签（逗号分隔）'),
 			),

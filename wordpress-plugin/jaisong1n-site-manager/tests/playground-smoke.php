@@ -144,6 +144,7 @@ update_post_meta($timeline_id, '_jg_links', array(array('name' => 'Website', 'ur
 
 $friend_id = jg_create_item('jg_friend', 'friend-one', 'Friend description');
 set_post_thumbnail($friend_id, $media_id);
+update_post_meta($friend_id, '_jg_icon', 'simple-icons:github');
 update_post_meta($friend_id, '_jg_site_url', 'https://example.com');
 $friend_without_avatar = jg_create_item('jg_friend', 'friend-two', 'Friend without avatar');
 update_post_meta($friend_without_avatar, '_jg_site_url', 'https://friend.example.com');
@@ -232,6 +233,7 @@ jg_smoke_assert(($first_data['announcements'][0]['link']['enable'] ?? false) ===
 jg_smoke_assert(($first_data['announcements'][0]['link']['url'] ?? '') === '/projects/?type=web#latest', 'Internal announcement link was not preserved.');
 jg_smoke_assert(($first_data['announcements'][1]['closable'] ?? true) === false, 'Non-closable announcement was not preserved.');
 jg_smoke_assert(($first_data['friends'][1]['avatarMedia'] ?? null) === null, 'Friend without avatar unexpectedly has media.');
+jg_smoke_assert(($first_data['friends'][0]['icon'] ?? '') === 'simple-icons:github', 'Friend Iconify icon is missing.');
 jg_smoke_assert(count($first_data['mediaManifest'] ?? array()) === 1, 'Media manifest did not deduplicate attachments.');
 jg_smoke_assert(($first_data['mediaManifest'][0]['width'] ?? 0) === 1 && ($first_data['mediaManifest'][0]['height'] ?? 0) === 1, 'Media dimensions are invalid.');
 $snapshot_pages = array_values(array_filter($first_data['pages'], static fn($page) => ($page['slug'] ?? '') === 'snapshot-page'));
