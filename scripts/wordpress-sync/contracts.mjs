@@ -17,6 +17,8 @@ export const SYNC_LIMITS = Object.freeze({
 	headersTimeoutMs: 15_000,
 	bodyTimeoutMs: 30_000,
 	requestTimeoutMs: 30_000,
+	maxRetries: 2,
+	retryDelayMs: 500,
 	maxSnapshotBytes: 2 * 1024 * 1024,
 });
 

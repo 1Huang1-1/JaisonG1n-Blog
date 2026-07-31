@@ -8,6 +8,7 @@ import { parse } from "node-html-parser";
 import sharp from "sharp";
 import { Agent, request as undiciRequest } from "undici";
 import { ALLOWED_IMAGE_MIME_TYPES, SYNC_LIMITS } from "./contracts.mjs";
+import { withNetworkRetries } from "./retry.mjs";
 
 const MIME_EXTENSION = new Map([
 	["image/jpeg", "jpg"],
@@ -167,6 +168,7 @@ export class MediaMirror {
 		requestImpl = undiciRequest,
 		dispatcherFactory,
 		limits = SYNC_LIMITS,
+		sleep,
 	} = {}) {
 		if (!allowedHost || !outputDir) throw new Error("MediaMirror requires allowedHost and outputDir");
 		this.allowedHost = allowedHost;
@@ -175,6 +177,7 @@ export class MediaMirror {
 		this.requestImpl = requestImpl;
 		this.dispatcherFactory = dispatcherFactory;
 		this.limits = limits;
+		this.sleep = sleep;
 		this.bySource = new Map();
 		this.byHash = new Map();
 		this.records = [];
@@ -186,25 +189,40 @@ export class MediaMirror {
 		for (let redirects = 0; ; redirects += 1) {
 			if (redirects > this.limits.maxRedirects) throw new Error(`Media exceeded ${this.limits.maxRedirects} redirects`);
 			const addresses = await resolvePublicAddresses(current.hostname, this.resolver);
-			const dispatcher = this.dispatcherFactory
-				? await this.dispatcherFactory({ url: current, addresses, limits: this.limits })
-				: new Agent({
-					connect: {
-						lookup: createPinnedLookup(addresses),
-						timeout: this.limits.connectTimeoutMs,
-						servername: current.hostname,
-					},
-				});
-			let response;
+			const { response, dispatcher } = await withNetworkRetries(
+				async () => {
+					let requestDispatcher;
+					try {
+						requestDispatcher = this.dispatcherFactory
+							? await this.dispatcherFactory({ url: current, addresses, limits: this.limits })
+							: new Agent({
+									connect: {
+										lookup: createPinnedLookup(addresses),
+										timeout: this.limits.connectTimeoutMs,
+										servername: current.hostname,
+									},
+								});
+						const requestResponse = await this.requestImpl(current, {
+							dispatcher: requestDispatcher,
+							method: "GET",
+							headers: { Accept: accept },
+							headersTimeout: this.limits.headersTimeoutMs,
+							bodyTimeout: this.limits.bodyTimeoutMs,
+							maxRedirections: 0,
+						});
+						return { response: requestResponse, dispatcher: requestDispatcher };
+					} catch (error) {
+						if (typeof requestDispatcher?.close === "function") await requestDispatcher.close();
+						throw error;
+					}
+				},
+				{
+					maxRetries: this.limits.maxRetries,
+					retryDelayMs: this.limits.retryDelayMs,
+					sleep: this.sleep,
+				},
+			);
 			try {
-				response = await this.requestImpl(current, {
-					dispatcher,
-					method: "GET",
-					headers: { Accept: accept },
-					headersTimeout: this.limits.headersTimeoutMs,
-					bodyTimeout: this.limits.bodyTimeoutMs,
-					maxRedirections: 0,
-				});
 				if (REDIRECT_STATUSES.has(response.statusCode)) {
 					await response.body.dump();
 					if (typeof dispatcher.close === "function") await dispatcher.close();

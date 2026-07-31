@@ -566,6 +566,42 @@ test("MediaMirror uses MockAgent, validates MIME, hashes and deduplicates", asyn
 	}
 });
 
+test("MediaMirror retries transient response-header timeouts", async () => {
+	const root = await mkdtemp(path.join(os.tmpdir(), "media-retry-"));
+	let attempts = 0;
+	try {
+		const mirror = new MediaMirror({
+			allowedHost: "cms.example",
+			outputDir: root,
+			resolver: async () => [{ address: "93.184.216.34", family: 4 }],
+			limits: { ...SYNC_LIMITS, maxRetries: 1, retryDelayMs: 0 },
+			sleep: async () => {},
+			dispatcherFactory: async () => ({ close: async () => {} }),
+			requestImpl: async () => {
+				attempts += 1;
+				if (attempts === 1) {
+					const error = new Error("Headers Timeout Error");
+					error.code = "UND_ERR_HEADERS_TIMEOUT";
+					throw error;
+				}
+				return {
+					statusCode: 200,
+					headers: {
+						"content-type": "image/png",
+						"content-length": String(PNG.length),
+					},
+					body: responseBody(PNG),
+				};
+			},
+		});
+		const media = await mirror.mirror("https://cms.example/retry.png");
+		assert.equal(attempts, 2);
+		assert.equal(media.mimeType, "image/png");
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
 test("manifest MIME must match while inline-only media needs response compatibility", async () => {
 	const root = await mkdtemp(path.join(os.tmpdir(), "media-mime-"));
 	const requestImpl = async () => ({

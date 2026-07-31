@@ -12,6 +12,7 @@ import {
 	SYNC_LIMITS,
 } from "./wordpress-sync/contracts.mjs";
 import { MediaMirror, rewriteStructuredMedia } from "./wordpress-sync/media.mjs";
+import { withNetworkRetries } from "./wordpress-sync/retry.mjs";
 import { commitDirectoryTransaction } from "./wordpress-sync/transaction.mjs";
 import { resolvePostPath } from "./wordpress-sync/post-path.mjs";
 
@@ -177,13 +178,21 @@ function buildPostsUrl(baseUrl, page) {
 	return url;
 }
 
-async function fetchJsonResponse(url, fetchImpl, description) {
+async function fetchJsonResponse(url, fetchImpl, description, retryOptions = {}) {
 	let response;
 	try {
-		response = await fetchImpl(url, {
-			headers: { Accept: "application/json" },
-			signal: AbortSignal.timeout(SYNC_LIMITS.requestTimeoutMs),
-		});
+		response = await withNetworkRetries(
+			() =>
+				fetchImpl(url, {
+					headers: { Accept: "application/json" },
+					signal: AbortSignal.timeout(SYNC_LIMITS.requestTimeoutMs),
+				}),
+			{
+				maxRetries: retryOptions.maxRetries ?? SYNC_LIMITS.maxRetries,
+				retryDelayMs: retryOptions.retryDelayMs ?? SYNC_LIMITS.retryDelayMs,
+				sleep: retryOptions.sleep,
+			},
+		);
 	} catch (error) {
 		throw new Error(`${description} request failed: ${error.message}`, { cause: error });
 	}
@@ -194,8 +203,8 @@ async function fetchJsonResponse(url, fetchImpl, description) {
 	return response;
 }
 
-async function fetchPage(baseUrl, page, fetchImpl) {
-	const response = await fetchJsonResponse(buildPostsUrl(baseUrl, page), fetchImpl, `WordPress page ${page}`);
+async function fetchPage(baseUrl, page, fetchImpl, retryOptions) {
+	const response = await fetchJsonResponse(buildPostsUrl(baseUrl, page), fetchImpl, `WordPress page ${page}`, retryOptions);
 	let posts;
 	try {
 		posts = await response.json();
@@ -206,8 +215,8 @@ async function fetchPage(baseUrl, page, fetchImpl) {
 	return { posts, response };
 }
 
-export async function fetchPublishedPosts({ baseUrl, fetchImpl = fetch, logger = console }) {
-	const first = await fetchPage(baseUrl, 1, fetchImpl);
+export async function fetchPublishedPosts({ baseUrl, fetchImpl = fetch, logger = console, retryOptions }) {
+	const first = await fetchPage(baseUrl, 1, fetchImpl, retryOptions);
 	const totalPagesHeader = first.response.headers.get("x-wp-totalpages");
 	const totalPages = totalPagesHeader === null ? 1 : Number.parseInt(totalPagesHeader, 10);
 	if (!Number.isInteger(totalPages) || totalPages < 0) throw new Error(`Invalid X-WP-TotalPages header: ${totalPagesHeader}`);
@@ -215,16 +224,17 @@ export async function fetchPublishedPosts({ baseUrl, fetchImpl = fetch, logger =
 	const posts = [...first.posts];
 	for (let page = 2; page <= totalPages; page += 1) {
 		logger.info(`WordPress page ${page}/${totalPages}`);
-		posts.push(...(await fetchPage(baseUrl, page, fetchImpl)).posts);
+		posts.push(...(await fetchPage(baseUrl, page, fetchImpl, retryOptions)).posts);
 	}
 	return posts.filter((post) => post?.status === "publish");
 }
 
-export async function fetchSiteSnapshot({ baseUrl, fetchImpl = fetch }) {
+export async function fetchSiteSnapshot({ baseUrl, fetchImpl = fetch, retryOptions }) {
 	const response = await fetchJsonResponse(
 		new URL("/wp-json/jaisong1n/v1/site-snapshot", baseUrl),
 		fetchImpl,
 		"WordPress site snapshot",
+		retryOptions,
 	);
 	const declaredLength = Number.parseInt(response.headers.get("content-length") ?? "", 10);
 	if (Number.isFinite(declaredLength) && declaredLength > SYNC_LIMITS.maxSnapshotBytes) throw new Error("WordPress site snapshot exceeds 2 MiB");
@@ -372,6 +382,7 @@ export async function syncWordPress({
 	logger = console,
 	mediaOptions = {},
 	permalinkConfig = { permalinkEnabled: false, permalinkFormat: "%postname%" },
+	retryOptions,
 	afterReplace,
 } = {}) {
 	const sourceUrl = normalizeBaseUrl(baseUrl);
@@ -383,7 +394,7 @@ export async function syncWordPress({
 	logger.info(`WordPress source: ${sourceUrl}`);
 
 	// Native posts are always strict and must finish before the optional snapshot path.
-	const posts = await fetchPublishedPosts({ baseUrl: sourceUrl, fetchImpl, logger });
+	const posts = await fetchPublishedPosts({ baseUrl: sourceUrl, fetchImpl, logger, retryOptions });
 	const transactionRoot = await mkdtemp(path.join(repoRoot, ".wordpress-sync-"));
 	const stagingRoot = path.join(transactionRoot, "stage");
 	const staged = {
@@ -398,7 +409,7 @@ export async function syncWordPress({
 		let structuredBundle = null;
 		let structuredError = null;
 		try {
-			const snapshot = await fetchSiteSnapshot({ baseUrl: sourceUrl, fetchImpl });
+			const snapshot = await fetchSiteSnapshot({ baseUrl: sourceUrl, fetchImpl, retryOptions });
 			structuredBundle = await generateStructured({
 				snapshot,
 				baseUrl: sourceUrl,

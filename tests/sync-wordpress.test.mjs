@@ -133,6 +133,33 @@ test("fetches all pages and filters non-published responses", async () => {
 	);
 });
 
+test("retries transient WordPress response failures", async () => {
+	let attempts = 0;
+	const fetchImpl = async () => {
+		attempts += 1;
+		if (attempts === 1) {
+			const error = new Error("Headers Timeout Error");
+			error.code = "UND_ERR_HEADERS_TIMEOUT";
+			throw error;
+		}
+		return new Response(JSON.stringify([post()]), {
+			status: 200,
+			headers: { "X-WP-TotalPages": "1", "Content-Type": "application/json" },
+		});
+	};
+	const posts = await fetchPublishedPosts({
+		baseUrl: "https://cms.example",
+		fetchImpl,
+		logger: { info() {} },
+		retryOptions: { maxRetries: 1, retryDelayMs: 0 },
+	});
+	assert.equal(attempts, 2);
+	assert.deepEqual(
+		posts.map((value) => value.id),
+		[6],
+	);
+});
+
 test("replaces only the generated output after a successful sync", async () => {
 	const root = await mkdtemp(path.join(os.tmpdir(), "wordpress-sync-test-"));
 	const outputDir = path.join(root, "src/content/posts/wordpress");

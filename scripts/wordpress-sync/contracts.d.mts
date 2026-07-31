@@ -17,6 +17,8 @@ export const SYNC_LIMITS: Readonly<{
 	headersTimeoutMs: number;
 	bodyTimeoutMs: number;
 	requestTimeoutMs: number;
+	maxRetries: number;
+	retryDelayMs: number;
 	maxSnapshotBytes: number;
 }>;
 
