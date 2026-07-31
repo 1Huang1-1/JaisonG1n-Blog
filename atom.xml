@@ -5,8 +5,39 @@
   <link href="https://jaisong1n.com/" rel="alternate" type="text/html"/>
   <link href="https://jaisong1n.com/atom.xml" rel="self" type="application/atom+xml"/>
   <id>https://jaisong1n.com/</id>
-  <updated>2026-07-31T07:23:56.545Z</updated>
+  <updated>2026-07-31T07:44:10.661Z</updated>
   <language>zh_CN</language>
+  <entry>
+    <title>从手动发布到自动部署：我的个人博客工作流升级记录</title>
+    <link href="https://jaisong1n.com/posts/wordpress-astro-auto-deploy-workflow/" rel="alternate" type="text/html"/>
+    <id>https://jaisong1n.com/posts/wordpress-astro-auto-deploy-workflow/</id>
+    <published>2026-07-31T07:41:50.000Z</published>
+    <updated>2026-07-31T07:41:50.000Z</updated>
+    <summary>记录个人博客从手动触发构建升级为 WordPress 发布后自动调用 GitHub Actions，并由 Astro 完成同步、构建和部署的过程。</summary>
+    <content type="html"><![CDATA[<h2>为什么要改造发布流程</h2>
+<p>过去我在 WordPress 中完成一篇文章的修改后，还要专门切换到构建页面手动触发流程。这个动作本身并不复杂，但很容易在赶时间时被遗漏：内容已经保存，线上页面却仍然是旧版本。写作和发布被拆成两段，注意力也被迫从文章本身转移到一次次确认构建状态上。随着文章更新越来越频繁，我希望把这段重复操作交给稳定的自动化链路，让自己把时间留给选题、表达和审核。</p>
+<h2>现在的发布链路</h2>
+<p>现在，当 WordPress 发布内容后，系统会先经过约 60 秒的防抖窗口，把短时间内连续的修改合并起来，再通过 workflow_dispatch 触发 GitHub Actions。随后工作流同步 WordPress 的结构化数据和媒体资源，执行 Astro 静态构建，更新 deploy 分支，最后让博客上线。这样的顺序让内容源始终清晰，也避免了每次微调都触发一次完整构建。</p>
+<ul>
+<li><code>WordPress 发布内容</code></li>
+<li><code>约 60 秒防抖并合并连续修改</code></li>
+<li><code>workflow_dispatch</code></li>
+<li><code>GitHub Actions</code></li>
+<li><code>同步数据和媒体</code></li>
+<li><code>Astro 静态构建并更新 deploy 分支</code></li>
+</ul>
+<h2>这次改造中关注的细节</h2>
+<p>我把可追溯性和失败隔离放在第一位。Site Manager 插件版本为 0.6.0，schemaVersion 保持为 5，保证已有内容结构可以继续被稳定识别。用于调用 GitHub 的 Token 采用最小权限，并且不会进入前端产物、内容快照或运行日志。连续保存会在防抖窗口内合并，不会产生多次构建；即使 GitHub 请求失败，也不会阻止 WordPress 保存内容。手动强制重建仍然保留为兜底入口。新插件统一使用 workflow_dispatch，repository_dispatch 暂时只保留给旧调用方兼容使用。</p>
+<h2>当前完成情况</h2>
+<p>目前，手动强制构建已经成功，自动触发构建也已经跑通。这篇文章用于继续验证 AI 通过 REST API 管理 WordPress 内容的能力。内容写入阶段会保持草稿状态，由我先检查结构、措辞和事实，再决定是否发布；这也让自动化的边界始终清楚。</p>
+<h2>下一步</h2>
+<p>接下来我会开发受控的 AI 草稿接口，并接入 OpenClaw 微信助手。AI 默认只创建草稿，人工审核后再发布；一旦内容发布，就复用现有的自动构建链路完成同步、构建和部署。这样既能提升写作效率，也能保留必要的人工判断。</p>
+]]></content>
+    <author>
+      <name>JaisonG1n</name>
+    </author>
+    <category term="Uncategorized"></category>
+  </entry>
   <entry>
     <title>JaisonG1n 博客测试文章</title>
     <link href="https://jaisong1n.com/posts/jaisong1n-%E5%8D%9A%E5%AE%A2%E6%B5%8B%E8%AF%95%E6%96%87%E7%AB%A0/" rel="alternate" type="text/html"/>
