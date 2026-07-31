@@ -4,6 +4,8 @@ const RETRYABLE_ERROR_CODES = new Set([
 	"EAI_AGAIN",
 	"ECONNREFUSED",
 	"ECONNRESET",
+	"EHOSTUNREACH",
+	"ENETUNREACH",
 	"ETIMEDOUT",
 	"UND_ERR_BODY_TIMEOUT",
 	"UND_ERR_CONNECT_TIMEOUT",
@@ -39,6 +41,14 @@ export function isRetryableNetworkError(error) {
 			String(candidate.message ?? ""),
 		);
 	});
+}
+
+export function describeNetworkError(error) {
+	const chain = errorChain(error);
+	const primary = chain[0];
+	const message = String(primary?.message ?? primary?.name ?? "Unknown network error");
+	const code = chain.find((candidate) => candidate?.code)?.code ?? chain.find((candidate) => candidate?.name)?.name;
+	return code && !message.includes(code) ? `${message} (${code})` : message;
 }
 
 export async function withNetworkRetries(

@@ -17,6 +17,7 @@ import {
 	htmlToMarkdown,
 	syncWordPress,
 } from "../scripts/sync-wordpress.mjs";
+import { describeNetworkError } from "../scripts/wordpress-sync/retry.mjs";
 
 function post(overrides = {}) {
 	return {
@@ -158,6 +159,14 @@ test("retries transient WordPress response failures", async () => {
 		posts.map((value) => value.id),
 		[6],
 	);
+});
+
+test("preserves the underlying network error code", async () => {
+	const cause = new Error("connect failed");
+	cause.code = "ENETUNREACH";
+	const error = new TypeError("fetch failed");
+	error.cause = cause;
+	assert.equal(describeNetworkError(error), "fetch failed (ENETUNREACH)");
 });
 
 test("replaces only the generated output after a successful sync", async () => {

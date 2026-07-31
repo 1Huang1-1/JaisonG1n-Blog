@@ -12,7 +12,7 @@ import {
 	SYNC_LIMITS,
 } from "./wordpress-sync/contracts.mjs";
 import { MediaMirror, rewriteStructuredMedia } from "./wordpress-sync/media.mjs";
-import { withNetworkRetries } from "./wordpress-sync/retry.mjs";
+import { describeNetworkError, withNetworkRetries } from "./wordpress-sync/retry.mjs";
 import { commitDirectoryTransaction } from "./wordpress-sync/transaction.mjs";
 import { resolvePostPath } from "./wordpress-sync/post-path.mjs";
 
@@ -194,7 +194,7 @@ async function fetchJsonResponse(url, fetchImpl, description, retryOptions = {})
 			},
 		);
 	} catch (error) {
-		throw new Error(`${description} request failed: ${error.message}`, { cause: error });
+		throw new Error(`${description} request failed: ${describeNetworkError(error)}`, { cause: error });
 	}
 	if (!response.ok) {
 		const detail = (await response.text()).slice(0, 300).replace(/\s+/g, " ");
