@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.6.0
+Stable tag: 0.7.0
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -24,6 +24,12 @@ The plugin accepts a fine-grained GitHub token with Actions Read and write for t
 Deactivation retains all data. Normal uninstall removes plugin-added role capabilities but retains content and settings. Destructive data cleanup runs only when an administrator explicitly enables it before uninstalling.
 
 == Changelog ==
+
+= 0.7.0 =
+
+* Adds the authenticated JaisonG1n AI Content API for controlled draft creation, reads, draft updates, explicit publish transitions, idempotency, concurrency checks, rate limits and bounded audit records.
+* Adds the `jg_ai_content_editor` role and administrator-only per-content AI edit and publish grants. Existing content remains unavailable until explicitly granted.
+* Keeps schemaVersion 5, public snapshots, existing content, and the existing WordPress save/status automation path unchanged.
 
 = 0.5.0 =
 

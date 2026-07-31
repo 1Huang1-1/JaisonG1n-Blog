@@ -16,7 +16,7 @@ async function phpFiles(directory = pluginRoot) {
 	return files;
 }
 
-test("plugin exposes only an explicit public snapshot route", async () => {
+test("plugin exposes a public snapshot and an authenticated AI content interface", async () => {
 	const source = await readFile(
 		path.join(pluginRoot, "includes/class-jg-rest.php"),
 		"utf8",
@@ -24,6 +24,21 @@ test("plugin exposes only an explicit public snapshot route", async () => {
 	assert.match(source, /jaisong1n\/v1/);
 	assert.match(source, /site-snapshot/);
 	assert.match(source, /'permission_callback'\s*=>\s*'__return_true'/);
+	const aiSource = await readFile(
+		path.join(pluginRoot, "includes/class-jg-ai-content.php"),
+		"utf8",
+	);
+	assert.match(aiSource, /jaisong1n\/v1\/ai/);
+	for (const route of [
+		"capabilities",
+		"content",
+		"publish",
+		"unpublish",
+		"claim",
+		"audit",
+	])
+		assert.match(aiSource, new RegExp(route));
+	assert.doesNotMatch(aiSource, /DELETE\s+\/content/);
 	assert.doesNotMatch(source, /register_rest_route[\s\S]*manual_dispatch/);
 });
 
@@ -86,15 +101,15 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.6.0 publishes schemaVersion 5 and deterministic ordering", async () => {
+test("version 0.7.0 preserves schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.6\.0/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.6\.0'/);
-	assert.match(readme, /Stable tag:\s*0\.6\.0/);
+	assert.match(entry, /Version:\s*0\.7\.0/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.7\.0'/);
+	assert.match(readme, /Stable tag:\s*0\.7\.0/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
@@ -310,6 +325,6 @@ test("plugin packaging fixes the basename and normalizes ZIP paths", async () =>
 	);
 	assert.match(packageJson, /package:wordpress-plugin/);
 	assert.match(packageJson, /verify:wordpress-plugin-package/);
-	assert.match(packageJson, /jaisong1n-site-manager-0\.6\.0\.zip/);
+	assert.match(packageJson, /jaisong1n-site-manager-0\.7\.0\.zip/);
 	assert.match(packageJson, /test:wordpress-upgrade/);
 });
