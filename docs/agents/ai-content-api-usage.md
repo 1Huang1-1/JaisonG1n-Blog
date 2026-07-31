@@ -1,0 +1,18 @@
+# AI Content API Usage
+
+本约定同时适用于 Codex、OpenClaw 和其他 Blog Agent。权威的公开 API 说明是 [AI Content API](../ai-content-api.md)；运行时以 `GET /wp-json/jaisong1n/v1/ai/capabilities` 返回的版本、字段、枚举和操作权限为准，不猜测字段，也不使用 WordPress 内部 meta key。
+
+## Credentials And Transport
+
+需要 `WP_BASE_URL`、`WP_API_USERNAME` 和 `WP_API_APPLICATION_PASSWORD`，只检查是否存在，绝不打印值、Application Password、Authorization header、Basic 编码、token、cookie 或环境变量内容。要求 HTTPS；凭据只能存在于 Agent 的 secret 或环境配置，不能写入仓库、SKILL.md、提示词或日志。
+
+## Content Types And Operations
+
+支持的 `contentType` 为 `article`、`diary`、`project`、`timeline`、`skill`、`aiTool`、`friend`、`announcement`、`techRadar` 和 `learningResource`。`page` 与 `album` 被拒绝，且没有删除接口。
+
+- 创建：`POST /content`，默认 draft，必须使用稳定且调用方/操作范围内唯一的 `Idempotency-Key`。
+- 读取：`GET /content` 或 `GET /content/{contentType}/{id}`，用于确认 ID、归属、类型、slug、状态、正文和修改时间。
+- 更新：`PATCH /content/{contentType}/{id}`，带读取结果中的 `expectedModifiedAt`；过期值为冲突，不覆盖他人或已发布内容。
+- 发布或取消发布：只使用 capabilities 声明的独立端点；适用前提由 [Publishing Policy](publishing-policy.md) 定义。
+
+相同幂等键的重放必须复用原结果；冲突复用应处理为 `409`。权限拒绝、并发冲突、限流或其他错误应停止并报告安全的摘要，不尝试其他凭据或绕过限制。接口不会调用 GitHub。
