@@ -10,6 +10,13 @@ function jg_smoke_assert(bool $condition, string $message): void {
 	}
 }
 
+register_shutdown_function(static function (): void {
+	$error = error_get_last();
+	if (is_array($error) && in_array($error['type'] ?? 0, array(E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR), true)) {
+		echo "PLAYGROUND_FATAL: " . wp_json_encode($error, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+	}
+});
+
 function jg_create_item(string $post_type, string $slug, string $content, int $menu_order = 0, string $status = 'publish'): int {
 	$post_id = wp_insert_post(array(
 		'post_type' => $post_type,
@@ -53,7 +60,8 @@ function jg_create_intermediate_image_url(int $attachment_id): string {
 	$upload = wp_upload_dir(null, true, true);
 	$original_file = get_attached_file($attachment_id);
 	jg_smoke_assert(is_string($original_file) && is_file($original_file), 'Could not find original image fixture.');
-	$derived_name = 'jg-schema-v3-1024x567.png';
+	$original_basename = wp_basename($original_file);
+	$derived_name = preg_replace('/(\\.[^.]+)$/', '-1024x567$1', $original_basename);
 	$derived_file = trailingslashit($upload['path']) . $derived_name;
 	jg_smoke_assert(copy($original_file, $derived_file), 'Could not create intermediate media fixture.');
 	$metadata = wp_get_attachment_metadata($attachment_id);
@@ -75,6 +83,8 @@ $settings = JG_Settings::get();
 $settings['trusted_media_hosts'] = 'cms.example.com';
 update_option(JG_Settings::OPTION, $settings);
 do_action('rest_api_init');
+$supported_types = JG_Dispatch::supported_post_types();
+jg_smoke_assert(count($supported_types) === 12 && !in_array('jg_device', $supported_types, true) && !in_array('jg_anime', $supported_types, true), 'Dispatch registry did not expose the expected 12 public post types: ' . wp_json_encode($supported_types));
 
 $administrator = get_role('administrator');
 $editor = get_role('editor');
@@ -348,6 +358,79 @@ $untrusted_snapshot = (new JG_Snapshot())->build();
 jg_smoke_assert(is_wp_error($untrusted_snapshot) && $untrusted_snapshot->get_error_code() === 'jg_media_host', 'Untrusted media host did not fail the snapshot.');
 update_option(JG_Settings::OPTION, $settings);
 
+if (!defined('JAISONG1N_GITHUB_TOKEN')) define('JAISONG1N_GITHUB_TOKEN', 'playground-fixture-token');
+$wpdb_token = $GLOBALS['wpdb'];
+delete_option('jg_github_token');
+add_option('jg_github_token', 'database-fixture-token', '', true);
+JG_Dispatch::install_defaults();
+$token_autoload = $wpdb_token->get_var($wpdb_token->prepare('SELECT autoload FROM ' . $wpdb_token->options . ' WHERE option_name = %s', 'jg_github_token'));
+jg_smoke_assert($token_autoload === 'no', 'GitHub token database option was not forced to autoload=no.');
+$dispatch_calls = 0;
+$dispatch_response_code = 200;
+$dispatch_sequence = array();
+$dispatch_filter = static function ($pre, $args, $url) use (&$dispatch_calls, &$dispatch_response_code, &$dispatch_sequence) {
+	if (!str_contains((string) $url, '/actions/workflows/build-deploy.yml/dispatches')) return $pre;
+	$dispatch_calls++;
+	$response_value = !empty($dispatch_sequence) ? array_shift($dispatch_sequence) : $dispatch_response_code;
+	if (is_wp_error($response_value)) return $response_value;
+	$response_code = (int) $response_value;
+	return array(
+		'headers' => array(),
+		'body' => $response_code === 200 ? wp_json_encode(array('workflow_run_id' => 123, 'run_url' => 'https://api.github.com/repos/1Huang1-1/JaisonG1n-Blog/actions/runs/123', 'html_url' => 'https://github.com/1Huang1-1/JaisonG1n-Blog/actions/runs/123')) : '',
+		'response' => array('code' => $response_code, 'message' => 'fixture'),
+		'cookies' => array(),
+	);
+};
+add_filter('pre_http_request', $dispatch_filter, 10, 3);
+
+delete_option('jg_last_dispatched_revision');
+update_option('jg_dispatch_pending', array('types' => array('content'), 'actions' => array('updated'), 'attempts' => 0), false);
+JG_Dispatch::dispatch_if_changed();
+$dispatch_status = get_option('jg_dispatch_status', array());
+jg_smoke_assert($dispatch_calls === 1 && ($dispatch_status['state'] ?? '') === 'success' && ($dispatch_status['workflow_run_id'] ?? 0) === 123 && ($dispatch_status['run_url'] ?? '') === 'https://api.github.com/repos/1Huang1-1/JaisonG1n-Blog/actions/runs/123', 'GitHub workflow_dispatch 200 response was not parsed or stored: ' . wp_json_encode(array('calls' => $dispatch_calls, 'status' => $dispatch_status, 'pending' => get_option('jg_dispatch_pending', array()))));
+
+$dispatch_response_code = 204;
+delete_option('jg_last_dispatched_revision');
+update_option('jg_dispatch_pending', array('types' => array('media'), 'actions' => array('updated'), 'attempts' => 0), false);
+JG_Dispatch::dispatch_if_changed();
+$dispatch_status = get_option('jg_dispatch_status', array());
+jg_smoke_assert($dispatch_calls === 2 && ($dispatch_status['state'] ?? '') === 'success', 'GitHub workflow_dispatch 204 response was not accepted.');
+
+update_option('jg_dispatch_pending', array('types' => array('content'), 'actions' => array('updated'), 'attempts' => 0), false);
+JG_Dispatch::dispatch_if_changed();
+jg_smoke_assert($dispatch_calls === 2 && (get_option('jg_dispatch_status', array())['state'] ?? '') === 'unchanged', 'Unchanged revision incorrectly dispatched again.');
+
+$dispatch_sequence = array(500, 429, 204);
+delete_option('jg_last_dispatched_revision');
+update_option('jg_dispatch_pending', array('types' => array('content'), 'actions' => array('updated'), 'attempts' => 0), false);
+$retry_calls_before = $dispatch_calls;
+JG_Dispatch::dispatch_if_changed();
+jg_smoke_assert($dispatch_calls === $retry_calls_before + 3 && (get_option('jg_dispatch_status', array())['state'] ?? '') === 'success', '5xx/429 dispatch retries were not exhausted before success.');
+
+$dispatch_sequence = array(new WP_Error('http_request_failed', 'fixture timeout'), new WP_Error('http_request_failed', 'fixture network error'), 204);
+delete_option('jg_last_dispatched_revision');
+update_option('jg_dispatch_pending', array('types' => array('content'), 'actions' => array('updated'), 'attempts' => 0), false);
+$network_retry_calls_before = $dispatch_calls;
+JG_Dispatch::dispatch_if_changed();
+jg_smoke_assert($dispatch_calls === $network_retry_calls_before + 3 && (get_option('jg_dispatch_status', array())['state'] ?? '') === 'success', 'Network dispatch retries were not exhausted before success.');
+
+$dispatch_sequence = array();
+remove_filter('pre_http_request', $dispatch_filter, 10);
+
+delete_option('jg_dispatch_pending');
+wp_clear_scheduled_hook(JG_Dispatch::CRON_HOOK);
+for ($read_index = 0; $read_index < 3; $read_index++) rest_do_request(new WP_REST_Request('GET', '/jaisong1n/v1/site-snapshot'));
+jg_smoke_assert(get_option('jg_dispatch_pending', array()) === array() && !wp_next_scheduled(JG_Dispatch::CRON_HOOK), 'Snapshot reads created a pending dispatch or Cron event.');
+
+update_option('jg_dispatch_pending', array('types' => array('content'), 'actions' => array('updated')), false);
+wp_schedule_single_event(time() + 45, JG_Dispatch::CRON_HOOK);
+JG_Dispatch::deactivate();
+jg_smoke_assert(is_array(get_option('jg_dispatch_pending', null)) && !wp_next_scheduled(JG_Dispatch::CRON_HOOK), 'Deactivation did not retain pending state while clearing Cron.');
+JG_Dispatch::activate();
+jg_smoke_assert(wp_next_scheduled(JG_Dispatch::CRON_HOOK) !== false, 'Activation did not reschedule retained pending state.');
+wp_clear_scheduled_hook(JG_Dispatch::CRON_HOOK);
+delete_option('jg_dispatch_pending');
+
 echo wp_json_encode(array(
 	'ok' => true,
 	'schemaVersion' => $first_data['schemaVersion'],
@@ -355,4 +438,7 @@ echo wp_json_encode(array(
 	'projectCount' => count($first_data['projects']),
 	'mediaCount' => count($first_data['mediaManifest']),
 	'etagStatus' => $second_response->get_status(),
+	'dispatchCalls' => $dispatch_calls,
+	'supportedPostTypes' => $supported_types,
+	'dispatchApiVersion' => JG_Dispatch::GITHUB_API_VERSION,
 ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";

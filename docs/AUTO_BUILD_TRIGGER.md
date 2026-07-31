@@ -123,3 +123,11 @@ git push
 
 **配置时间**: 约 5 分钟  
 **一次配置,长期有效** ✨
+# Current implementation note (0.6.0)
+
+The current plugin uses GitHub.com `workflow_dispatch` with API version
+`2026-03-10`, a fine-grained PAT limited to repository Actions Read and write,
+revision de-duplication, and a 30-60 second debounce. The older
+`repository_dispatch` instructions below are retained as historical
+compatibility documentation only. The workflow keeps that event deprecated
+for older external callers; the current plugin does not emit it.

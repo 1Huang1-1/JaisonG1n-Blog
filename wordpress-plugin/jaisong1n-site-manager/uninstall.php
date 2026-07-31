@@ -33,7 +33,15 @@ if (!empty($settings['cleanup_on_uninstall'])) {
 
 	delete_option('jg_site_settings');
 	delete_option('jg_dispatch_status');
+	delete_option('jg_dispatch_config');
+	delete_option('jg_github_token');
+	delete_option('jg_dispatch_history');
 	delete_option('jg_last_dispatched_revision');
+	delete_option('jg_dispatch_pending');
+	delete_option('jg_dispatch_lock');
+	global $wpdb;
+	$wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'jg_media_refs');
+	delete_option('jg_media_index_version');
 }
 
 foreach (array('administrator', 'editor') as $role_name) {

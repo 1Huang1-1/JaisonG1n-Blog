@@ -4,10 +4,38 @@ on:
   push:
     branches:
       - master
+  # Deprecated compatibility for older external callers. The 0.6.0 plugin
+  # uses workflow_dispatch only and never emits both events.
   repository_dispatch:
     types:
       - wordpress_content_changed
   workflow_dispatch:
+    inputs:
+      trigger_source:
+        description: Trigger source
+        required: false
+        default: manual
+        type: string
+      change_types:
+        description: Comma-separated public content types
+        required: false
+        default: manual
+        type: string
+      change_actions:
+        description: Comma-separated database actions
+        required: false
+        default: force
+        type: string
+      requested_at:
+        description: UTC request timestamp
+        required: false
+        default: ""
+        type: string
+      force:
+        description: Force a rebuild even when revision is unchanged
+        required: false
+        default: "false"
+        type: string
   schedule:
     - cron: "*/30 * * * *"
 

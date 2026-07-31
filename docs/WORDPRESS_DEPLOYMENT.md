@@ -54,3 +54,13 @@ GitHub Actions 的 cron 使用 UTC，`*/30 * * * *` 表示每个 UTC 小时的�
 正文会删除 Gutenberg 注释和 `script` 标签，转换为 GFM，并保留图片以及 `iframe`、`video`、`audio` 媒体 HTML。保留远程媒体意味着浏览器仍会请求其原始主机；WordPress 编辑者应被视为可信内容作者。这个转换不是面向不受信任投稿者的完整 HTML 安全沙箱。
 
 文件名会处理 Windows 保留名、非法字符、Unicode slug、路径穿越和重名。frontmatter 字符串及数组使用安全的 YAML 兼容转义，`published` 与 `updated` 以未加引号的 ISO 8601 时间标量输出，从而由 Astro 内容加载器解析为 `Date`。
+# Automatic build trigger (plugin 0.6.0)
+
+WordPress writes create a pending public revision and schedule one debounced
+Cron worker. The worker compares the revision with the last accepted revision
+before calling GitHub Actions `workflow_dispatch`. HTTP 200 and 204 are
+accepted; failed requests retain pending state and retry at 60, 300 and 900
+seconds. The request uses API version `2026-03-10` and a fine-grained PAT with
+only Actions Read and write on the target repository. `repository_dispatch` is
+still present in the workflow as a deprecated compatibility trigger for older
+callers, but the 0.6.0 plugin never sends both events.

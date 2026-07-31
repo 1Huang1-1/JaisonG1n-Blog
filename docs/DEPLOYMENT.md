@@ -2,6 +2,8 @@
 
 本文档提供 Mizuki 博客在各个平台的部署配置说明。
 
+> 当前 JaisonG1n Site Manager 0.6.0 通过 GitHub.com `workflow_dispatch` 触发构建，API 版本为 `2026-03-10`，仅需要目标仓库的 Actions Read and write 权限。文档中较早的 `repository_dispatch` 示例仅作为兼容历史参考；工作流仍保留该入口，但新插件不会调用它。
+
 ## 📖 目录
 
 - [部署前准备](#-部署前准备)

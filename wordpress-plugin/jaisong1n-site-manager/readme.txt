@@ -3,16 +3,16 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.5.0
+Stable tag: 0.6.0
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
 
 == Description ==
 
-Adds independently permissioned content types, a Chinese settings page, a normalized public site snapshot, ETag support, reserved-slug enforcement, and debounced GitHub repository_dispatch notifications.
+Adds independently permissioned content types, a Chinese settings page, a normalized public site snapshot, ETag support, reserved-slug enforcement, and debounced GitHub workflow_dispatch notifications.
 
-The plugin never stores GitHub tokens in WordPress. Define JG_GITHUB_TOKEN in wp-config.php or the server environment.
+The plugin accepts a fine-grained GitHub token with Actions Read and write for the target repository. Define JAISONG1N_GITHUB_TOKEN in wp-config.php or the server environment, or store it in the private plugin field. It is never included in snapshots, exports, HTML, JavaScript or logs.
 
 == Installation ==
 
@@ -29,6 +29,13 @@ Deactivation retains all data. Normal uninstall removes plugin-added role capabi
 
 * Adds schemaVersion 5 album records with ordered local-media-ready photo metadata.
 * Keeps existing album post meta and attachments intact while exposing excerpts, revisions, captions and featured state.
+
+= 0.6.0 =
+
+* Triggers GitHub Actions through workflow_dispatch using API version 2026-03-10 and handles both 200 and 204 responses.
+* Adds private debounce, revision de-duplication, retry state, manual force rebuilds and a bounded 20-entry history.
+* Adds a lightweight reverse media reference index; attachment changes no longer scan every post and post meta.
+* Keeps the workflow repository_dispatch trigger as deprecated compatibility for older external callers.
 
 = 0.4.0 =
 

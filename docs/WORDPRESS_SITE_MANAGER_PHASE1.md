@@ -155,3 +155,9 @@ GitHub fine-grained PAT 只绑定上述仓库，并按项目约定授予 Reposit
 ## 第二阶段
 
 第二阶段在用户确认插件后台和快照后实施：统一 Astro 同步临时目录、生产失败关闭策略、受信媒体主机与私网拦截、15 MB 单文件限制、SHA-256 媒体镜像，以及项目、技能、AI 工具和时间线的首批迁移。迁移验收前继续保留旧数据入口。
+# Version note
+
+This historical phase-1 document describes pre-0.6.0 repository dispatch
+behavior. The current plugin is 0.6.0, keeps schemaVersion 5, uses
+`workflow_dispatch` with GitHub API version `2026-03-10`, and stores any
+database fallback Token in a private option with autoload disabled.

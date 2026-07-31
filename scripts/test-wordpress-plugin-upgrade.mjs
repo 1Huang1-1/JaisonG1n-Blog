@@ -22,14 +22,14 @@ const REPLACEMENT_ZIP = path.join(
 	REPOSITORY_ROOT,
 	"wordpress-plugin",
 	"dist",
-	`${PLUGIN_SLUG}-0.5.0.zip`,
+	`${PLUGIN_SLUG}-0.6.0.zip`,
 );
 
 const baselinePlugin = `<?php
 /**
  * Plugin Name: JaisonG1n Site Manager
- * Description: Minimal 0.4.1 upgrade-path fixture for album/schema upgrade testing.
- * Version: 0.4.1
+ * Description: Minimal 0.5.0 upgrade-path fixture for dispatch upgrade testing.
+ * Version: 0.5.0
  * Author: JaisonG1n
  * Text Domain: jaisong1n-site-manager
  */
@@ -38,6 +38,7 @@ if (!defined('ABSPATH')) { exit; }
 
 function jg_upgrade_fixture_activate(): void {
 	add_option('jg_site_settings', array('site_title' => 'Upgrade preserved'), '', false);
+	add_option('jg_github_token', 'upgrade-fixture-token', '', true);
 	register_post_type('jg_project', array('public' => false, 'show_ui' => true));
 	wp_insert_post(array(
 		'post_type' => 'jg_project',
@@ -94,7 +95,7 @@ function run(command, args) {
 async function main() {
 	await verifyPackage(REPLACEMENT_ZIP);
 	const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "jg-upgrade-test-"));
-	const baselineZip = path.join(temporaryDirectory, `${PLUGIN_SLUG}-0.4.1.zip`);
+	const baselineZip = path.join(temporaryDirectory, `${PLUGIN_SLUG}-0.5.0.zip`);
 	const pluginsDirectory = path.join(temporaryDirectory, "plugins");
 	const replacementDirectory = path.join(temporaryDirectory, "replacement");
 	try {

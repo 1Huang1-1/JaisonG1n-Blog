@@ -86,15 +86,15 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.5.0 publishes schemaVersion 5 and deterministic ordering", async () => {
+test("version 0.6.0 publishes schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.5\.0/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.5\.0'/);
-	assert.match(readme, /Stable tag:\s*0\.5\.0/);
+	assert.match(entry, /Version:\s*0\.6\.0/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.6\.0'/);
+	assert.match(readme, /Stable tag:\s*0\.6\.0/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
@@ -165,9 +165,11 @@ test("token is not stored in plugin settings or returned by REST", async () => {
 	);
 	const settings = sources.join("\n");
 	assert.doesNotMatch(settings, /['"]github_token['"]\s*=>/i);
-	assert.match(settings, /getenv\('JG_GITHUB_TOKEN'\)/);
+	assert.match(settings, /'JAISONG1N_GITHUB_TOKEN'/);
+	assert.match(settings, /getenv\(\$name\)/);
+	assert.match(settings, /jg_github_token/);
+	assert.match(settings, /autoload.*false|false.*autoload/i);
 	assert.match(settings, /1Huang1-1\/JaisonG1n-Blog/);
-	assert.match(settings, /wordpress_content_changed/);
 });
 
 test("uninstall defaults to retaining all plugin data", async () => {
@@ -205,6 +207,13 @@ test("workflow accepts debounced WordPress dispatches", async () => {
 	const workflow = await readFile(".github/workflows/build-deploy.yml", "utf8");
 	assert.match(workflow, /repository_dispatch:/);
 	assert.match(workflow, /wordpress_content_changed/);
+	assert.match(workflow, /workflow_dispatch:/);
+	assert.match(workflow, /trigger_source:/);
+	assert.match(workflow, /change_types:/);
+	assert.match(workflow, /change_actions:/);
+	assert.match(workflow, /requested_at:/);
+	assert.match(workflow, /force:/);
+	assert.match(workflow, /Deprecated compatibility/);
 	assert.match(workflow, /group: jaisong1n-production-build/);
 	assert.match(workflow, /cancel-in-progress: true/);
 });
@@ -214,14 +223,74 @@ test("dispatch covers public post metadata and still debounces by revision", asy
 		path.join(pluginRoot, "includes/class-jg-dispatch.php"),
 		"utf8",
 	);
-	assert.match(source, /time\(\) \+ 45/);
+	assert.match(source, /GITHUB_API_VERSION = '2026-03-10'/);
+	assert.match(source, /actions\/workflows/);
+	assert.match(source, /code === 200/);
+	assert.match(source, /code === 204/);
+	assert.match(source, /MAX_HTTP_ATTEMPTS/);
+	assert.match(source, /RETRY_DELAYS/);
+	assert.match(source, /PENDING_OPTION/);
+	assert.match(source, /force/);
+	assert.doesNotMatch(source, /event_type|client_payload/);
 	assert.match(source, /'sticky_posts'/);
 	assert.match(source, /'edited_term'/);
 	assert.match(source, /'profile_update'/);
 	assert.match(source, /'edit_attachment'/);
+	assert.match(source, /'delete_attachment'/);
+	assert.match(source, /function attachment_deleted/);
 	assert.match(source, /'author'\s*=>\s*get_the_author_meta/);
 	assert.match(source, /'featuredImageUrl'/);
 	assert.match(source, /get_option\(self::REVISION_OPTION/);
+	assert.match(source, /actions\/workflows/);
+});
+
+test("supported dispatch types are registry-driven and exclude deprecated CPTs", async () => {
+	const [source, types] = await Promise.all([
+		readFile(path.join(pluginRoot, "includes/class-jg-dispatch.php"), "utf8"),
+		readFile(
+			path.join(pluginRoot, "includes/class-jg-content-types.php"),
+			"utf8",
+		),
+	]);
+	for (const type of [
+		"post",
+		"page",
+		"jg_project",
+		"jg_skill",
+		"jg_ai_tool",
+		"jg_timeline",
+		"jg_friend",
+		"jg_announcement",
+		"jg_tech_radar",
+		"jg_learning_resource",
+		"jg_diary",
+		"jg_album",
+	])
+		assert.match(
+			type === "post" || type === "page" ? source : types,
+			new RegExp(`['"]${type}['"]`),
+		);
+	assert.match(source, /JG_Content_Types::definitions/);
+	assert.match(source, /is_deprecated/);
+});
+
+test("media changes use the reverse index instead of a full content scan", async () => {
+	const source = await readFile(
+		path.join(pluginRoot, "includes/class-jg-media-index.php"),
+		"utf8",
+	);
+	const dispatch = await readFile(
+		path.join(pluginRoot, "includes/class-jg-dispatch.php"),
+		"utf8",
+	);
+	assert.match(source, /jg_media_refs/);
+	assert.match(source, /attachment_lookup/);
+	assert.match(source, /attachment_url_to_postid/);
+	assert.match(dispatch, /JG_Media_Index::has_public_reference/);
+	assert.doesNotMatch(
+		dispatch,
+		/get_posts\(array\([\s\S]*post_type.*attachment/,
+	);
 });
 
 test("plugin packaging fixes the basename and normalizes ZIP paths", async () => {
@@ -241,5 +310,6 @@ test("plugin packaging fixes the basename and normalizes ZIP paths", async () =>
 	);
 	assert.match(packageJson, /package:wordpress-plugin/);
 	assert.match(packageJson, /verify:wordpress-plugin-package/);
+	assert.match(packageJson, /jaisong1n-site-manager-0\.6\.0\.zip/);
 	assert.match(packageJson, /test:wordpress-upgrade/);
 });
