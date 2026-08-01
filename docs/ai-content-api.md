@@ -1,6 +1,6 @@
 # AI Content API
 
-`JaisonG1n Site Manager 0.8.1` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
+`JaisonG1n Site Manager 0.8.2` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
 
 Use a dedicated WordPress user with the `jg_ai_content_editor` role and an Application Password. Clients must first request `GET /capabilities`; the response is the live authority for content types, fields, and operations. It never exposes internal meta keys, confirmation tokens, or site secrets.
 
@@ -59,3 +59,48 @@ Audit records retain at most 100 operation summaries. Publishing records `publis
 ## Ownership Repair For Existing Drafts
 
 For an AI-created draft whose native author drifted from its AI owner, an administrator can synchronize the author without touching other content. The repair only runs when the draft is a supported content type, `_jg_ai_owner_user_id` is a valid user, `_jg_ai_created` is true, and the native author differs from that owner. The AI Content Assistant panel shows a "同步作者为 AI 所有者" button under exactly those conditions, and the guarded `JG_AI_Content::repair_ai_ownership()` helper applies the same rules for one-off or scripted repairs. Normal diaries are never rewritten in bulk.
+
+## Deployment Status
+
+Read-only deployment status is available at:
+
+```http
+GET /wp-json/jaisong1n/v1/ai/content/{contentType}/{id}/deployment-status
+```
+
+The endpoint requires Application Password authentication and the same object read permission as `GET /content/{contentType}/{id}`. It never requires `manage_options`, never triggers a build, and never exposes GitHub tokens, raw logs, or internal option dumps. Response statuses keep five layers separate: WordPress content, dispatch acceptance, GitHub build, front-end deployment, and public page availability.
+
+```json
+{
+  "contentType": "diary",
+  "contentId": 91,
+  "title": "...",
+  "wordpressStatus": "publish",
+  "dispatchStatus": "accepted",
+  "buildStatus": "success",
+  "buildConclusion": "success",
+  "deploymentStatus": "deployed",
+  "pageStatus": "reachable",
+  "publicUrl": "https://jaisong1n.com/diary/...",
+  "cmsUrl": "https://cms.jaisong1n.com/wp-admin/post.php?post=91&action=edit",
+  "workflowRunId": 123,
+  "workflowRunUrl": "https://api.github.com/repos/1Huang1-1/JaisonG1n-Blog/actions/runs/123",
+  "triggeredAt": "2026-08-02T00:00:00+00:00",
+  "startedAt": "2026-08-02T00:01:00+00:00",
+  "completedAt": "2026-08-02T00:03:00+00:00",
+  "lastCheckedAt": "2026-08-02T00:03:30+00:00",
+  "errorCode": null,
+  "errorSummary": null
+}
+```
+
+Status semantics:
+
+- `wordpressStatus` is the raw WordPress post status; it is never derived from build state.
+- `dispatchStatus` is `accepted`, `failed`, `unchanged`, `busy`, or `null`. Dispatch acceptance never means the build succeeded.
+- `buildStatus` is `not_triggered`, `pending`, `queued`, `in_progress`, `success`, `failed`, `cancelled`, or `unknown`, read from the GitHub Actions run when a run ID exists. GitHub success never directly means the front-end is deployed.
+- `deploymentStatus` is `deployed`, `pending`, or `unknown`. It is set to `deployed` only after a successful build and a reachable public page probe on the configured production host.
+- `pageStatus` is `reachable`, `not_found`, `unavailable`, or `unchecked`. A reachable page proves the URL serves content, not that it is the newest build.
+- `publicUrl` comes from the server-side canonical URL helper and the configured production site URL; `cmsUrl` remains the WordPress edit address.
+
+Dispatch records persist in `jg_dispatch_history` and retain every merged content reference, so a debounced build covering several diaries is associated with each of them instead of a single post ID. The endpoint picks the latest record containing the requested content that was triggered at or after the content's last modification; it never hard-binds the site's latest build to unrelated content.

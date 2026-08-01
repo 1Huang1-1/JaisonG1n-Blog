@@ -106,6 +106,7 @@ final class JG_AI_Content {
 		self::route($namespace, '/content', WP_REST_Server::CREATABLE, 'create_content', 'create', self::create_args());
 		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)', WP_REST_Server::READABLE, 'get_content', 'read', self::detail_args());
 		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)', 'PATCH', 'update_content', 'update', self::update_args());
+		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/deployment-status', WP_REST_Server::READABLE, 'deployment_status', 'deploymentStatus', self::detail_args());
 		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/prepare-publish', WP_REST_Server::CREATABLE, 'prepare_publish', 'publish', self::detail_args());
 		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/publish', WP_REST_Server::CREATABLE, 'publish_content', 'publish', self::publish_args());
 		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/unpublish', WP_REST_Server::CREATABLE, 'unpublish_content', 'publish', self::expected_args());
@@ -132,6 +133,7 @@ final class JG_AI_Content {
 			$operations = array();
 			if (self::can_create($contract)) $operations[] = 'createDraft';
 			if (self::can_read($contract, null)) $operations[] = 'read';
+			if (self::can_read($contract, null)) $operations[] = 'deploymentStatus';
 			if (self::can_update_type($contract)) $operations[] = 'updateDraft';
 			if (self::can_publish_type($contract)) { $operations[] = 'preparePublish'; $operations[] = 'publish'; }
 			$types[$name] = array('operations' => $operations, 'fields' => self::public_fields($contract));
@@ -176,6 +178,114 @@ final class JG_AI_Content {
 		$post = self::post_for_contract((int) $request['id'], $contract); if (is_wp_error($post)) return $post;
 		if (!self::can_read($contract, $post)) return self::not_found();
 		return new WP_REST_Response(self::project($post, $contract, true), 200);
+	}
+
+	public static function deployment_status(WP_REST_Request $request) {
+		$contract = self::contract((string) $request['contentType']); if (is_wp_error($contract)) return $contract;
+		$post = self::post_for_contract((int) $request['id'], $contract); if (is_wp_error($post)) return $post;
+		if (!self::can_read($contract, $post)) return self::not_found();
+
+		$public_url = self::get_canonical_public_url($contract['apiType'], $post);
+		$record = JG_Dispatch::find_latest_record_for_content($contract['apiType'], (int) $post->ID, trim((string) $post->post_modified_gmt));
+		$response = array(
+			'contentType' => $contract['apiType'],
+			'contentId' => (int) $post->ID,
+			'title' => $post->post_title,
+			'wordpressStatus' => $post->post_status,
+			'dispatchStatus' => null,
+			'buildStatus' => 'not_triggered',
+			'buildConclusion' => null,
+			'deploymentStatus' => 'unknown',
+			'pageStatus' => 'unchecked',
+			'publicUrl' => $public_url,
+			'cmsUrl' => admin_url('post.php?post=' . $post->ID . '&action=edit'),
+			'workflowRunId' => null,
+			'workflowRunUrl' => null,
+			'triggeredAt' => null,
+			'startedAt' => null,
+			'completedAt' => null,
+			'lastCheckedAt' => gmdate('c'),
+			'errorCode' => null,
+			'errorSummary' => null,
+		);
+
+		if (is_array($record)) {
+			$response['dispatchStatus'] = $record['dispatchStatus'] ?? null;
+			$response['workflowRunId'] = isset($record['workflowRunId']) && $record['workflowRunId'] !== null ? (int) $record['workflowRunId'] : null;
+			$response['workflowRunUrl'] = $record['runUrl'] ?? null;
+			$response['triggeredAt'] = $record['triggeredAt'] ?? null;
+			$response['startedAt'] = $record['startedAt'] ?? null;
+			$response['completedAt'] = $record['completedAt'] ?? null;
+			$response['lastCheckedAt'] = $record['lastCheckedAt'] ?? $response['lastCheckedAt'];
+			$response['errorCode'] = $record['errorCode'] ?? null;
+			$response['errorSummary'] = $record['errorSummary'] ?? null;
+			$run_id = $response['workflowRunId'];
+			if ($run_id > 0) {
+				$run = JG_Dispatch::query_run($run_id, $record);
+				$response['buildStatus'] = $run['buildStatus'];
+				$response['buildConclusion'] = $run['buildConclusion'];
+				if ($run['startedAt'] !== null) $response['startedAt'] = $run['startedAt'];
+				if ($run['completedAt'] !== null) $response['completedAt'] = $run['completedAt'];
+				$response['lastCheckedAt'] = $run['lastCheckedAt'];
+				if ($run['errorCode'] !== null) {
+					$response['errorCode'] = $run['errorCode'];
+					$response['errorSummary'] = $run['errorSummary'];
+				}
+			} else {
+				$response['buildStatus'] = $record['buildStatus'] ?? 'pending';
+			}
+		}
+
+		if ($post->post_status === 'publish' && $public_url !== null) {
+			$page = self::probe_public_page($public_url);
+			$response['pageStatus'] = $page;
+			if ($response['buildStatus'] === 'success' && $page === 'reachable') {
+				$response['deploymentStatus'] = 'deployed';
+			} elseif (in_array($response['buildStatus'], array('success', 'queued', 'in_progress', 'pending'), true)) {
+				$response['deploymentStatus'] = 'pending';
+			}
+		}
+
+		$details = array('state' => (string) $response['buildStatus']);
+		if (is_int($response['workflowRunId'])) $details['workflowRunId'] = $response['workflowRunId'];
+		self::record('deploymentStatus', $contract['apiType'], (int) $post->ID, 200, array(), false, $details);
+		return new WP_REST_Response($response, 200);
+	}
+
+	public static function get_canonical_public_url(string $content_type, WP_Post $post): ?string {
+		$base = esc_url_raw((string) (JG_Settings::get()['public_site_url'] ?? ''), array('https'));
+		if ($base === '' || strtolower((string) wp_parse_url($base, PHP_URL_HOST)) === '') return null;
+		$slug = trim(rawurldecode((string) $post->post_name));
+		if ($slug === '' || str_contains($slug, '/') || str_contains($slug, '\\')) return null;
+		if ($content_type === 'article') $path = '/posts/' . rawurlencode($slug) . '/';
+		elseif ($content_type === 'diary') $path = '/diary/' . rawurlencode($slug) . '/';
+		else return null;
+		return untrailingslashit($base) . $path;
+	}
+
+	public static function probe_public_page(string $url): string {
+		$allowed = strtolower((string) wp_parse_url(esc_url_raw((string) (JG_Settings::get()['public_site_url'] ?? ''), array('https')), PHP_URL_HOST));
+		$host = strtolower((string) wp_parse_url($url, PHP_URL_HOST));
+		if ($allowed === '' || $host !== $allowed) return 'unavailable';
+		$cache_key = 'jg_page_probe_' . md5($url);
+		$cached = get_transient($cache_key);
+		if (is_string($cached) && in_array($cached, array('reachable', 'not_found', 'unavailable'), true)) return $cached;
+		$response = wp_remote_get($url, array(
+			'timeout' => 10,
+			'redirection' => 0,
+			'sslverify' => true,
+			'limit_response_size' => 65536,
+			'user-agent' => 'JaisonG1n-Site-Manager/' . JG_SITE_MANAGER_VERSION . ' status-probe',
+			'headers' => array('Accept' => 'text/html'),
+		));
+		$status = 'unavailable';
+		if (!is_wp_error($response)) {
+			$code = (int) wp_remote_retrieve_response_code($response);
+			if ($code >= 200 && $code < 300) $status = 'reachable';
+			elseif ($code === 404) $status = 'not_found';
+		}
+		set_transient($cache_key, $status, 30);
+		return $status;
 	}
 
 	public static function list_content(WP_REST_Request $request): WP_REST_Response {
@@ -366,6 +476,13 @@ final class JG_AI_Content {
 			'announcement' => array('apiType' => 'announcement', 'postType' => 'jg_announcement'), 'techRadar' => array('apiType' => 'techRadar', 'postType' => 'jg_tech_radar'),
 			'learningResource' => array('apiType' => 'learningResource', 'postType' => 'jg_learning_resource'),
 		);
+	}
+
+	public static function api_type_for_post_type(string $post_type): ?string {
+		foreach (self::registry() as $name => $contract) {
+			if ($contract['postType'] === $post_type) return $name;
+		}
+		return null;
 	}
 
 	private static function contract(string $type) { $all = self::registry(); return $all[$type] ?? self::error('jg_ai_unsupported_content_type', 'This content type is not supported.', 400); }
@@ -559,13 +676,15 @@ final class JG_AI_Content {
 	private static function idempotency_key(WP_REST_Request $request) { $key = $request->get_header('Idempotency-Key') ?: (string) $request->get_param('idempotencyKey'); return preg_match('/^[A-Za-z0-9._:-]{8,128}$/', $key) ? $key : self::error('jg_ai_idempotency_required', 'A valid idempotency key is required.', 400); }
 	private static function idempotency_replay(int $user_id, string $action, string $key, string $hash) { $entries = get_option(self::IDEMPOTENCY_OPTION, array()); $entry = $entries[$user_id . ':' . $action . ':' . $key] ?? null; if (!$entry || ($entry['expiresAt'] ?? 0) < time()) return null; return !hash_equals($entry['hash'], $hash) ? self::error('jg_ai_idempotency_conflict', 'This idempotency key was used with a different request.', 409) : $entry['result']; }
 	private static function store_idempotency(int $user_id, string $action, string $key, string $hash, array $result, int $status): void { $entries = array_filter(get_option(self::IDEMPOTENCY_OPTION, array()), static fn($entry) => ($entry['expiresAt'] ?? 0) >= time()); $entries[$user_id . ':' . $action . ':' . $key] = array('hash' => $hash, 'result' => $result, 'status' => $status, 'createdAt' => time(), 'expiresAt' => time() + DAY_IN_SECONDS); if (count($entries) > self::MAX_IDEMPOTENCY_ENTRIES) $entries = array_slice($entries, -self::MAX_IDEMPOTENCY_ENTRIES, null, true); update_option(self::IDEMPOTENCY_OPTION, $entries, false); }
-	private static function rate_limit(string $operation) { $limits = array('create' => 10, 'update' => 30, 'publish' => 5, 'read' => 60, 'audit' => 60, 'claim' => 10); $limit = $limits[$operation] ?? 10; $key = 'jg_ai_rate_' . get_current_user_id() . '_' . $operation; $count = (int) get_transient($key); if ($count >= $limit) return self::error('jg_ai_rate_limited', 'Too many requests. Try again later.', 429, array('retryAfter' => 60)); set_transient($key, $count + 1, MINUTE_IN_SECONDS); return true; }
+	private static function rate_limit(string $operation) { $limits = array('create' => 10, 'update' => 30, 'publish' => 5, 'read' => 60, 'deploymentStatus' => 60, 'audit' => 60, 'claim' => 10); $limit = $limits[$operation] ?? 10; $key = 'jg_ai_rate_' . get_current_user_id() . '_' . $operation; $count = (int) get_transient($key); if ($count >= $limit) return self::error('jg_ai_rate_limited', 'Too many requests. Try again later.', 429, array('retryAfter' => 60)); set_transient($key, $count + 1, MINUTE_IN_SECONDS); return true; }
 	private static function record(string $action, string $type, int $post_id, int $status, array $fields, bool $replay, array $details = array()): void {
 		$safe_details = array();
 		if (isset($details['reason']) && is_string($details['reason'])) $safe_details['reason'] = sanitize_key($details['reason']);
 		foreach (array('tokenFingerprint', 'idempotencyFingerprint') as $key) {
 			if (isset($details[$key]) && is_string($details[$key]) && preg_match('/^[a-f0-9]{12}$/', $details[$key]) === 1) $safe_details[$key] = $details[$key];
 		}
+		if (isset($details['state']) && is_string($details['state']) && preg_match('/^[a-z_]+$/', $details['state']) === 1) $safe_details['state'] = $details['state'];
+		if (isset($details['workflowRunId']) && is_int($details['workflowRunId']) && $details['workflowRunId'] >= 0) $safe_details['workflowRunId'] = $details['workflowRunId'];
 		$items = get_option(self::AUDIT_OPTION, array());
 		$entry = array('at' => gmdate('c'), 'userId' => get_current_user_id(), 'action' => $action, 'contentType' => $type, 'postId' => $post_id, 'status' => $status, 'fields' => array_values($fields), 'idempotentReplay' => $replay, 'correlationId' => wp_generate_uuid4());
 		if ($safe_details) $entry['details'] = $safe_details;

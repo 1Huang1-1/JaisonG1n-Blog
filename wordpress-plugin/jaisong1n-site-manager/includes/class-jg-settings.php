@@ -23,6 +23,7 @@ final class JG_Settings {
 			'logo_id' => 0,
 			'home_title' => 'JaisonG1n',
 			'home_subtitles' => '',
+			'public_site_url' => 'https://jaisong1n.com',
 			'banner_desktop_ids' => '',
 			'banner_mobile_ids' => '',
 			'carousel_interval' => 5,
@@ -79,6 +80,7 @@ final class JG_Settings {
 		}
 		$output['site_start_date'] = self::date_value($input['site_start_date'] ?? '') ?: $defaults['site_start_date'];
 		$output['home_subtitles'] = self::limited_lines($input['home_subtitles'] ?? '', 20, 300);
+		$output['public_site_url'] = self::https_site_url($input['public_site_url'] ?? '', $defaults['public_site_url']);
 		$output['social_links'] = self::sanitize_social_links($input['social_links'] ?? '');
 		$output['trusted_media_hosts'] = implode("\n", JG_Content_Policy::sanitize_host_list($input['trusted_media_hosts'] ?? ''));
 		$output['embed_hosts'] = implode("\n", JG_Content_Policy::sanitize_host_list($input['embed_hosts'] ?? ''));
@@ -233,6 +235,7 @@ final class JG_Settings {
 
 	private static function render_security_card(array $s): void {
 		echo '<section class="jg-settings-card"><h2>内容安全</h2>';
+		self::input('public_site_url', '生产博客地址（HTTPS）', $s['public_site_url'], 'url');
 		self::textarea('trusted_media_hosts', '可信 WordPress 媒体主机（每行一个）', $s['trusted_media_hosts']); self::textarea('embed_hosts', 'iframe/audio/video 白名单（每行一个）', $s['embed_hosts']);
 		echo '<p>媒体同步阶段还会执行协议、IP、MIME、大小、数量和总容量限制。</p></section>';
 	}
@@ -250,6 +253,11 @@ final class JG_Settings {
 	private static function media_input(string $key, string $label, $value, bool $multiple = false): void { $id = 'jg-setting-' . $key; echo '<label><span>' . esc_html($label) . '</span><input type="hidden" id="' . esc_attr($id) . '" name="' . esc_attr(self::OPTION . '[' . $key . ']') . '" value="' . esc_attr((string) $value) . '"><span><button type="button" class="button jg-select-media" data-target="#' . esc_attr($id) . '" data-multiple="' . ($multiple ? '1' : '0') . '">选择图片</button> <button type="button" class="button-link-delete jg-clear-media" data-target="#' . esc_attr($id) . '">清空</button></span></label>'; }
 
 	private static function date_value($value): string { return preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $value) ? (string) $value : ''; }
+	private static function https_site_url($value, string $fallback): string {
+		$url = esc_url_raw((string) $value, array('https'));
+		if ($url === '' || strtolower((string) wp_parse_url($url, PHP_URL_HOST)) === '') return $fallback;
+		return $url;
+	}
 	private static function enum($value, array $allowed, string $fallback): string { return in_array((string) $value, $allowed, true) ? (string) $value : $fallback; }
 	private static function limited_lines($value, int $max_lines, int $max_length): string { return implode("\n", array_slice(array_filter(array_map(static fn($line) => mb_substr(sanitize_text_field($line), 0, $max_length), preg_split('/\R/', (string) $value))), 0, $max_lines)); }
 	private static function line_values(string $value): array { return array_values(array_filter(array_map('trim', preg_split('/\R/', $value)))); }

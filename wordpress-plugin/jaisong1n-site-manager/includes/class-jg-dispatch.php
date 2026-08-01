@@ -18,6 +18,9 @@ final class JG_Dispatch {
 	private const LOCK_OPTION = 'jg_dispatch_lock';
 	private const MAX_HTTP_ATTEMPTS = 3;
 	private const RETRY_DELAYS = array(60, 300, 900);
+	private const MAX_RECORDS = 50;
+	private const RUN_CACHE_TTL = 20;
+	private const RUN_CACHE_PREFIX = 'jg_dispatch_run_';
 
 	public static function init(): void {
 		self::install_defaults();
@@ -71,12 +74,12 @@ final class JG_Dispatch {
 
 	public static function post_status_changed(string $new_status, string $old_status, WP_Post $post): void {
 		if (!in_array($post->post_type, self::supported_post_types(), true) || ($new_status !== 'publish' && $old_status !== 'publish')) return;
-		self::schedule('content', 'status');
+		self::schedule('content', 'status', $post);
 	}
 
 	public static function post_saved(int $post_id, WP_Post $post, bool $update = false): void {
 		if (wp_is_post_autosave($post_id) || wp_is_post_revision($post_id) || $post->post_status !== 'publish') return;
-		if (in_array($post->post_type, self::supported_post_types(), true)) self::schedule('content', $update ? 'updated' : 'created');
+		if (in_array($post->post_type, self::supported_post_types(), true)) self::schedule('content', $update ? 'updated' : 'created', $post);
 	}
 
 	public static function option_changed(string $option, $old_value, $value): void {
@@ -92,7 +95,7 @@ final class JG_Dispatch {
 
 	public static function terms_changed(int $object_id): void {
 		$post = get_post($object_id);
-		if ($post instanceof WP_Post && $post->post_status === 'publish' && in_array($post->post_type, self::supported_post_types(), true)) self::schedule('taxonomy', 'updated');
+		if ($post instanceof WP_Post && $post->post_status === 'publish' && in_array($post->post_type, self::supported_post_types(), true)) self::schedule('taxonomy', 'updated', $post);
 	}
 
 	public static function taxonomy_changed(int $term_id, int $term_taxonomy_id, string $taxonomy): void {
@@ -116,16 +119,28 @@ final class JG_Dispatch {
 	public static function post_meta_changed($meta_id, int $post_id, string $meta_key): void {
 		if ($meta_key !== '_thumbnail_id' && !str_starts_with($meta_key, '_jg_')) return;
 		$post = get_post($post_id);
-		if ($post instanceof WP_Post && $post->post_status === 'publish' && in_array($post->post_type, self::supported_post_types(), true)) self::schedule('media', 'updated');
+		if ($post instanceof WP_Post && $post->post_status === 'publish' && in_array($post->post_type, self::supported_post_types(), true)) self::schedule('media', 'updated', $post);
 	}
 
-	private static function schedule(string $change_type, string $change_action): void {
+	private static function schedule(string $change_type, string $change_action, ?WP_Post $post = null): void {
 		$pending = get_option(self::PENDING_OPTION, array());
 		if (!is_array($pending)) $pending = array();
 		$pending['types'] = array_values(array_unique(array_merge((array) ($pending['types'] ?? array()), array(sanitize_key($change_type)))));
 		$pending['actions'] = array_values(array_unique(array_merge((array) ($pending['actions'] ?? array()), array(sanitize_key($change_action)))));
 		$pending['first_seen'] = $pending['first_seen'] ?? gmdate('c');
 		$pending['attempts'] = absint($pending['attempts'] ?? 0);
+		$ref = $post instanceof WP_Post ? self::content_ref($post) : null;
+		if ($ref) {
+			$refs = (array) ($pending['contentRefs'] ?? array());
+			$refs[$ref['contentType'] . ':' . $ref['contentId']] = $ref;
+			$pending['contentRefs'] = array_values($refs);
+		}
+		$config = self::config();
+		$pending['triggerId'] = sanitize_key((string) ($pending['triggerId'] ?? wp_generate_uuid4()));
+		$pending['triggeredAt'] = (string) ($pending['triggeredAt'] ?? gmdate('c'));
+		$pending['source'] = sanitize_key((string) ($pending['source'] ?? 'wordpress'));
+		$pending['workflowId'] = sanitize_file_name((string) ($pending['workflowId'] ?? $config['workflow']));
+		$pending['ref'] = sanitize_text_field((string) ($pending['ref'] ?? $config['ref']));
 		update_option(self::PENDING_OPTION, $pending, false);
 		if (self::auto_enabled() && !wp_next_scheduled(self::CRON_HOOK)) wp_schedule_single_event(time() + self::debounce(), self::CRON_HOOK);
 	}
@@ -137,22 +152,22 @@ final class JG_Dispatch {
 			if (!is_array($pending) || empty($pending)) return;
 			$revision = self::public_revision();
 			if (is_wp_error($revision)) {
-				self::failed($pending, $revision->get_error_message());
+				self::failed($pending, $revision);
 				return;
 			}
 			if (hash_equals((string) get_option(self::REVISION_OPTION, ''), $revision)) {
 				delete_option(self::PENDING_OPTION);
-				self::store_status('unchanged', 'Public revision is unchanged; no workflow was dispatched.');
+				self::record_dispatch($pending, 'unchanged', array('message' => 'Public revision is unchanged; no workflow was dispatched.'));
 				return;
 			}
 			$result = self::send($revision, $pending, false);
 			if (is_wp_error($result)) {
-				self::failed($pending, $result->get_error_message());
+				self::failed($pending, $result);
 				return;
 			}
 			update_option(self::REVISION_OPTION, $revision, false);
 			delete_option(self::PENDING_OPTION);
-			self::store_status('success', 'Workflow dispatched.', $result);
+			self::record_dispatch($pending, 'accepted', array_merge(array('message' => 'Workflow dispatched.'), $result));
 		} finally {
 			delete_option(self::LOCK_OPTION);
 		}
@@ -163,17 +178,17 @@ final class JG_Dispatch {
 		check_admin_referer('jg_manual_dispatch');
 		$revision = self::public_revision();
 		if (is_wp_error($revision)) {
-			self::store_status('error', $revision->get_error_message());
+			self::record_dispatch(array('source' => 'manual'), 'failed', array('message' => $revision->get_error_message(), 'error_code' => $revision->get_error_code(), 'error_summary' => $revision->get_error_message()));
 		} elseif (!self::acquire_lock()) {
-			self::store_status('busy', 'Another dispatch is already running.');
+			self::record_dispatch(array('source' => 'manual'), 'busy', array('message' => 'Another dispatch is already running.'));
 		} else {
 			try {
 				$result = self::send($revision, array('types' => array('manual'), 'actions' => array('force')), true);
-				if (is_wp_error($result)) self::failed(get_option(self::PENDING_OPTION, array()), $result->get_error_message());
+				if (is_wp_error($result)) self::failed(get_option(self::PENDING_OPTION, array()), $result);
 				else {
 					update_option(self::REVISION_OPTION, $revision, false);
 					delete_option(self::PENDING_OPTION);
-					self::store_status('success', 'Forced workflow dispatch completed.', $result);
+					self::record_dispatch(array('source' => 'manual'), 'accepted', array_merge(array('message' => 'Forced workflow dispatch completed.'), $result));
 				}
 			} finally {
 				delete_option(self::LOCK_OPTION);
@@ -245,11 +260,11 @@ final class JG_Dispatch {
 		return new WP_Error('jg_dispatch_http', 'GitHub request failed.');
 	}
 
-	private static function failed(array $pending, string $message): void {
+	private static function failed(array $pending, WP_Error $error): void {
 		$attempts = absint($pending['attempts'] ?? 0) + 1;
 		$pending['attempts'] = $attempts;
 		update_option(self::PENDING_OPTION, $pending, false);
-		self::store_status('error', $message);
+		self::record_dispatch($pending, 'failed', array('message' => $error->get_error_message(), 'error_code' => $error->get_error_code(), 'error_summary' => $error->get_error_message()));
 		if (self::auto_enabled() && $attempts <= count(self::RETRY_DELAYS)) wp_schedule_single_event(time() + self::RETRY_DELAYS[$attempts - 1], self::CRON_HOOK);
 	}
 
@@ -305,13 +320,161 @@ final class JG_Dispatch {
 	}
 	private static function ensure_private_option(string $name, $default): void { if (get_option($name, null) === null) add_option($name, $default, '', false); self::fix_autoload($name); }
 	private static function fix_autoload(string $name): void { global $wpdb; $wpdb->update($wpdb->options, array('autoload' => 'no'), array('option_name' => $name), array('%s'), array('%s')); }
-	private static function store_status(string $state, string $message, array $meta = array()): void {
-		$entry = array('state' => sanitize_key($state), 'message' => sanitize_text_field($message), 'time' => gmdate('c'));
-		foreach (array('status', 'workflow_run_id', 'run_url', 'html_url') as $key) if (array_key_exists($key, $meta)) $entry[$key] = $meta[$key];
-		update_option(self::STATUS_OPTION, $entry, false);
+	public static function find_latest_record_for_content(string $content_type, int $content_id, string $modified_at_gmt = ''): ?array {
 		$history = get_option(self::HISTORY_OPTION, array());
-		array_unshift($history, $entry);
-		update_option(self::HISTORY_OPTION, array_slice(array_values($history), 0, 20), false);
+		if (!is_array($history)) return null;
+		$modified_ts = $modified_at_gmt !== '' ? strtotime($modified_at_gmt) : 0;
+		foreach ($history as $record) {
+			if (!is_array($record)) continue;
+			$found = false;
+			foreach ((array) ($record['contentRefs'] ?? array()) as $ref) {
+				if (is_array($ref) && ($ref['contentType'] ?? '') === $content_type && (int) ($ref['contentId'] ?? 0) === $content_id) {
+					$found = true;
+					break;
+				}
+			}
+			if (!$found) continue;
+			$triggered = isset($record['triggeredAt']) && is_string($record['triggeredAt']) ? strtotime($record['triggeredAt']) : 0;
+			if ($modified_ts > 0 && $triggered > 0 && $triggered < $modified_ts) continue;
+			return $record;
+		}
+		return null;
+	}
+
+	public static function query_run(int $workflow_run_id, array $record = array()): array {
+		$cache_key = self::RUN_CACHE_PREFIX . $workflow_run_id;
+		$cached = get_transient($cache_key);
+		if (is_array($cached)) return $cached;
+
+		$now = gmdate('c');
+		$fallback = array(
+			'workflowRunId' => $workflow_run_id,
+			'buildStatus' => isset($record['buildStatus']) && $record['buildStatus'] !== '' ? $record['buildStatus'] : 'unknown',
+			'buildConclusion' => $record['buildConclusion'] ?? null,
+			'startedAt' => $record['startedAt'] ?? null,
+			'completedAt' => $record['completedAt'] ?? null,
+			'lastCheckedAt' => $now,
+			'errorCode' => null,
+			'errorSummary' => null,
+		);
+
+		$config = self::config();
+		$token = self::token();
+		$endpoint = 'https://api.github.com/repos/' . rawurlencode($config['owner']) . '/' . rawurlencode($config['repository']) . '/actions/runs/' . $workflow_run_id;
+		$response = wp_remote_get($endpoint, array(
+			'timeout' => 10,
+			'redirection' => 0,
+			'headers' => array(
+				'Accept' => 'application/vnd.github+json',
+				'Authorization' => $token !== '' ? 'Bearer ' . $token : '',
+				'User-Agent' => 'JaisonG1n-Site-Manager/' . JG_SITE_MANAGER_VERSION,
+				'X-GitHub-Api-Version' => self::GITHUB_API_VERSION,
+			),
+		));
+
+		if (is_wp_error($response)) {
+			$fallback['errorCode'] = 'jg_dispatch_run_network';
+			$fallback['errorSummary'] = mb_substr(sanitize_text_field($response->get_error_message()), 0, 200);
+			return $fallback;
+		}
+		$code = (int) wp_remote_retrieve_response_code($response);
+		if ($code !== 200) {
+			$fallback['errorCode'] = 'jg_dispatch_run_http_' . $code;
+			$fallback['errorSummary'] = 'GitHub run query returned HTTP ' . $code . '.';
+			return $fallback;
+		}
+		$decoded = json_decode((string) wp_remote_retrieve_body($response), true);
+		if (!is_array($decoded)) {
+			$fallback['errorCode'] = 'jg_dispatch_run_invalid_response';
+			$fallback['errorSummary'] = 'GitHub returned an invalid run response.';
+			return $fallback;
+		}
+		$status = sanitize_key((string) ($decoded['status'] ?? ''));
+		$conclusion = isset($decoded['conclusion']) && $decoded['conclusion'] !== null && $decoded['conclusion'] !== '' ? sanitize_key((string) $decoded['conclusion']) : null;
+		$result = array(
+			'workflowRunId' => $workflow_run_id,
+			'buildStatus' => self::map_run_status($status, $conclusion),
+			'buildConclusion' => $conclusion,
+			'startedAt' => self::iso_time((string) ($decoded['started_at'] ?? '')),
+			'completedAt' => self::iso_time((string) ($decoded['completed_at'] ?? '')),
+			'lastCheckedAt' => $now,
+			'errorCode' => null,
+			'errorSummary' => null,
+		);
+		set_transient($cache_key, $result, self::RUN_CACHE_TTL);
+		return $result;
+	}
+
+	private static function map_run_status(string $status, ?string $conclusion): string {
+		if ($status === 'queued') return 'queued';
+		if ($status === 'in_progress') return 'in_progress';
+		if ($status === 'completed') {
+			if ($conclusion === 'success') return 'success';
+			if ($conclusion === 'failure') return 'failed';
+			if ($conclusion === 'cancelled') return 'cancelled';
+			if ($conclusion === 'timed_out') return 'failed';
+			return 'unknown';
+		}
+		return 'unknown';
+	}
+
+	private static function content_ref(WP_Post $post): ?array {
+		$api_type = JG_AI_Content::api_type_for_post_type($post->post_type);
+		if ($api_type === null) return null;
+		$modified = self::iso_time(trim((string) $post->post_modified_gmt));
+		return array('contentType' => $api_type, 'contentId' => (int) $post->ID, 'modifiedAt' => $modified ?? gmdate('c'));
+	}
+
+	private static function iso_time(string $value): ?string {
+		if ($value === '' || $value === '0000-00-00 00:00:00') return null;
+		$timestamp = strtotime($value . (str_contains($value, 'T') || str_contains($value, '+') || str_contains($value, 'Z') ? '' : ' UTC'));
+		return $timestamp === false ? null : gmdate('c', $timestamp);
+	}
+
+	private static function record_dispatch(array $pending, string $dispatch_status, array $meta = array()): void {
+		$config = self::config();
+		$record = array(
+			'triggerId' => sanitize_key((string) ($pending['triggerId'] ?? wp_generate_uuid4())),
+			'source' => sanitize_key((string) ($pending['source'] ?? 'wordpress')),
+			'contentRefs' => array_values(array_filter((array) ($pending['contentRefs'] ?? array()), static fn($ref) => is_array($ref))),
+			'workflowId' => sanitize_file_name((string) ($pending['workflowId'] ?? $config['workflow'])),
+			'workflowRunId' => isset($meta['workflow_run_id']) && is_numeric($meta['workflow_run_id']) && (int) $meta['workflow_run_id'] > 0 ? absint($meta['workflow_run_id']) : null,
+			'runUrl' => isset($meta['run_url']) ? $meta['run_url'] : null,
+			'runHtmlUrl' => isset($meta['html_url']) ? $meta['html_url'] : null,
+			'ref' => sanitize_text_field((string) ($pending['ref'] ?? $config['ref'])),
+			'dispatchStatus' => sanitize_key($dispatch_status),
+			'buildStatus' => in_array($dispatch_status, array('failed', 'not_configured', 'unchanged', 'busy'), true) ? 'not_triggered' : 'pending',
+			'buildConclusion' => null,
+			'deploymentStatus' => 'unknown',
+			'triggeredAt' => isset($pending['triggeredAt']) && is_string($pending['triggeredAt']) ? $pending['triggeredAt'] : gmdate('c'),
+			'startedAt' => null,
+			'completedAt' => null,
+			'lastCheckedAt' => gmdate('c'),
+			'errorCode' => isset($meta['error_code']) ? sanitize_key((string) $meta['error_code']) : null,
+			'errorSummary' => isset($meta['error_summary']) ? mb_substr(sanitize_text_field((string) $meta['error_summary']), 0, 200) : null,
+		);
+
+		$status = array(
+			'state' => self::legacy_state($dispatch_status),
+			'message' => sanitize_text_field((string) ($meta['message'] ?? '')),
+			'time' => $record['triggeredAt'],
+			'record' => $record,
+		);
+		foreach (array('status', 'workflow_run_id', 'run_url', 'html_url') as $key) {
+			if (array_key_exists($key, $meta)) $status[$key] = $meta[$key];
+		}
+		update_option(self::STATUS_OPTION, $status, false);
+
+		$history = get_option(self::HISTORY_OPTION, array());
+		if (!is_array($history)) $history = array();
+		array_unshift($history, $record);
+		update_option(self::HISTORY_OPTION, array_slice(array_values($history), 0, self::MAX_RECORDS), false);
+	}
+
+	private static function legacy_state(string $dispatch_status): string {
+		if ($dispatch_status === 'accepted') return 'success';
+		if ($dispatch_status === 'failed' || $dispatch_status === 'not_configured') return 'error';
+		return sanitize_key($dispatch_status);
 	}
 
 	public static function render_status_panel(): void {

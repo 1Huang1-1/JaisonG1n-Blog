@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.8.1
+Stable tag: 0.8.2
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -24,6 +24,14 @@ The plugin accepts a fine-grained GitHub token with Actions Read and write for t
 Deactivation retains all data. Normal uninstall removes plugin-added role capabilities but retains content and settings. Destructive data cleanup runs only when an administrator explicitly enables it before uninstalling.
 
 == Changelog ==
+
+= 0.8.2 =
+
+* Adds a read-only deployment status endpoint under the AI Content API: `GET /content/{type}/{id}/deployment-status`.
+* Tracks per-dispatch records with merged content references, workflow run IDs, GitHub run URLs, and WordPress/dispatch/build/deployment/page status layers.
+* Queries GitHub Actions run state with short caching and safe failure fallbacks; never maps dispatch acceptance to build success or GitHub success to a deployed front-end.
+* Adds a canonical public URL helper for diary and article routes and a restricted, trusted-host page probe for deployment confirmation.
+* Exposes `deploymentStatus` as a read-only capability for readable content types without granting publish or build triggers.
 
 = 0.8.1 =
 

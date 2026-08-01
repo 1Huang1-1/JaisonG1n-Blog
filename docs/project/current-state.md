@@ -1,5 +1,17 @@
 # Current project state
 
+## 2026-08-02 Site Manager 0.8.2 部署状态 API（本地实现）
+
+- 插件代码版本为 `0.8.2`，公开快照 `schemaVersion` 继续为 `5`。
+- 新增只读 `GET /content/{type}/{id}/deployment-status`：Application Password 认证、与内容读取相同的对象权限、不要求 `manage_options`、不触发构建。
+- 状态五层分离：`wordpressStatus` / `dispatchStatus` / `buildStatus` / `deploymentStatus` / `pageStatus`；`workflowRunId` 只从 GitHub 200 响应解析，204 不伪造；GitHub success 不直接映射 deployed，需可信页面探测确认。
+- dispatch 记录扩展：`jg_dispatch_pending` 累积多内容 `contentRefs`，`jg_dispatch_history` 保存完整记录（triggerId/source/contentRefs/workflowRunId/runUrl/时间戳/错误），`jg_dispatch_status` 保留旧面板视图；无 contentRefs 的旧记录不会被硬绑定到内容。
+- GitHub Actions run 查询 20 秒缓存；403/404/429/500/网络错误保留最后已知状态并返回脱敏错误。
+- canonical public URL：diary `/diary/{slug}/`、article `/posts/{slug}/`，基址取 `JG_Settings::public_site_url`（默认 `https://jaisong1n.com`）；空 slug、含路径分隔符与不支持类型返回 null；与 CMS editUrl 分离。
+- 页面探测仅允许配置的生产域名、限制重定向、64 KiB 上限与 10 秒超时；capabilities 为可读类型新增只读 `deploymentStatus`。
+- 本地测试：部署状态 Playground 94 条断言、AI Content 111 条断言、smoke、0.8.1→0.8.2 升级、`pnpm test` 55/55、`pnpm check` 320 文件零问题。
+- 本版本为本地实现与本地测试结果；尚未安装到真实 WordPress，未执行生产验收。生产实时版本仍为 `0.8.1`。
+
 ## 2026-08-01 Site Manager 0.8.1 权限模型修复状态（本地实现）
 
 - 插件代码版本为 `0.8.1`，公开快照 `schemaVersion` 继续为 `5`。
@@ -23,7 +35,7 @@
 ## 基本信息
 
 - 项目名称：JaisonG1n-Blog
-- 当前插件版本：JaisonG1n Site Manager `0.8.1`（本地实现；生产实时版本为 `0.8.0`，未安装 0.8.1）
+- 当前插件版本：JaisonG1n Site Manager `0.8.2`（本地实现；生产实时版本为 `0.8.1`，未安装 0.8.2）
 - 当前快照 schemaVersion：`5`
 - 主分支：`master`（`origin/HEAD` 指向 `origin/master`）
 - 当前工作分支：`codex/ai-content-api-0-7`

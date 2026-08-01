@@ -101,15 +101,15 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.8.1 preserves schemaVersion 5 and deterministic ordering", async () => {
+test("version 0.8.2 preserves schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.8\.1/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.8\.1'/);
-	assert.match(readme, /Stable tag:\s*0\.8\.1/);
+	assert.match(entry, /Version:\s*0\.8\.2/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.8\.2'/);
+	assert.match(readme, /Stable tag:\s*0\.8\.2/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
@@ -192,6 +192,41 @@ test("diary updates and reviewed publishing share one AI ownership check", async
 	}
 	assert.match(source, /function repair_ai_ownership/);
 	assert.match(source, /jg_ai_sync_owner/);
+});
+
+test("deployment status API is read-only and keeps status layers separate", async () => {
+	const [aiSource, dispatchSource, settingsSource] = await Promise.all([
+		readFile(path.join(pluginRoot, "includes/class-jg-ai-content.php"), "utf8"),
+		readFile(path.join(pluginRoot, "includes/class-jg-dispatch.php"), "utf8"),
+		readFile(path.join(pluginRoot, "includes/class-jg-settings.php"), "utf8"),
+	]);
+	assert.match(aiSource, /deployment-status/);
+	assert.match(aiSource, /deployment_status/);
+	assert.match(aiSource, /deploymentStatus/);
+	assert.match(aiSource, /function get_canonical_public_url/);
+	assert.match(aiSource, /function probe_public_page/);
+	assert.match(aiSource, /'\/diary\/'/);
+	assert.match(aiSource, /'\/posts\/'/);
+	assert.match(aiSource, /rawurlencode/);
+	assert.match(aiSource, /limit_response_size/);
+	assert.match(aiSource, /'redirection'\s*=>\s*0/);
+	assert.match(aiSource, /public_site_url/);
+	assert.match(dispatchSource, /find_latest_record_for_content/);
+	assert.match(dispatchSource, /contentRefs/);
+	assert.match(dispatchSource, /query_run/);
+	assert.match(dispatchSource, /map_run_status/);
+	assert.match(dispatchSource, /RUN_CACHE_TTL = 20/);
+	assert.match(dispatchSource, /MAX_RECORDS = 50/);
+	assert.match(dispatchSource, /'dispatchStatus'\s*=>/);
+	assert.match(dispatchSource, /'buildStatus'\s*=>/);
+	assert.match(dispatchSource, /'deploymentStatus'\s*=>/);
+	assert.match(dispatchSource, /GITHUB_API_VERSION = '2026-03-10'/);
+	assert.match(dispatchSource, /workflow_run_id/);
+	assert.match(settingsSource, /public_site_url/);
+	assert.doesNotMatch(
+		dispatchSource,
+		/Authorization.*error_log|error_log.*Authorization/,
+	);
 });
 
 test("only announcement links opt into validated root-relative paths", async () => {
@@ -402,6 +437,6 @@ test("plugin packaging fixes the basename and normalizes ZIP paths", async () =>
 	);
 	assert.match(packageJson, /package:wordpress-plugin/);
 	assert.match(packageJson, /verify:wordpress-plugin-package/);
-	assert.match(packageJson, /jaisong1n-site-manager-0\.8\.1\.zip/);
+	assert.match(packageJson, /jaisong1n-site-manager-0\.8\.2\.zip/);
 	assert.match(packageJson, /test:wordpress-upgrade/);
 });

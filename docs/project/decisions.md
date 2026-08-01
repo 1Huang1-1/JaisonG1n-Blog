@@ -1,5 +1,35 @@
 # 重要技术决策
 
+## 2026-08-02：部署状态以五层分离并通过可信探测确认（Site Manager 0.8.2）
+
+### 问题
+
+AI 发布后缺少服务端可查询的构建/部署状态，OpenClaw 只能猜测前台是否上线；GitHub 接受 `workflow_dispatch` 与构建成功、GitHub 构建成功与 Cloudflare 部署完成均不是同一回事。
+
+### 最终选择
+
+在 AI Content API 中提供只读 `GET /content/{type}/{id}/deployment-status`，权限与内容读取一致，不要求 `manage_options`。状态五层分离：`wordpressStatus`、`dispatchStatus`、`buildStatus`、`deploymentStatus`、`pageStatus`。
+
+- dispatch 记录扩展自 `jg_dispatch_pending`/`jg_dispatch_history`/`jg_dispatch_status`，不新建表；debounce 期间累积多内容 `contentRefs`，查询按“包含该内容引用且 triggeredAt 不早于内容最后修改时间”的最新记录关联，禁止把全站最新构建硬绑定到任意内容。
+- GitHub Actions run 查询使用官方 run API，20 秒缓存；403/404/429/500/网络错误保留最后已知状态并记录脱敏错误，不自动重跑或触发。
+- `workflowRunId` 只从 200 响应解析；204 只记 `dispatchStatus=accepted` 且 runId 为 null，不伪造。
+- canonical public URL 由服务端生成（diary `/diary/{slug}/`、article `/posts/{slug}/`，基址取配置的 `public_site_url`），与 WordPress CMS 编辑地址分离。
+- 页面探测仅允许配置的生产博客域名、限制重定向、限制下载大小并设置超时；`deploymentStatus=deployed` 仅在构建成功且页面探测 reachable 时给出；`pageStatus=reachable` 不代表内容为最新版本。
+
+### 放弃或暂缓的方案
+
+- 不接 Cloudflare Pages API（本版本无部署 ID 查询），不把 GitHub success 直接映射为 deployed。
+- 不在 Astro 前端大规模增加 build ID/commit 标识（列为后续版本）。
+- 不开放任何可触发构建、取消构建或读取 GitHub token 的接口；状态查询不得修改内容。
+
+### 影响
+
+capabilities 新增只读 `deploymentStatus` operation，schemaVersion 保持 5（向后兼容新增）。dispatch 历史记录结构扩展但仍兼容旧条目（无 contentRefs 的旧记录不会被硬绑定）。
+
+### 后续条件
+
+若接入 Cloudflare Pages API 或增加页面 build ID，必须同步更新契约文档、安全模型与测试。
+
 ## 2026-08-01：AI 内容管理统一使用所有权授权模型（Site Manager 0.8.1）
 
 ### 问题
