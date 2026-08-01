@@ -1,5 +1,31 @@
 # 重要技术决策
 
+## 2026-08-01：AI 内容管理统一使用所有权授权模型（Site Manager 0.8.1）
+
+### 问题
+
+Site Manager 0.8.0 中 `can_publish()` 额外要求 `current_user_can('edit_post', post_id)`，而 AI 角色的读取/编辑授权使用 `_jg_ai_owner_user_id` 与 `_jg_ai_editable`。当 AI 已授权的草稿原生作者与 AI 所有者不一致时（例如管理员创建的测试草稿），`prepare-publish` 即使通过全局设置、发布 capability 和文章级 publishable 检查，仍返回 403。
+
+### 最终选择
+
+引入统一的文章级授权函数 `can_manage_ai_content()`，`updateDraft` 与 reviewed publish 共用：原生 `edit_post` 通过，或（当前用户是 AI 所有者：原生作者或 `_jg_ai_owner_user_id`，且 `_jg_ai_editable` 为真）。发布仍额外要求 `reviewed_diary_publish` 开启、用户拥有 `jg_ai_publish_diary_drafts`、内容类型为 diary、状态为 draft、`_jg_ai_publishable` 为真。
+
+拒绝时外部统一返回 403 `jg_ai_publish_forbidden`，审计记录细分原因：`setting_disabled`、`missing_publish_capability`、`ownership_denied`、`edit_denied`、`not_publishable`、`not_draft`。
+
+### 放弃或暂缓的方案
+
+- 不简单删除 `edit_post` 检查；它保留为附加允许条件，避免依赖 `edit_others_jg_diarys` 扩大 AI 角色范围。
+- 不允许仅凭 `_jg_ai_publishable` 发布其他用户的文章；editable 标记只授予读取，不授予写入或发布。
+- 不批量改写普通日记作者。仅当 `_jg_ai_owner_user_id` 有效、`_jg_ai_created` 为真、作者与所有者不一致时，管理员可通过受控修复（后台按钮或 `repair_ai_ownership()`）同步作者。
+
+### 影响
+
+AI 创建的草稿在其所有者名下始终可更新和进入受控发布流程；管理员创建并标记 editable 的草稿仍只读，除非显式修复所有权。schemaVersion 保持 5；无数据迁移要求。
+
+### 后续条件
+
+改变文章级授权语义或审计原因枚举时，必须同步更新 API 文档、安全模型、测试与 Agent 使用规则。
+
 ## 2026-08-01：AI 日记发布采用服务端两阶段确认
 
 Site Manager 0.8.0 将受控日记发布与草稿修改、WordPress 原生发布权限分离。AI 角色默认不具备发布权限；管理员开关只授予 `jg_ai_publish_diary_drafts`，且每篇日记仍需单独标记为允许发布。

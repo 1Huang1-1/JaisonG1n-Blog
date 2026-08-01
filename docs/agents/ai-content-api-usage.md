@@ -1,8 +1,10 @@
 # AI Content API Usage
 
-## Reviewed publish protocol (Site Manager 0.8.0)
+## Reviewed publish protocol (Site Manager 0.8.1)
 
 Treat `publish` as a two-stage, server-authorized diary-only operation. It is available only when the live diary capabilities include both `preparePublish` and `publish`.
+
+`updateDraft` and reviewed publishing share the same object-level ownership check: the current user must be the AI owner (native author or `_jg_ai_owner_user_id`) with the editable grant, or hold native WordPress `edit_post`. The `_jg_ai_editable` mark alone grants read, not update or publish. A diary created through `POST /content` is authored by and owned by the calling AI user.
 
 1. Read the latest diary and show the user the title, slug, excerpt, and intended publication action.
 2. After explicit user confirmation, call `POST /content/diary/{id}/prepare-publish`.

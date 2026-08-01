@@ -1,5 +1,15 @@
 # Current project state
 
+## 2026-08-01 Site Manager 0.8.1 权限模型修复状态（本地实现）
+
+- 插件代码版本为 `0.8.1`，公开快照 `schemaVersion` 继续为 `5`。
+- 统一 `updateDraft` 与 reviewed publish 的文章级授权：`can_manage_ai_content()` 通过当且仅当原生 `edit_post` 通过，或（当前用户是 AI 所有者：原生作者或 `_jg_ai_owner_user_id`，且 `_jg_ai_editable` 为真）。
+- 发布仍额外要求 `reviewed_diary_publish` 开启、`jg_ai_publish_diary_drafts` capability、diary 类型、draft 状态与 `_jg_ai_publishable` 为真；不依赖 `edit_others_jg_diarys`。
+- 拒绝时外部统一返回 403 `jg_ai_publish_forbidden`；审计记录细分原因：`setting_disabled`、`missing_publish_capability`、`ownership_denied`、`edit_denied`、`not_publishable`、`not_draft`。
+- 新增管理员受控所有权修复：`repair_ai_ownership()` 与后台"同步作者为 AI 所有者"按钮，仅在 `_jg_ai_owner_user_id` 有效、`_jg_ai_created` 为真且作者与所有者不一致时生效；不批量改写普通日记作者。
+- 本地测试覆盖：AI 草稿作者写入、owner 与作者一致、AI owner 可 updateDraft/preparePublish、非 owner 拒绝、设置关闭/缺 capability/未标记/非 draft 拒绝、prepare 不改变状态且不触发构建、0.8.0→0.8.1 升级不扩大权限。
+- 本版本为本地实现与本地测试结果；尚未安装到真实 WordPress，未执行生产验收。生产实时版本仍为 `0.8.0`。
+
 ## 2026-08-01 Site Manager 0.8.0 实施状态
 
 - 插件代码版本为 `0.8.0`，公开快照 `schemaVersion` 继续为 `5`。
@@ -13,7 +23,7 @@
 ## 基本信息
 
 - 项目名称：JaisonG1n-Blog
-- 当前插件版本：JaisonG1n Site Manager `0.7.0`
+- 当前插件版本：JaisonG1n Site Manager `0.8.1`（本地实现；生产实时版本为 `0.8.0`，未安装 0.8.1）
 - 当前快照 schemaVersion：`5`
 - 主分支：`master`（`origin/HEAD` 指向 `origin/master`）
 - 当前工作分支：`codex/ai-content-api-0-7`

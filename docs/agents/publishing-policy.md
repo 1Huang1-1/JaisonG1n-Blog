@@ -2,9 +2,11 @@
 
 ## Reviewed diary publishing
 
-Site Manager 0.8.0 requires a two-stage server flow for AI diary publishing. A direct status update is prohibited. The Agent must first obtain a short-lived confirmation token from `prepare-publish`, then submit that token with the unchanged `expectedModifiedAt` and a stable idempotency key to `publish`.
+Site Manager 0.8.1 requires a two-stage server flow for AI diary publishing. A direct status update is prohibited. The Agent must first obtain a short-lived confirmation token from `prepare-publish`, then submit that token with the unchanged `expectedModifiedAt` and a stable idempotency key to `publish`.
 
 The preparation step is not publication and must not be described as success. A content change after preparation invalidates the confirmation and requires a new read, a new user confirmation, and a new token. The Agent must not expose or retain confirmation tokens, must not attempt unpublishing, and must not invoke GitHub deployment APIs directly.
+
+Draft updates and reviewed publishing share one object-level authorization: AI ownership (native author or AI-owner meta) plus the editable grant, or native WordPress `edit_post`. The editable grant alone is read-only; the publishable mark alone never permits publishing another user's diary.
 
 本政策适用于 Codex、OpenClaw 和任何未来 Blog Agent。
 

@@ -71,6 +71,10 @@ $created = jg_ai_test_request('POST', '/jaisong1n/v1/ai/content', $diary_body, a
 jg_ai_test_assert($created->get_status() === 201, 'Diary draft creation failed.');
 $created_data = $created->get_data();
 jg_ai_test_assert($created_data['status'] === 'draft' && $created_data['id'] > 0, 'Diary draft result is invalid.');
+$created_post = get_post($created_data['id']);
+jg_ai_test_assert((int) $created_post->post_author === (int) $user_id, 'AI draft was not authored by the creating user.');
+$created_owner = (int) get_post_meta($created_data['id'], '_jg_ai_owner_user_id', true);
+jg_ai_test_assert($created_owner === (int) $user_id && $created_owner === (int) $created_post->post_author, 'AI owner meta does not match the draft author.');
 
 global $wpdb;
 $wpdb->update($wpdb->posts, array('post_modified' => '2025-01-01 00:00:00', 'post_modified_gmt' => '2025-01-01 00:00:00'), array('ID' => $created_data['id']));
@@ -147,6 +151,9 @@ jg_ai_test_assert(str_contains($audit_json, 'updateDraft') && !str_contains($aud
 $publish = jg_ai_test_request('POST', '/jaisong1n/v1/ai/content/article/' . $article_data['id'] . '/publish', array('expectedModifiedAt' => '2025-01-01T00:00:00Z'));
 jg_ai_test_assert($publish->get_status() === 403, 'Publishing must be disabled by default.');
 
+$setting_off_prepare = jg_ai_test_prepare((int) $user_id, (int) $created_data['id']);
+jg_ai_test_assert($setting_off_prepare->get_status() === 403 && jg_ai_test_error_code($setting_off_prepare) === 'jg_ai_publish_forbidden', 'Prepare must be rejected while reviewed publishing is disabled.');
+
 $admin_id = wp_create_user('jg-ai-publish-admin', wp_generate_password(24), 'jg-ai-publish-admin@example.test');
 jg_ai_test_assert(!is_wp_error($admin_id), 'Could not create the publish administrator.');
 (new WP_User((int) $admin_id))->set_role('administrator');
@@ -170,6 +177,70 @@ foreach ($enabled_capabilities['contentTypes'] as $type => $definition) {
 	if ($type === 'diary') continue;
 	jg_ai_test_assert(!in_array('preparePublish', $definition['operations'], true) && !in_array('publish', $definition['operations'], true), 'Reviewed publishing leaked to ' . $type . '.');
 }
+
+$no_publish_role = add_role('jg_ai_no_publish_editor', 'AI No Publish Editor', get_role('jg_ai_content_editor')->capabilities);
+jg_ai_test_assert($no_publish_role instanceof WP_Role, 'Could not clone the AI editor role.');
+$no_publish_role->remove_cap('jg_ai_publish_diary_drafts');
+$no_cap_user_id = wp_create_user('jg-ai-no-publish', wp_generate_password(24), 'jg-ai-no-publish@example.test');
+jg_ai_test_assert(!is_wp_error($no_cap_user_id), 'Could not create the no-publish test user.');
+(new WP_User((int) $no_cap_user_id))->set_role('jg_ai_no_publish_editor');
+wp_set_current_user((int) $no_cap_user_id);
+$no_cap_prepare = jg_ai_test_prepare((int) $no_cap_user_id, (int) $created_data['id']);
+jg_ai_test_assert($no_cap_prepare->get_status() === 403 && jg_ai_test_error_code($no_cap_prepare) === 'jg_ai_publish_forbidden', 'Prepare must be rejected without the diary publish capability.');
+wp_set_current_user((int) $user_id);
+remove_role('jg_ai_no_publish_editor');
+
+$not_publishable_body = array('contentType' => 'diary', 'title' => 'Not publishable diary', 'slug' => 'not-publishable-diary', 'contentHtml' => '<p>body</p>', 'idempotencyKey' => 'playground-ai-diary-np-0001');
+$np_created = jg_ai_test_request('POST', '/jaisong1n/v1/ai/content', $not_publishable_body, array('Idempotency-Key' => 'playground-ai-diary-np-0001'));
+jg_ai_test_assert($np_created->get_status() === 201, 'Not-publishable diary creation failed.');
+$np_id = (int) $np_created->get_data()['id'];
+$np_prepare = jg_ai_test_prepare((int) $user_id, $np_id);
+jg_ai_test_assert($np_prepare->get_status() === 403 && jg_ai_test_error_code($np_prepare) === 'jg_ai_publish_forbidden', 'Prepare must be rejected when the diary is not marked publishable.');
+
+$drift_body = array('contentType' => 'diary', 'title' => 'Drifted owner diary', 'slug' => 'drifted-owner-diary', 'contentHtml' => '<p>body</p>', 'idempotencyKey' => 'playground-ai-diary-drift-0001');
+$drift_created = jg_ai_test_request('POST', '/jaisong1n/v1/ai/content', $drift_body, array('Idempotency-Key' => 'playground-ai-diary-drift-0001'));
+jg_ai_test_assert($drift_created->get_status() === 201, 'Drifted diary creation failed.');
+$drift_id = (int) $drift_created->get_data()['id'];
+update_post_meta($drift_id, '_jg_ai_publishable', true);
+wp_update_post(array('ID' => $drift_id, 'post_author' => (int) $admin_id), true);
+clean_post_cache($drift_id);
+jg_ai_test_assert((int) get_post($drift_id)->post_author === (int) $admin_id, 'Drift simulation failed.');
+jg_ai_test_assert((int) get_post_meta($drift_id, '_jg_ai_owner_user_id', true) === (int) $user_id, 'AI owner meta was lost during drift simulation.');
+$drift_read = jg_ai_test_request('GET', '/jaisong1n/v1/ai/content/diary/' . $drift_id)->get_data();
+jg_ai_test_assert($drift_read['status'] === 'draft', 'Drifted diary read failed.');
+$drift_update = jg_ai_test_request('PATCH', '/jaisong1n/v1/ai/content/diary/' . $drift_id, array('expectedModifiedAt' => $drift_read['modifiedAt'], 'title' => 'Drifted owner updated'));
+jg_ai_test_assert($drift_update->get_status() === 200 && $drift_update->get_data()['title'] === 'Drifted owner updated', 'AI owner could not update a draft whose author drifted.');
+delete_option('jg_dispatch_pending');
+wp_clear_scheduled_hook(JG_Dispatch::CRON_HOOK);
+$drift_prepare = jg_ai_test_prepare((int) $user_id, $drift_id);
+jg_ai_test_assert($drift_prepare->get_status() === 200 && $drift_prepare->get_data()['status'] === 'draft', 'AI owner could not prepare a draft whose author drifted: ' . wp_json_encode($drift_prepare->get_data()));
+jg_ai_test_assert(get_post_status($drift_id) === 'draft' && get_option('jg_dispatch_pending', false) === false && !wp_next_scheduled(JG_Dispatch::CRON_HOOK), 'Drifted prepare changed state or scheduled a build.');
+
+$other_editor_id = wp_create_user('jg-ai-other-editor', wp_generate_password(24), 'jg-ai-other-editor@example.test');
+jg_ai_test_assert(!is_wp_error($other_editor_id), 'Could not create the other editor test user.');
+(new WP_User((int) $other_editor_id))->set_role('jg_ai_content_editor');
+wp_set_current_user((int) $other_editor_id);
+$other_prepare = jg_ai_test_prepare((int) $other_editor_id, $drift_id);
+jg_ai_test_assert($other_prepare->get_status() === 403 && jg_ai_test_error_code($other_prepare) === 'jg_ai_publish_forbidden', 'A non-owner was allowed to prepare a publishable diary.');
+update_post_meta($drift_id, '_jg_ai_editable', false);
+$ownerless_prepare = jg_ai_test_prepare((int) $other_editor_id, $drift_id);
+jg_ai_test_assert($ownerless_prepare->get_status() === 403 && jg_ai_test_error_code($ownerless_prepare) === 'jg_ai_publish_forbidden', 'A non-owner without the editable grant was not rejected.');
+wp_set_current_user((int) $user_id);
+
+$repair_draft_id = wp_insert_post(array('post_type' => 'jg_diary', 'post_status' => 'draft', 'post_author' => (int) $admin_id, 'post_title' => 'Repair target'));
+update_post_meta($repair_draft_id, '_jg_ai_created', true);
+update_post_meta($repair_draft_id, '_jg_ai_owner_user_id', (int) $user_id);
+update_post_meta($repair_draft_id, '_jg_ai_editable', true);
+jg_ai_test_assert(JG_AI_Content::repair_ai_ownership((int) $repair_draft_id) === true, 'Guarded ownership repair failed.');
+jg_ai_test_assert((int) get_post($repair_draft_id)->post_author === (int) $user_id, 'Ownership repair did not sync the author.');
+jg_ai_test_assert(JG_AI_Content::repair_ai_ownership(999999) === false, 'Ownership repair accepted a missing post.');
+$repair_page_id = wp_insert_post(array('post_type' => 'page', 'post_status' => 'draft', 'post_title' => 'Repair page'));
+update_post_meta($repair_page_id, '_jg_ai_created', true);
+update_post_meta($repair_page_id, '_jg_ai_owner_user_id', (int) $user_id);
+jg_ai_test_assert(JG_AI_Content::repair_ai_ownership((int) $repair_page_id) === false, 'Ownership repair touched a non-registry content type.');
+$not_created_id = wp_insert_post(array('post_type' => 'jg_diary', 'post_status' => 'draft', 'post_author' => (int) $admin_id, 'post_title' => 'Not created repair'));
+update_post_meta($not_created_id, '_jg_ai_owner_user_id', (int) $user_id);
+jg_ai_test_assert(JG_AI_Content::repair_ai_ownership((int) $not_created_id) === false, 'Ownership repair acted without the AI-created flag.');
 
 delete_option('jg_dispatch_pending');
 wp_clear_scheduled_hook(JG_Dispatch::CRON_HOOK);
@@ -247,6 +318,9 @@ $audit = get_option('jg_ai_content_audit', array());
 $audit_json = wp_json_encode($audit);
 foreach (array('publish_prepare', 'publish_success', 'publish_rejected', 'publish_conflict', 'idempotent_replay') as $action) {
 	jg_ai_test_assert(str_contains($audit_json, $action), 'Audit is missing ' . $action . '.');
+}
+foreach (array('setting_disabled', 'missing_publish_capability', 'ownership_denied', 'edit_denied', 'not_publishable', 'not_draft') as $reason) {
+	jg_ai_test_assert(str_contains($audit_json, $reason), 'Audit is missing rejection reason ' . $reason . '.');
 }
 jg_ai_test_assert(!str_contains($audit_json, $prepared_data['confirmationToken']) && !str_contains($audit_json, 'Updated body') && !str_contains($audit_json, 'Authorization'), 'Publish audit exposed a token, body, or credential header.');
 jg_ai_test_assert(get_option('jg_dispatch_status', array()) === array(), 'AI publish called the GitHub dispatch worker directly.');

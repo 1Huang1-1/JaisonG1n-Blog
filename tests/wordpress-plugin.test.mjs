@@ -101,15 +101,15 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.8.0 preserves schemaVersion 5 and deterministic ordering", async () => {
+test("version 0.8.1 preserves schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.8\.0/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.8\.0'/);
-	assert.match(readme, /Stable tag:\s*0\.8\.0/);
+	assert.match(entry, /Version:\s*0\.8\.1/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.8\.1'/);
+	assert.match(readme, /Stable tag:\s*0\.8\.1/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
@@ -159,6 +159,39 @@ test("reviewed diary publishing uses a separate capability and one-time tokens",
 	assert.match(source, /publish_conflict/);
 	assert.doesNotMatch(source, /add_cap\([^\n]*publish_jg_diary/);
 	assert.doesNotMatch(source, /workflow_dispatch|api\.github\.com/);
+});
+
+test("diary updates and reviewed publishing share one AI ownership check", async () => {
+	const source = await readFile(
+		path.join(pluginRoot, "includes/class-jg-ai-content.php"),
+		"utf8",
+	);
+	assert.match(source, /can_manage_ai_content/);
+	assert.match(source, /_jg_ai_owner_user_id/);
+	assert.match(source, /function can_manage_ai_content/);
+	assert.match(source, /current_user_can\('edit_post', \$post->ID\)/);
+	assert.match(source, /is_ai_owner\(\$post\)/);
+	assert.match(source, /_jg_ai_editable/);
+	assert.match(
+		source,
+		/can_publish\(array \$contract, \?WP_Post \$post\): bool \{[\s\S]*?can_manage_ai_content/,
+	);
+	assert.match(
+		source,
+		/can_manage_ai_content[\s\S]*?current_user_can\('edit_post', \$post->ID\)[\s\S]*?is_ai_owner\(\$post\)/,
+	);
+	assert.match(source, /function publish_rejection_reason/);
+	for (const reason of [
+		"setting_disabled",
+		"missing_publish_capability",
+		"ownership_denied",
+		"edit_denied",
+		"not_publishable",
+	]) {
+		assert.match(source, new RegExp(reason));
+	}
+	assert.match(source, /function repair_ai_ownership/);
+	assert.match(source, /jg_ai_sync_owner/);
 });
 
 test("only announcement links opt into validated root-relative paths", async () => {
@@ -369,6 +402,6 @@ test("plugin packaging fixes the basename and normalizes ZIP paths", async () =>
 	);
 	assert.match(packageJson, /package:wordpress-plugin/);
 	assert.match(packageJson, /verify:wordpress-plugin-package/);
-	assert.match(packageJson, /jaisong1n-site-manager-0\.8\.0\.zip/);
+	assert.match(packageJson, /jaisong1n-site-manager-0\.8\.1\.zip/);
 	assert.match(packageJson, /test:wordpress-upgrade/);
 });

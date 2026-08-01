@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.8.0
+Stable tag: 0.8.1
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -24,6 +24,13 @@ The plugin accepts a fine-grained GitHub token with Actions Read and write for t
 Deactivation retains all data. Normal uninstall removes plugin-added role capabilities but retains content and settings. Destructive data cleanup runs only when an administrator explicitly enables it before uninstalling.
 
 == Changelog ==
+
+= 0.8.1 =
+
+* Unifies diary draft updates and reviewed publishing behind one AI ownership check: native WordPress edit capability or explicit AI ownership plus the editable grant.
+* Allows API-owned diary drafts to enter `prepare-publish` without the `edit_others_jg_diarys` capability while keeping publish behind the reviewed setting, the diary-only publish capability, and the per-content publishable grant.
+* Adds granular audit rejection reasons (`setting_disabled`, `missing_publish_capability`, `ownership_denied`, `edit_denied`, `not_publishable`, `not_draft`) while keeping the public 403 code unchanged.
+* Adds an administrator-only, guarded ownership repair path for AI-created drafts whose author drifted from the AI owner.
 
 = 0.8.0 =
 

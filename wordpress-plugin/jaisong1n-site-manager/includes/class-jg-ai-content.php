@@ -26,6 +26,7 @@ final class JG_AI_Content {
 		add_action('admin_menu', array(__CLASS__, 'add_settings_page'));
 		add_action('admin_init', array(__CLASS__, 'register_settings'));
 		add_action('admin_post_jg_ai_clear_audit', array(__CLASS__, 'clear_audit'));
+		add_action('admin_post_jg_ai_sync_owner', array(__CLASS__, 'handle_sync_owner'));
 		add_action('admin_init', array(__CLASS__, 'install'));
 		add_action('update_option_' . self::SETTINGS_OPTION, array(__CLASS__, 'settings_updated'), 10, 2);
 	}
@@ -227,8 +228,9 @@ final class JG_AI_Content {
 			self::record('publish_rejected', 'diary', $post_id, 404, array(), false, array('reason' => 'not_found'));
 			return $post;
 		}
-		if (!self::can_publish($contract, $post)) {
-			self::record('publish_rejected', 'diary', $post_id, 403, array(), false, array('reason' => 'forbidden'));
+		$denial_reason = self::publish_rejection_reason($contract, $post);
+		if ($denial_reason !== 'ok') {
+			self::record('publish_rejected', 'diary', $post_id, 403, array(), false, array('reason' => $denial_reason));
 			return self::error('jg_ai_publish_forbidden', 'Reviewed diary publishing is not enabled or authorized.', 403);
 		}
 		if ($post->post_status !== 'draft') {
@@ -271,8 +273,9 @@ final class JG_AI_Content {
 			self::record('publish_rejected', 'diary', $post_id, 404, array(), false, array('reason' => 'not_found'));
 			return $post;
 		}
-		if (!self::can_publish($contract, $post)) {
-			self::record('publish_rejected', 'diary', $post_id, 403, array(), false, array('reason' => 'forbidden'));
+		$denial_reason = self::publish_rejection_reason($contract, $post);
+		if ($denial_reason !== 'ok') {
+			self::record('publish_rejected', 'diary', $post_id, 403, array(), false, array('reason' => $denial_reason));
 			return self::error('jg_ai_publish_forbidden', 'Reviewed diary publishing is not enabled or authorized.', 403);
 		}
 		$input = $request->get_json_params(); if (!is_array($input)) $input = $request->get_params();
@@ -372,12 +375,18 @@ final class JG_AI_Content {
 	private static function safe_wp_error(WP_Error $error): WP_Error { return self::error('jg_ai_content_write_failed', 'The content could not be saved.', 400); }
 
 	private static function can_create(array $contract): bool { $object = get_post_type_object($contract['postType']); return !empty(self::settings()['create_drafts']) && $object && current_user_can($object->cap->create_posts); }
-	private static function can_read(array $contract, ?WP_Post $post): bool { return $post === null || (int) $post->post_author === get_current_user_id() || (bool) get_post_meta($post->ID, '_jg_ai_editable', true); }
+	private static function can_read(array $contract, ?WP_Post $post): bool {
+		if ($post === null) return true;
+		$owner_id = (int) get_post_meta($post->ID, '_jg_ai_owner_user_id', true);
+		return (int) $post->post_author === get_current_user_id()
+			|| ($owner_id > 0 && $owner_id === get_current_user_id())
+			|| (bool) get_post_meta($post->ID, '_jg_ai_editable', true);
+	}
 	private static function can_update_type(array $contract): bool {
 		$object = get_post_type_object($contract['postType']);
 		return $contract['apiType'] === 'diary' && !empty(self::settings()['update_drafts']) && $object && current_user_can($object->cap->edit_posts);
 	}
-	private static function can_update(array $contract, ?WP_Post $post): bool { return self::can_update_type($contract) && $post !== null && current_user_can('edit_post', $post->ID) && self::can_read($contract, $post); }
+	private static function can_update(array $contract, ?WP_Post $post): bool { return self::can_update_type($contract) && self::can_manage_ai_content($contract, $post); }
 	private static function can_publish_type(array $contract): bool {
 		return $contract['apiType'] === 'diary'
 			&& !empty(self::settings()['reviewed_diary_publish'])
@@ -386,10 +395,35 @@ final class JG_AI_Content {
 
 	private static function can_publish(array $contract, ?WP_Post $post): bool {
 		return self::can_publish_type($contract)
-			&& $post !== null
-			&& current_user_can('edit_post', $post->ID)
-			&& self::can_read($contract, $post)
+			&& self::can_manage_ai_content($contract, $post)
 			&& (bool) get_post_meta($post->ID, '_jg_ai_publishable', true);
+	}
+
+	private static function is_ai_owner(WP_Post $post): bool {
+		$owner_id = (int) get_post_meta($post->ID, '_jg_ai_owner_user_id', true);
+		return (int) $post->post_author === get_current_user_id()
+			|| ($owner_id > 0 && $owner_id === get_current_user_id());
+	}
+
+	private static function can_manage_ai_content(array $contract, ?WP_Post $post): bool {
+		if ($post === null || !self::can_read($contract, $post)) return false;
+		// Native WordPress edit remains an allowed path for role-granted or directly owned posts.
+		if (current_user_can('edit_post', $post->ID)) return true;
+		// AI ownership plus the explicit editable grant covers API-owned drafts
+		// without relying on edit_others_* capabilities.
+		return self::is_ai_owner($post) && (bool) get_post_meta($post->ID, '_jg_ai_editable', true);
+	}
+
+	private static function publish_rejection_reason(array $contract, ?WP_Post $post): string {
+		if (!self::can_publish_type($contract)) {
+			return empty(self::settings()['reviewed_diary_publish']) ? 'setting_disabled' : 'missing_publish_capability';
+		}
+		if ($post === null) return 'not_found';
+		if (!self::can_manage_ai_content($contract, $post)) {
+			return self::can_read($contract, $post) ? 'edit_denied' : 'ownership_denied';
+		}
+		if (!(bool) get_post_meta($post->ID, '_jg_ai_publishable', true)) return 'not_publishable';
+		return 'ok';
 	}
 
 	private static function normalize_input(array $input, array $contract, bool $creating) {
@@ -540,8 +574,39 @@ final class JG_AI_Content {
 	}
 
 	public static function add_meta_box(): void { foreach (self::registry() as $contract) add_meta_box('jg_ai_content_access', 'AI Content Assistant', array(__CLASS__, 'render_meta_box'), $contract['postType'], 'side', 'default'); }
-	public static function render_meta_box(WP_Post $post): void { if (!current_user_can('manage_options')) return; wp_nonce_field('jg_ai_content_access', 'jg_ai_content_access_nonce'); echo '<p><label><input type="checkbox" name="jg_ai_editable" value="1" ' . checked((bool) get_post_meta($post->ID, '_jg_ai_editable', true), true, false) . '> Allow AI Content Assistant to edit</label></p><p><label><input type="checkbox" name="jg_ai_publishable" value="1" ' . checked((bool) get_post_meta($post->ID, '_jg_ai_publishable', true), true, false) . '> Allow AI Content Assistant to publish</label></p><p><strong>AI created:</strong> ' . esc_html(get_post_meta($post->ID, '_jg_ai_created', true) ? 'Yes' : 'No') . '</p><p><strong>AI owner:</strong> ' . esc_html((string) get_post_meta($post->ID, '_jg_ai_owner_user_id', true)) . '</p>'; }
+	public static function render_meta_box(WP_Post $post): void {
+		if (!current_user_can('manage_options')) return;
+		wp_nonce_field('jg_ai_content_access', 'jg_ai_content_access_nonce');
+		echo '<p><label><input type="checkbox" name="jg_ai_editable" value="1" ' . checked((bool) get_post_meta($post->ID, '_jg_ai_editable', true), true, false) . '> Allow AI Content Assistant to edit</label></p><p><label><input type="checkbox" name="jg_ai_publishable" value="1" ' . checked((bool) get_post_meta($post->ID, '_jg_ai_publishable', true), true, false) . '> Allow AI Content Assistant to publish</label></p><p><strong>AI created:</strong> ' . esc_html(get_post_meta($post->ID, '_jg_ai_created', true) ? 'Yes' : 'No') . '</p><p><strong>AI owner:</strong> ' . esc_html((string) get_post_meta($post->ID, '_jg_ai_owner_user_id', true)) . '</p>';
+		$owner_id = (int) get_post_meta($post->ID, '_jg_ai_owner_user_id', true);
+		if ((bool) get_post_meta($post->ID, '_jg_ai_created', true) && $owner_id > 0 && get_userdata($owner_id) && (int) $post->post_author !== $owner_id) {
+			echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin-top:8px"><input type="hidden" name="action" value="jg_ai_sync_owner"><input type="hidden" name="post_id" value="' . esc_attr((string) $post->ID) . '">';
+			wp_nonce_field('jg_ai_sync_owner', 'jg_ai_sync_owner_nonce');
+			echo '<button class="button">同步作者为 AI 所有者</button></form>';
+		}
+	}
 	public static function save_claim(int $post_id, WP_Post $post): void { if (wp_is_post_autosave($post_id) || wp_is_post_revision($post_id) || !isset($_POST['jg_ai_content_access_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['jg_ai_content_access_nonce'])), 'jg_ai_content_access') || !current_user_can('manage_options')) return; if (!isset(array_flip(array_column(self::registry(), 'postType'))[$post->post_type])) return; update_post_meta($post_id, '_jg_ai_editable', !empty($_POST['jg_ai_editable'])); update_post_meta($post_id, '_jg_ai_publishable', !empty($_POST['jg_ai_publishable'])); }
+	public static function handle_sync_owner(): void {
+		if (!current_user_can('manage_options') || !check_admin_referer('jg_ai_sync_owner', 'jg_ai_sync_owner_nonce')) wp_die('Invalid request.');
+		$post_id = absint($_POST['post_id'] ?? 0);
+		$repaired = self::repair_ai_ownership($post_id);
+		$target = $post_id > 0 ? admin_url('post.php?post=' . $post_id . '&action=edit') : admin_url('edit.php');
+		wp_safe_redirect(add_query_arg('jg_ai_sync', $repaired ? '1' : '0', $target));
+		exit;
+	}
+	public static function repair_ai_ownership(int $post_id): bool {
+		$post = get_post($post_id);
+		if (!$post) return false;
+		if (!in_array($post->post_type, array_column(self::registry(), 'postType'), true)) return false;
+		$owner_id = (int) get_post_meta($post_id, '_jg_ai_owner_user_id', true);
+		if ($owner_id <= 0 || !get_userdata($owner_id)) return false;
+		if (!(bool) get_post_meta($post_id, '_jg_ai_created', true)) return false;
+		if ((int) $post->post_author === $owner_id) return true;
+		$updated = wp_update_post(array('ID' => $post_id, 'post_author' => $owner_id), true);
+		if (is_wp_error($updated)) return false;
+		clean_post_cache($post_id);
+		return true;
+	}
 	private static function render_audit(): void { $items = get_option(self::AUDIT_OPTION, array()); echo '<table class="widefat"><thead><tr><th>Time</th><th>Action</th><th>Type</th><th>Content</th><th>Status</th></tr></thead><tbody>'; foreach (array_reverse($items) as $item) echo '<tr><td>' . esc_html($item['at']) . '</td><td>' . esc_html($item['action']) . '</td><td>' . esc_html($item['contentType']) . '</td><td>' . esc_html((string) $item['postId']) . '</td><td>' . esc_html((string) $item['status']) . '</td></tr>'; echo '</tbody></table><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">'; wp_nonce_field('jg_ai_clear_audit'); echo '<input type="hidden" name="action" value="jg_ai_clear_audit"><p><button class="button">Clear audit log</button></p></form>'; }
 	public static function clear_audit(): void { if (!current_user_can('manage_options') || !check_admin_referer('jg_ai_clear_audit')) wp_die('Invalid request.'); update_option(self::AUDIT_OPTION, array(), false); wp_safe_redirect(admin_url('options-general.php?page=jg-ai-content')); exit; }
 	private static function list_args(): array { return array('contentType' => array('sanitize_callback' => 'sanitize_text_field'), 'status' => array('sanitize_callback' => 'sanitize_key'), 'search' => array('sanitize_callback' => 'sanitize_text_field'), 'slug' => array('sanitize_callback' => 'sanitize_title'), 'page' => array('validate_callback' => static fn($v) => is_numeric($v)), 'perPage' => array('validate_callback' => static fn($v) => is_numeric($v))); }
