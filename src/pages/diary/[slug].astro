@@ -1,8 +1,9 @@
 ---
+import path from "node:path";
 import { Icon } from "astro-icon/components";
 import { ShareCard } from "@components/features/posts";
 import StructuredHtmlContent from "../../components/misc/StructuredHtmlContent.astro";
-import { shareConfig, siteConfig } from "../../config";
+import { profileConfig, shareConfig, siteConfig } from "../../config";
 import type { DiaryImage, DiaryItem } from "../../data/diary";
 import { sortDiary } from "../../data/diary";
 import { loadStructuredContent } from "../../data/structured-content";
@@ -61,6 +62,29 @@ const moodLabel = item.mood
 	: "";
 const getImageUrl = (image: DiaryImage | null | undefined) =>
 	image?.src || image?.url || "";
+
+let posterAvatarUrl = profileConfig.avatar;
+if (profileConfig.avatar) {
+	const isLocal = !(
+		profileConfig.avatar.startsWith("/") ||
+		profileConfig.avatar.startsWith("http") ||
+		profileConfig.avatar.startsWith("https") ||
+		profileConfig.avatar.startsWith("data:")
+	);
+	if (isLocal) {
+		const files = import.meta.glob<ImageMetadata>("../../**", {
+			import: "default",
+		});
+		const normalizedPath = path
+			.normalize(path.join("../../", profileConfig.avatar))
+			.replace(/\\/g, "/");
+		const file = files[normalizedPath];
+		if (file) {
+			const image = await file();
+			posterAvatarUrl = image.src;
+		}
+	}
+}
 ---
 
 <ContentDetailLayout
@@ -92,6 +116,7 @@ const getImageUrl = (image: DiaryImage | null | undefined) =>
 			coverImage={getImageUrl(item.coverImage) || undefined}
 			url={canonicalUrl}
 			siteTitle={siteConfig.title}
+			avatar={posterAvatarUrl}
 		/>
 	)}
 
