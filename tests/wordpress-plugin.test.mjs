@@ -101,15 +101,15 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.7.1 preserves schemaVersion 5 and deterministic ordering", async () => {
+test("version 0.8.0 preserves schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.7\.1/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.7\.1'/);
-	assert.match(readme, /Stable tag:\s*0\.7\.1/);
+	assert.match(entry, /Version:\s*0\.8\.0/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.8\.0'/);
+	assert.match(readme, /Stable tag:\s*0\.8\.0/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
@@ -137,6 +137,28 @@ test("AI draft updates are diary-only and modifiedAt is nullable", async () => {
 	assert.match(source, /\$timestamp === false \? null/);
 	assert.match(source, /'modifiedAt' => self::modified_at\(\$post\)/);
 	assert.match(source, /self::record\('updateDraft'.*\$changed/);
+});
+
+test("reviewed diary publishing uses a separate capability and one-time tokens", async () => {
+	const source = await readFile(
+		path.join(pluginRoot, "includes/class-jg-ai-content.php"),
+		"utf8",
+	);
+	assert.match(source, /prepare-publish/);
+	assert.match(source, /jg_ai_publish_diary_drafts/);
+	assert.match(source, /PUBLISH_TOKEN_TTL = 600/);
+	assert.match(source, /bin2hex\(random_bytes\(32\)\)/);
+	assert.match(source, /hash\('sha256', \$token\)/);
+	assert.match(source, /'action' => 'publish'/);
+	assert.match(source, /jg_ai_confirmation_token_expired/);
+	assert.match(source, /jg_ai_confirmation_token_used/);
+	assert.match(source, /idempotent_replay/);
+	assert.match(source, /publish_prepare/);
+	assert.match(source, /publish_success/);
+	assert.match(source, /publish_rejected/);
+	assert.match(source, /publish_conflict/);
+	assert.doesNotMatch(source, /add_cap\([^\n]*publish_jg_diary/);
+	assert.doesNotMatch(source, /workflow_dispatch|api\.github\.com/);
 });
 
 test("only announcement links opt into validated root-relative paths", async () => {
@@ -347,6 +369,6 @@ test("plugin packaging fixes the basename and normalizes ZIP paths", async () =>
 	);
 	assert.match(packageJson, /package:wordpress-plugin/);
 	assert.match(packageJson, /verify:wordpress-plugin-package/);
-	assert.match(packageJson, /jaisong1n-site-manager-0\.7\.1\.zip/);
+	assert.match(packageJson, /jaisong1n-site-manager-0\.8\.0\.zip/);
 	assert.match(packageJson, /test:wordpress-upgrade/);
 });

@@ -1,5 +1,15 @@
 # Current project state
 
+## 2026-08-01 Site Manager 0.8.0 实施状态
+
+- 插件代码版本为 `0.8.0`，公开快照 `schemaVersion` 继续为 `5`。
+- 日记草稿发布实现为 `preparePublish` 后接 `publish`，要求 10 分钟一次性令牌、`expectedModifiedAt` 和幂等键。
+- 令牌只以 SHA-256 摘要保存，并绑定用户、日记 ID、内容版本和 publish 动作。
+- `jg_ai_content_editor` 默认没有发布权限；管理员开关只授予 `jg_ai_publish_diary_drafts`，不授予 WordPress 原生日记发布 capability。
+- 发布成功沿用 WordPress 状态/保存 Hook 与现有防抖构建 pending；AI API 不直接调用 GitHub。
+- 本次只完成本地实现、文档和测试；尚未安装到真实 WordPress，也没有执行生产全链路验收。
+- 精确命令结果和提交证据记录在本次独立任务日志中。
+
 ## 基本信息
 
 - 项目名称：JaisonG1n-Blog

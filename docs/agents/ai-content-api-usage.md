@@ -1,5 +1,16 @@
 # AI Content API Usage
 
+## Reviewed publish protocol (Site Manager 0.8.0)
+
+Treat `publish` as a two-stage, server-authorized diary-only operation. It is available only when the live diary capabilities include both `preparePublish` and `publish`.
+
+1. Read the latest diary and show the user the title, slug, excerpt, and intended publication action.
+2. After explicit user confirmation, call `POST /content/diary/{id}/prepare-publish`.
+3. Use the returned token once, before `expiresAt`, with the exact returned `modifiedAt` and a stable `Idempotency-Key` in `POST /content/diary/{id}/publish`.
+4. On `409`, read the diary again and ask for confirmation again. Never reuse a stale confirmation.
+
+Never print or persist the confirmation token in logs, prompts, task records, or local files. Never call GitHub or `workflow_dispatch` from the Agent. A successful publish only means WordPress accepted the state change; deployment continues through the existing debounced automation.
+
 本约定同时适用于 Codex、OpenClaw 和其他 Blog Agent。权威的公开 API 说明是 [AI Content API](../ai-content-api.md)；运行时以 `GET /wp-json/jaisong1n/v1/ai/capabilities` 返回的版本、字段、枚举和操作权限为准，不猜测字段，也不使用 WordPress 内部 meta key。
 
 ## Credentials And Transport

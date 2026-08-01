@@ -1,27 +1,51 @@
 # AI Content API
 
-`JaisonG1n Site Manager 0.7.1` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
+`JaisonG1n Site Manager 0.8.0` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
 
-Use a dedicated WordPress user with the `jg_ai_content_editor` role and an Application Password. The client must first request `GET /capabilities`; it exposes only public content fields and operations, never internal meta keys, tokens, or site configuration.
+Use a dedicated WordPress user with the `jg_ai_content_editor` role and an Application Password. Clients must first request `GET /capabilities`; the response is the live authority for content types, fields, and operations. It never exposes internal meta keys, confirmation tokens, or site secrets.
 
-Supported content types are `article`, `diary`, `project`, `timeline`, `skill`, `aiTool`, `friend`, `announcement`, `techRadar`, and `learningResource`. `page` and `album` are rejected. There are no delete endpoints and no album write interface.
+Supported content types are `article`, `diary`, `project`, `timeline`, `skill`, `aiTool`, `friend`, `announcement`, `techRadar`, and `learningResource`. `page` and `album` are rejected. There are no delete endpoints or album write operations.
 
-Create drafts with `POST /content` and an `Idempotency-Key` header. The key is required, bounded, scoped to the caller and action, and replaying the same request returns the original result. A conflicting reuse returns `409`.
+## Draft Operations
 
-Read with `GET /content` or `GET /content/{contentType}/{id}`. `modifiedAt` is an ISO 8601 UTC string or `null` when WordPress has a zero or invalid modified date.
+Create drafts with `POST /content` and an `Idempotency-Key` header. Read with `GET /content` or `GET /content/{contentType}/{id}`. `modifiedAt` is an ISO 8601 UTC string or `null` for an invalid WordPress zero date.
 
-`updateDraft` is exposed only for `diary`. Update a diary draft with `PATCH /content/diary/{id}` and the exact `expectedModifiedAt` from the latest read. An explicitly read `null` value must be sent as JSON `null`. At least one of `title`, `content`, `excerpt`, or `slug` must contain a new value:
+Only diary drafts expose `updateDraft`. Send `PATCH /content/diary/{id}` with the exact `expectedModifiedAt` from the latest read and at least one changed `title`, `content`, `excerpt`, or `slug` field. The endpoint never changes status, ownership, dates, permissions, or internal metadata.
 
-```json
+## Reviewed Diary Publishing
+
+Publishing is disabled by default. An administrator must enable reviewed diary publishing in Settings > AI Content API and separately mark the diary as publishable in its AI Content Assistant panel. Enabling the setting grants only `jg_ai_publish_diary_drafts` to the AI role. It never grants WordPress's native diary publish capability.
+
+The live diary capabilities then expose `preparePublish` and `publish`. No other content type receives these operations.
+
+### Prepare
+
+```http
+POST /wp-json/jaisong1n/v1/ai/content/diary/{id}/prepare-publish
+```
+
+The target must still be a draft. The response contains its current title, slug, excerpt, `modifiedAt`, `editUrl`, a 64-character `confirmationToken`, and `expiresAt`. The token is valid for ten minutes, is bound to the current user, diary ID, current content version, and `publish` action, and is stored only as a SHA-256 digest. Preparing does not write content, change status, or create a build pending record.
+
+### Publish
+
+```http
+POST /wp-json/jaisong1n/v1/ai/content/diary/{id}/publish
+Idempotency-Key: stable-client-key
+Content-Type: application/json
+
 {
+  "confirmationToken": "<one-time token returned by prepare>",
   "expectedModifiedAt": "2026-08-01T03:04:05Z",
-  "title": "Updated diary title",
-  "content": "<p>Updated diary body.</p>"
+  "idempotencyKey": "stable-client-key"
 }
 ```
 
-The endpoint rejects other content types, non-drafts, stale timestamps, unchanged requests, and fields such as `status`, `author`, `date`, `meta`, or structured content fields. It never publishes, deletes, changes ownership, or calls GitHub. A stale value returns `409`; only the caller's own AI content or administrator-granted content is editable.
+The server verifies that the token exists, is unexpired and unused, belongs to the current user and diary, represents the publish action, and matches the unchanged draft version. It also rechecks the live setting, role capability, per-content grant, edit permission, and draft status. A stale draft returns `409`; an expired token returns `410`; invalid authorization or token binding is rejected without publishing.
 
-Publishing and unpublishing use their separate endpoints and require `expectedModifiedAt`, the WordPress publish capability, an administrator grant on the content, and the administrator-enabled publishing setting. Publishing is disabled by default. The API does not call GitHub; successful WordPress publication follows the existing save/status automation path.
+A successful request consumes the token and records the idempotency result. Replaying the same key and request returns the original result with `idempotentReplay: true`; using another key after publication returns a stable conflict. Publishing enters the existing WordPress status/save automation and creates one debounced build pending record. The API client does not call GitHub directly.
 
-Administrators can explicitly grant edit and publish access in the AI Content Assistant meta box. The audit page retains the latest 100 operation summaries without request bodies, excerpts, credentials, Authorization headers, or tokens. The API applies per-user rate limits and returns `429` with a retry hint.
+## Security And Audit
+
+The API uses explicit field allowlists, per-user rate limits, optimistic concurrency, action-scoped idempotency, and a separate reviewed-publish capability. Unpublishing remains unavailable.
+
+Audit records retain at most 100 operation summaries. Publishing records `publish_prepare`, `publish_success`, `publish_rejected`, `publish_conflict`, and `idempotent_replay`. They may include a 12-character irreversible token or idempotency fingerprint, but never full content, confirmation tokens, Application Passwords, Authorization headers, or request bodies.

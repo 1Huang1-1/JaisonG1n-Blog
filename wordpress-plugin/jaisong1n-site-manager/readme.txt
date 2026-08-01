@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.7.1
+Stable tag: 0.8.0
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -24,6 +24,12 @@ The plugin accepts a fine-grained GitHub token with Actions Read and write for t
 Deactivation retains all data. Normal uninstall removes plugin-added role capabilities but retains content and settings. Destructive data cleanup runs only when an administrator explicitly enables it before uninstalling.
 
 == Changelog ==
+
+= 0.8.0 =
+
+* Adds reviewed diary publishing through a prepare step and a ten-minute, one-time confirmation token.
+* Keeps native WordPress publishing unavailable to the AI editor role and grants a separate diary-only capability only when an administrator enables it.
+* Adds optimistic concurrency, publish idempotency, token-safe audit events, and the existing debounced build path without direct GitHub calls.
 
 = 0.7.1 =
 

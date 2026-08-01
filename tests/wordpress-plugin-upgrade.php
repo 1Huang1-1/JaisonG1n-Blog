@@ -42,13 +42,13 @@ $main_file = WP_PLUGIN_DIR . '/' . $basename;
 $replacement_directory = '/workspace/replacement/jaisong1n-site-manager';
 
 $baseline_validation = validate_plugin($basename);
-jg_upgrade_assert($baseline_validation === 0, '0.7.0 baseline validate_plugin failed: ' . wp_json_encode($baseline_validation));
+jg_upgrade_assert($baseline_validation === 0, '0.7.1 baseline validate_plugin failed: ' . wp_json_encode($baseline_validation));
 $activation = activate_plugin($basename, '', false, false);
-jg_upgrade_assert(!is_wp_error($activation), '0.7.0 activation failed: ' . wp_json_encode($activation));
+jg_upgrade_assert(!is_wp_error($activation), '0.7.1 activation failed: ' . wp_json_encode($activation));
 $active_before = get_option('active_plugins', array());
 jg_upgrade_assert(in_array($basename, $active_before, true), '0.7.0 basename was not stored in active_plugins.');
-jg_upgrade_assert(get_option('jg_site_settings', array())['site_title'] === 'Upgrade preserved', '0.7.0 setting fixture is missing.');
-jg_upgrade_assert(count(get_posts(array('post_type' => 'jg_project', 'post_status' => 'publish', 'numberposts' => -1))) === 1, '0.7.0 content fixture is missing.');
+jg_upgrade_assert(get_option('jg_site_settings', array())['site_title'] === 'Upgrade preserved', '0.7.1 setting fixture is missing.');
+jg_upgrade_assert(count(get_posts(array('post_type' => 'jg_project', 'post_status' => 'publish', 'numberposts' => -1))) === 1, '0.7.1 content fixture is missing.');
 
 jg_upgrade_clear_directory($plugin_directory);
 jg_upgrade_copy_directory($replacement_directory, $plugin_directory);
@@ -59,10 +59,10 @@ $active_after = get_option('active_plugins', array());
 jg_upgrade_assert($active_after === $active_before, 'active_plugins changed during same-directory replacement.');
 jg_upgrade_assert(is_readable($main_file), 'Replacement main plugin file is not readable.');
 $replacement_validation = validate_plugin($basename);
-jg_upgrade_assert($replacement_validation === 0, '0.7.1 validate_plugin failed: ' . wp_json_encode($replacement_validation));
+jg_upgrade_assert($replacement_validation === 0, '0.8.0 validate_plugin failed: ' . wp_json_encode($replacement_validation));
 
 require $main_file;
-jg_upgrade_assert(defined('JG_SITE_MANAGER_VERSION') && JG_SITE_MANAGER_VERSION === '0.7.1', '0.7.1 plugin did not load.');
+jg_upgrade_assert(defined('JG_SITE_MANAGER_VERSION') && JG_SITE_MANAGER_VERSION === '0.8.0', '0.8.0 plugin did not load.');
 JG_Site_Manager::init();
 JG_Content_Types::register();
 JG_AI_Content::install();
@@ -77,6 +77,11 @@ jg_upgrade_assert(get_option('jg_dispatch_pending', array())['revision'] === 'a'
 jg_upgrade_assert(count(get_option('jg_dispatch_history', array())) === 1, 'Dispatch history did not survive the upgrade.');
 jg_upgrade_assert(!get_post_meta(1, '_jg_ai_editable', true), 'Existing content was unexpectedly made AI editable.');
 jg_upgrade_assert(!JG_AI_Content::settings()['allow_publish'], 'AI publishing must remain disabled after upgrade.');
+jg_upgrade_assert(!JG_AI_Content::settings()['reviewed_diary_publish'], 'Reviewed diary publishing must remain disabled after upgrade.');
+$ai_role = get_role('jg_ai_content_editor');
+jg_upgrade_assert($ai_role && !$ai_role->has_cap('jg_ai_publish_diary_drafts'), 'Upgrade unexpectedly granted reviewed publish permission.');
+$publish_tokens_autoload = $wpdb->get_var($wpdb->prepare('SELECT autoload FROM ' . $wpdb->options . ' WHERE option_name = %s', 'jg_ai_publish_confirmation_tokens'));
+jg_upgrade_assert(!in_array($publish_tokens_autoload, array('yes', 'on', 'auto-on', 'auto'), true), 'Publish confirmation tokens must not autoload: ' . (string) $publish_tokens_autoload);
 $editor = get_role('editor');
 jg_upgrade_assert($editor && $editor->has_cap('jg_fixture_capability') && !$editor->has_cap('manage_options'), 'Existing user roles were changed during upgrade.');
 
@@ -87,7 +92,7 @@ jg_upgrade_assert(($snapshot['schemaVersion'] ?? null) === 5, 'schemaVersion is 
 
 echo wp_json_encode(array(
 	'ok' => true,
-	'baselineVersion' => '0.7.0',
+	'baselineVersion' => '0.7.1',
 	'replacementVersion' => JG_SITE_MANAGER_VERSION,
 	'pluginBasename' => $basename,
 	'activePluginsBefore' => $active_before,
@@ -101,4 +106,6 @@ echo wp_json_encode(array(
 	'dispatchHistoryPreserved' => true,
 	'oldContentAiEditable' => false,
 	'publishEnabled' => false,
+	'reviewedPublishEnabled' => false,
+	'publishTokenAutoload' => $publish_tokens_autoload,
 ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";

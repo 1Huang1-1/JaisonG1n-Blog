@@ -1,5 +1,13 @@
 # 重要技术决策
 
+## 2026-08-01：AI 日记发布采用服务端两阶段确认
+
+Site Manager 0.8.0 将受控日记发布与草稿修改、WordPress 原生发布权限分离。AI 角色默认不具备发布权限；管理员开关只授予 `jg_ai_publish_diary_drafts`，且每篇日记仍需单独标记为允许发布。
+
+发布必须先调用 `prepare-publish` 获取 10 分钟有效的一次性令牌，再携带未变化的 `expectedModifiedAt` 和幂等键调用 `publish`。服务端只存储令牌 SHA-256 摘要，并将其绑定到用户、日记 ID、内容版本和 publish 动作。
+
+Agent 不直接调用 GitHub；WordPress 发布成功后只进入既有防抖构建链路。该设计避免草稿修改权限隐式升级为发布权限，阻止过期确认覆盖新内容，并保证重试不会重复发布或重复创建构建 pending。
+
 仅记录重要架构、权限、安全和兼容性决策。以下条目根据本地 Git 历史、插件 changelog、实现和项目文档补录；不包含凭据。
 
 ## 2026-07-31：以 workflow_dispatch 作为 WordPress 自动构建入口

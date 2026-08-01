@@ -39,9 +39,18 @@ if (!empty($settings['cleanup_on_uninstall'])) {
 	delete_option('jg_last_dispatched_revision');
 	delete_option('jg_dispatch_pending');
 	delete_option('jg_dispatch_lock');
+	delete_option('jg_ai_content_settings');
+	delete_option('jg_ai_content_idempotency');
+	delete_option('jg_ai_content_audit');
+	delete_option('jg_ai_publish_confirmation_tokens');
 	global $wpdb;
 	$wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'jg_media_refs');
 	delete_option('jg_media_index_version');
+}
+
+$ai_role = get_role('jg_ai_content_editor');
+if ($ai_role) {
+	$ai_role->remove_cap('jg_ai_publish_diary_drafts');
 }
 
 foreach (array('administrator', 'editor') as $role_name) {
