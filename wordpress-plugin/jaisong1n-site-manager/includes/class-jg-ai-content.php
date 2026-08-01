@@ -110,7 +110,7 @@ final class JG_AI_Content {
 			$operations = array();
 			if (self::can_create($contract)) $operations[] = 'createDraft';
 			if (self::can_read($contract, null)) $operations[] = 'read';
-			if (self::can_update($contract, null)) $operations[] = 'updateDraft';
+			if (self::can_update_type($contract)) $operations[] = 'updateDraft';
 			if (self::can_publish($contract, null)) $operations[] = 'publish';
 			$types[$name] = array('operations' => $operations, 'fields' => self::public_fields($contract));
 		}
@@ -169,17 +169,24 @@ final class JG_AI_Content {
 
 	public static function update_content(WP_REST_Request $request) {
 		$contract = self::contract((string) $request['contentType']); if (is_wp_error($contract)) return $contract;
+		if ($contract['apiType'] !== 'diary') return self::error('jg_ai_update_draft_unsupported', 'Draft updates are only available for diary content.', 403);
 		$post = self::post_for_contract((int) $request['id'], $contract); if (is_wp_error($post)) return $post;
 		if (!self::can_update($contract, $post)) return self::not_found();
-		if ($post->post_status !== 'draft') return self::error('jg_ai_published_update_requires_confirmation', 'Published content cannot be changed through the draft update endpoint.', 409, array('requiresConfirmation' => true));
+		if ($post->post_status !== 'draft') return self::error('jg_ai_draft_required', 'Only diary drafts can be changed through this endpoint.', 409);
 		$input = $request->get_json_params(); if (!is_array($input)) $input = $request->get_params();
-		if (!self::modified_matches($post, $input['expectedModifiedAt'] ?? '')) return self::error('jg_ai_stale_content', 'Content has changed. Read it again before updating.', 409);
-		$normalized = self::normalize_input($input, $contract, false); if (is_wp_error($normalized)) return $normalized;
+		if (!array_key_exists('expectedModifiedAt', $input) || (!is_string($input['expectedModifiedAt']) && $input['expectedModifiedAt'] !== null) || $input['expectedModifiedAt'] === '') return self::error('jg_ai_expected_modified_at_required', 'expectedModifiedAt is required.', 400);
+		if (!self::modified_matches($post, $input['expectedModifiedAt'])) return self::error('jg_ai_stale_content', 'Content has changed. Read it again before updating.', 409);
+		$normalized = self::normalize_diary_update($input); if (is_wp_error($normalized)) return $normalized;
 		$data = array('ID' => $post->ID);
-		foreach (array('title' => 'post_title', 'slug' => 'post_name', 'excerpt' => 'post_excerpt', 'contentHtml' => 'post_content') as $input_key => $post_key) if (array_key_exists($input_key, $normalized)) $data[$post_key] = $normalized[$input_key];
+		$changed = array();
+		foreach (array('title' => 'post_title', 'slug' => 'post_name', 'excerpt' => 'post_excerpt', 'content' => 'post_content') as $input_key => $post_key) {
+			if (!array_key_exists($input_key, $normalized) || $normalized[$input_key] === $post->$post_key) continue;
+			$data[$post_key] = $normalized[$input_key];
+			$changed[] = $input_key;
+		}
+		if (!$changed) return self::error('jg_ai_no_changes', 'At least one diary field must contain a new value.', 400);
 		$result = wp_update_post($data, true); if (is_wp_error($result)) return self::safe_wp_error($result);
-		if (!self::write_fields($post->ID, $contract, $normalized['fields'])) return self::error('jg_ai_update_failed', 'The content could not be saved.', 500);
-		$updated = get_post($post->ID); self::record('updateDraft', $contract['apiType'], $post->ID, 200, array_keys($normalized['fields']), false);
+		$updated = get_post($post->ID); self::record('updateDraft', $contract['apiType'], $post->ID, 200, $changed, false);
 		return new WP_REST_Response(self::project($updated, $contract, true), 200);
 	}
 
@@ -227,7 +234,11 @@ final class JG_AI_Content {
 
 	private static function can_create(array $contract): bool { $object = get_post_type_object($contract['postType']); return !empty(self::settings()['create_drafts']) && $object && current_user_can($object->cap->create_posts); }
 	private static function can_read(array $contract, ?WP_Post $post): bool { return $post === null || (int) $post->post_author === get_current_user_id() || (bool) get_post_meta($post->ID, '_jg_ai_editable', true); }
-	private static function can_update(array $contract, ?WP_Post $post): bool { return !empty(self::settings()['update_drafts']) && $post !== null && current_user_can('edit_post', $post->ID) && self::can_read($contract, $post); }
+	private static function can_update_type(array $contract): bool {
+		$object = get_post_type_object($contract['postType']);
+		return $contract['apiType'] === 'diary' && !empty(self::settings()['update_drafts']) && $object && current_user_can($object->cap->edit_posts);
+	}
+	private static function can_update(array $contract, ?WP_Post $post): bool { return self::can_update_type($contract) && $post !== null && current_user_can('edit_post', $post->ID) && self::can_read($contract, $post); }
 	private static function can_publish(array $contract, ?WP_Post $post): bool { $object = get_post_type_object($contract['postType']); return !empty(self::settings()['allow_publish']) && $post !== null && current_user_can($object->cap->publish_posts) && self::can_read($contract, $post) && (bool) get_post_meta($post->ID, '_jg_ai_publishable', true); }
 
 	private static function normalize_input(array $input, array $contract, bool $creating) {
@@ -257,10 +268,42 @@ final class JG_AI_Content {
 		return $output;
 	}
 
+	private static function normalize_diary_update(array $input) {
+		$allowed = array('contentType', 'id', 'expectedModifiedAt', 'title', 'slug', 'excerpt', 'content');
+		foreach (array_keys($input) as $key) if (!in_array($key, $allowed, true)) return self::error('jg_ai_unknown_field', 'An unsupported request field was provided.', 400);
+		$output = array();
+		foreach (array('title', 'slug', 'excerpt', 'content') as $key) {
+			if (!array_key_exists($key, $input)) continue;
+			if (!is_string($input[$key])) return self::error('jg_ai_invalid_field_type', 'Diary update fields must be strings.', 400);
+			$value = $input[$key];
+			if ($key === 'title') {
+				$value = mb_substr(sanitize_text_field($value), 0, 200);
+				if ($value === '') return self::error('jg_ai_invalid_title', 'Title cannot be empty.', 400);
+			} elseif ($key === 'slug') {
+				if (preg_match('#[:/?\\\\]#', $value)) return self::error('jg_ai_invalid_slug', 'Slug cannot contain a path, protocol, or query.', 400);
+				$value = sanitize_title($value);
+				if ($value === '') return self::error('jg_ai_invalid_slug', 'Slug cannot be empty.', 400);
+			} elseif ($key === 'excerpt') {
+				$value = mb_substr(wp_strip_all_tags($value), 0, 1000);
+			} else {
+				$value = wp_kses_post($value);
+			}
+			$output[$key] = $value;
+		}
+		if (!$output) return self::error('jg_ai_no_changes', 'At least one diary field must be provided.', 400);
+		return $output;
+	}
+
 	private static function write_fields(int $post_id, array $contract, array $fields): bool { foreach ($fields as $key => $value) { if (($contract['taxonomy'] ?? false) && in_array($key, array('tags', 'categories'), true)) { if (is_wp_error(wp_set_post_terms($post_id, $value, $key === 'tags' ? 'post_tag' : 'category', false))) return false; continue; } if (update_post_meta($post_id, '_jg_' . $key, $value) === false && get_post_meta($post_id, '_jg_' . $key, true) !== $value) return false; } return true; }
-	private static function modified_matches(WP_Post $post, $expected): bool { return is_string($expected) && hash_equals(gmdate('Y-m-d\\TH:i:s\\Z', strtotime($post->post_modified_gmt . ' GMT')), $expected); }
-	private static function project(WP_Post $post, array $contract, bool $detail): array { $result = array('id' => $post->ID, 'contentType' => $contract['apiType'], 'status' => $post->post_status, 'title' => $post->post_title, 'slug' => $post->post_name, 'modifiedAt' => gmdate('Y-m-d\\TH:i:s\\Z', strtotime($post->post_modified_gmt . ' GMT'))); if (!$detail) return $result; $fields = array(); foreach (self::contract_fields($contract) as $key => $definition) $fields[$key] = !empty($definition['taxonomy']) ? wp_get_post_terms($post->ID, $key === 'tags' ? 'post_tag' : 'category', array('fields' => 'ids')) : get_post_meta($post->ID, '_jg_' . $key, true); $result += array('excerpt' => $post->post_excerpt, 'contentHtml' => $post->post_content, 'fields' => $fields, 'editUrl' => admin_url('post.php?post=' . $post->ID . '&action=edit'), 'previewUrl' => $post->post_status === 'publish' ? get_permalink($post) : null); return $result; }
-	private static function public_fields(array $contract): array { $fields = array('title' => array('type' => 'string', 'required' => true, 'maxLength' => 200, 'create' => true, 'update' => true), 'slug' => array('type' => 'string', 'required' => false, 'maxLength' => 200, 'create' => true, 'update' => true), 'excerpt' => array('type' => 'string', 'required' => false, 'maxLength' => 1000, 'create' => true, 'update' => true), 'contentHtml' => array('type' => 'html', 'required' => false, 'create' => true, 'update' => true)); foreach (self::contract_fields($contract) as $key => $field) $fields[$key] = array_filter(array('type' => !empty($field['taxonomy']) ? 'array' : $field['type'], 'enum' => $field['options'] ?? null, 'minimum' => $field['min'] ?? null, 'maximum' => $field['max'] ?? null, 'create' => true, 'update' => true), static fn($value) => $value !== null); return $fields; }
+	private static function modified_at(WP_Post $post): ?string {
+		$value = trim((string) $post->post_modified_gmt);
+		if ($value === '' || $value === '0000-00-00 00:00:00') return null;
+		$timestamp = strtotime($value . ' GMT');
+		return $timestamp === false ? null : gmdate('Y-m-d\\TH:i:s\\Z', $timestamp);
+	}
+	private static function modified_matches(WP_Post $post, $expected): bool { $current = self::modified_at($post); if ($current === null) return $expected === null; return is_string($expected) && hash_equals($current, $expected); }
+	private static function project(WP_Post $post, array $contract, bool $detail): array { $result = array('id' => $post->ID, 'contentType' => $contract['apiType'], 'status' => $post->post_status, 'title' => $post->post_title, 'slug' => $post->post_name, 'modifiedAt' => self::modified_at($post)); if (!$detail) return $result; $fields = array(); foreach (self::contract_fields($contract) as $key => $definition) $fields[$key] = !empty($definition['taxonomy']) ? wp_get_post_terms($post->ID, $key === 'tags' ? 'post_tag' : 'category', array('fields' => 'ids')) : get_post_meta($post->ID, '_jg_' . $key, true); $result += array('excerpt' => $post->post_excerpt, 'contentHtml' => $post->post_content, 'fields' => $fields, 'editUrl' => admin_url('post.php?post=' . $post->ID . '&action=edit'), 'previewUrl' => $post->post_status === 'publish' ? get_permalink($post) : null); return $result; }
+	private static function public_fields(array $contract): array { $can_update = $contract['apiType'] === 'diary'; $fields = array('title' => array('type' => 'string', 'required' => true, 'maxLength' => 200, 'create' => true, 'update' => $can_update), 'slug' => array('type' => 'string', 'required' => false, 'maxLength' => 200, 'create' => true, 'update' => $can_update), 'excerpt' => array('type' => 'string', 'required' => false, 'maxLength' => 1000, 'create' => true, 'update' => $can_update), 'contentHtml' => array('type' => 'html', 'required' => false, 'create' => true, 'update' => false)); if ($can_update) $fields['content'] = array('type' => 'html', 'required' => false, 'create' => false, 'update' => true); foreach (self::contract_fields($contract) as $key => $field) $fields[$key] = array_filter(array('type' => !empty($field['taxonomy']) ? 'array' : $field['type'], 'enum' => $field['options'] ?? null, 'minimum' => $field['min'] ?? null, 'maximum' => $field['max'] ?? null, 'create' => true, 'update' => false), static fn($value) => $value !== null); return $fields; }
 	private static function contract_fields(array $contract): array { $fields = JG_Content_Types::field_definitions()[$contract['postType']] ?? array(); if (!empty($contract['taxonomy'])) { $fields['tags'] = array('type' => 'array', 'taxonomy' => true); $fields['categories'] = array('type' => 'array', 'taxonomy' => true); } return $fields; }
 	private static function statuses($value): array { $allowed = array('draft', 'publish', 'pending', 'private', 'future'); return in_array($value, $allowed, true) ? array($value) : $allowed; }
 	private static function idempotency_key(WP_REST_Request $request) { $key = $request->get_header('Idempotency-Key') ?: (string) $request->get_param('idempotencyKey'); return preg_match('/^[A-Za-z0-9._:-]{8,128}$/', $key) ? $key : self::error('jg_ai_idempotency_required', 'A valid idempotency key is required.', 400); }
@@ -277,7 +320,7 @@ final class JG_AI_Content {
 	private static function list_args(): array { return array('contentType' => array('sanitize_callback' => 'sanitize_text_field'), 'status' => array('sanitize_callback' => 'sanitize_key'), 'search' => array('sanitize_callback' => 'sanitize_text_field'), 'slug' => array('sanitize_callback' => 'sanitize_title'), 'page' => array('validate_callback' => static fn($v) => is_numeric($v)), 'perPage' => array('validate_callback' => static fn($v) => is_numeric($v))); }
 	private static function create_args(): array { return array('contentType' => array('required' => true, 'sanitize_callback' => 'sanitize_key'), 'idempotencyKey' => array('sanitize_callback' => 'sanitize_text_field')); }
 	private static function detail_args(): array { return array('contentType' => array('validate_callback' => static fn($v) => is_string($v)), 'id' => array('validate_callback' => static fn($v) => ctype_digit((string) $v))); }
-	private static function update_args(): array { return self::detail_args() + array('expectedModifiedAt' => array('required' => true, 'sanitize_callback' => 'sanitize_text_field')); }
+	private static function update_args(): array { return self::detail_args() + array('expectedModifiedAt' => array('required' => false, 'validate_callback' => static fn($value) => $value === null || (is_string($value) && preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/', $value) === 1))); }
 	private static function expected_args(): array { return self::detail_args() + array('expectedModifiedAt' => array('required' => true, 'sanitize_callback' => 'sanitize_text_field')); }
 	private static function claim_args(): array { return self::detail_args() + array('editable' => array('sanitize_callback' => 'rest_sanitize_boolean'), 'publishable' => array('sanitize_callback' => 'rest_sanitize_boolean')); }
 }

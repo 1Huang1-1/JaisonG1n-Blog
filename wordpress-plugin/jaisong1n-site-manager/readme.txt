@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.7.0
+Stable tag: 0.7.1
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -24,6 +24,12 @@ The plugin accepts a fine-grained GitHub token with Actions Read and write for t
 Deactivation retains all data. Normal uninstall removes plugin-added role capabilities but retains content and settings. Destructive data cleanup runs only when an administrator explicitly enables it before uninstalling.
 
 == Changelog ==
+
+= 0.7.1 =
+
+* Safely exposes `updateDraft` for diary drafts only, with an explicit public field allowlist and optimistic concurrency checks.
+* Returns `modifiedAt` as an ISO 8601 UTC string or `null`; zero and invalid WordPress dates are no longer converted to epoch-like values.
+* Keeps publishing, status changes, other content types, internal metadata, authorship and GitHub workflow dispatch outside the draft update endpoint.
 
 = 0.7.0 =
 

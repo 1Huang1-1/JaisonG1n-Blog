@@ -101,20 +101,42 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.7.0 preserves schemaVersion 5 and deterministic ordering", async () => {
+test("version 0.7.1 preserves schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.7\.0/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.7\.0'/);
-	assert.match(readme, /Stable tag:\s*0\.7\.0/);
+	assert.match(entry, /Version:\s*0\.7\.1/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.7\.1'/);
+	assert.match(readme, /Stable tag:\s*0\.7\.1/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
 		/'orderby'\s*=>\s*array\('menu_order'\s*=>\s*'ASC',\s*'date'\s*=>\s*'DESC',\s*'ID'\s*=>\s*'ASC'\)/,
 	);
+});
+
+test("AI draft updates are diary-only and modifiedAt is nullable", async () => {
+	const source = await readFile(
+		path.join(pluginRoot, "includes/class-jg-ai-content.php"),
+		"utf8",
+	);
+	assert.match(source, /\$contract\['apiType'\] !== 'diary'/);
+	assert.match(source, /jg_ai_update_draft_unsupported/);
+	assert.match(
+		source,
+		/array\('contentType', 'id', 'expectedModifiedAt', 'title', 'slug', 'excerpt', 'content'\)/,
+	);
+	assert.match(source, /jg_ai_no_changes/);
+	assert.match(
+		source,
+		/private static function modified_at\(WP_Post \$post\): \?string/,
+	);
+	assert.match(source, /'0000-00-00 00:00:00'/);
+	assert.match(source, /\$timestamp === false \? null/);
+	assert.match(source, /'modifiedAt' => self::modified_at\(\$post\)/);
+	assert.match(source, /self::record\('updateDraft'.*\$changed/);
 });
 
 test("only announcement links opt into validated root-relative paths", async () => {
@@ -325,6 +347,6 @@ test("plugin packaging fixes the basename and normalizes ZIP paths", async () =>
 	);
 	assert.match(packageJson, /package:wordpress-plugin/);
 	assert.match(packageJson, /verify:wordpress-plugin-package/);
-	assert.match(packageJson, /jaisong1n-site-manager-0\.7\.0\.zip/);
+	assert.match(packageJson, /jaisong1n-site-manager-0\.7\.1\.zip/);
 	assert.match(packageJson, /test:wordpress-upgrade/);
 });

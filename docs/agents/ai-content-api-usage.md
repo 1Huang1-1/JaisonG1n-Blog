@@ -12,7 +12,7 @@
 
 - 创建：`POST /content`，默认 draft，必须使用稳定且调用方/操作范围内唯一的 `Idempotency-Key`。
 - 读取：`GET /content` 或 `GET /content/{contentType}/{id}`，用于确认 ID、归属、类型、slug、状态、正文和修改时间。
-- 更新：`PATCH /content/{contentType}/{id}`，带读取结果中的 `expectedModifiedAt`；过期值为冲突，不覆盖他人或已发布内容。
+- 更新：只有 capabilities 明确包含 `updateDraft` 的 `diary` 草稿可使用 `PATCH /content/diary/{id}`。请求只能提交发生实际变化的 `title`、`content`、`excerpt`、`slug`，并原样携带最新读取结果中的 `expectedModifiedAt`（包括显式 `null`）；过期值为冲突，不覆盖他人或已发布内容。
 - 发布或取消发布：只使用 capabilities 声明的独立端点；适用前提由 [Publishing Policy](publishing-policy.md) 定义。
 
 相同幂等键的重放必须复用原结果；冲突复用应处理为 `409`。权限拒绝、并发冲突、限流或其他错误应停止并报告安全的摘要，不尝试其他凭据或绕过限制。接口不会调用 GitHub。
