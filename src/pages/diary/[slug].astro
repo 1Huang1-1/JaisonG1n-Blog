@@ -1,7 +1,8 @@
 ---
 import { Icon } from "astro-icon/components";
+import { ShareCard } from "@components/features/posts";
 import StructuredHtmlContent from "../../components/misc/StructuredHtmlContent.astro";
-import { siteConfig } from "../../config";
+import { shareConfig, siteConfig } from "../../config";
 import type { DiaryImage, DiaryItem } from "../../data/diary";
 import { sortDiary } from "../../data/diary";
 import { loadStructuredContent } from "../../data/structured-content";
@@ -81,6 +82,18 @@ const getImageUrl = (image: DiaryImage | null | undefined) =>
 	</div>
 
 	{prepared.html ? <StructuredHtmlContent html={prepared.html} /> : <p class="text-black/55 dark:text-white/55">{item.description}</p>}
+
+	{shareConfig.enable && (
+		<ShareCard
+			class="mt-8"
+			title={displayTitle}
+			description={item.description}
+			pubDate={item.date}
+			coverImage={getImageUrl(item.coverImage) || undefined}
+			url={canonicalUrl}
+			siteTitle={siteConfig.title}
+		/>
+	)}
 
 	{(previous || next) && (
 		<nav class="mt-10 grid gap-3 border-t border-black/10 pt-6 dark:border-white/10 sm:grid-cols-2" aria-label="Diary navigation">
