@@ -1,13 +1,14 @@
 # Current project state
 
-## 2026-08-02 Site Manager 0.8.3 自动受控发布资格（本地实现）
+## 2026-08-02 Site Manager 0.8.3 自动受控发布资格（生产已验收）
 
 - 插件代码版本为 `0.8.3`，公开快照 `schemaVersion` 继续为 `5`。
 - 新增内容安全开关 `auto_publishable_ai_diaries`（默认关闭）：AI 通过 AI Content API 自建 diary 草稿时，在同时满足 contentType=diary、状态 draft、`reviewed_diary_publish` 开启、用户拥有 `jg_ai_publish_diary_drafts`、`post_author` 与 `_jg_ai_owner_user_id` 均为当前用户时，自动写入 `_jg_ai_publishable=1`。
 - 自动标记仅授予两阶段发布流程资格；confirmationToken、expectedModifiedAt、幂等键、精确确认与 draft 检查全部保留；不自动发布、不触发构建。
 - 后台人工创建、导入、其他作者、非 diary、缺 capability、设置关闭时不自动标记；历史草稿不批量修改；已手动设置保持不变。
 - 本地测试：AI Content Playground 129 条断言、部署状态 94 条断言、smoke、0.8.2→0.8.3 升级（默认关闭且不批量改历史）、`pnpm test` 55/55、`pnpm check` 320 文件零问题。
-- 本版本为本地实现与本地测试结果；尚未安装到真实 WordPress。生产实时版本仍为 `0.8.1`。
+- 用户已在真实环境确认端到端验收：AI 自建 diary 自动获得受控发布资格、preparePublish 成功、精确确认后只发布一次、deployment-status 正确关联 workflowRunId、GitHub build success、deployment deployed、page reachable、canonical publicUrl 正确。
+- 生产实时版本为 `0.8.3`；0.8.1/0.8.2 与 0.8.3 实现已合并归档到主分支（本归档会话按用户指令执行）。
 
 ## 2026-08-02 Site Manager 0.8.2 部署状态 API（本地实现）
 
@@ -44,7 +45,7 @@
 ## 基本信息
 
 - 项目名称：JaisonG1n-Blog
-- 当前插件版本：JaisonG1n Site Manager `0.8.3`（本地实现；生产实时版本为 `0.8.1`，未安装 0.8.2/0.8.3）
+- 当前插件版本：JaisonG1n Site Manager `0.8.3`（生产已验收）
 - 当前快照 schemaVersion：`5`
 - 主分支：`master`（`origin/HEAD` 指向 `origin/master`）
 - 当前工作分支：`codex/ai-content-api-0-7`
