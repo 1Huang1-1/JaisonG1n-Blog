@@ -17,6 +17,7 @@ import {
 	htmlToMarkdown,
 	syncWordPress,
 } from "../scripts/sync-wordpress.mjs";
+import { describeNetworkError } from "../scripts/wordpress-sync/retry.mjs";
 
 function post(overrides = {}) {
 	return {
@@ -131,6 +132,41 @@ test("fetches all pages and filters non-published responses", async () => {
 		posts.map((value) => value.id),
 		[6, 7],
 	);
+});
+
+test("retries transient WordPress response failures", async () => {
+	let attempts = 0;
+	const fetchImpl = async () => {
+		attempts += 1;
+		if (attempts === 1) {
+			const error = new Error("Headers Timeout Error");
+			error.code = "UND_ERR_HEADERS_TIMEOUT";
+			throw error;
+		}
+		return new Response(JSON.stringify([post()]), {
+			status: 200,
+			headers: { "X-WP-TotalPages": "1", "Content-Type": "application/json" },
+		});
+	};
+	const posts = await fetchPublishedPosts({
+		baseUrl: "https://cms.example",
+		fetchImpl,
+		logger: { info() {} },
+		retryOptions: { maxRetries: 1, retryDelayMs: 0 },
+	});
+	assert.equal(attempts, 2);
+	assert.deepEqual(
+		posts.map((value) => value.id),
+		[6],
+	);
+});
+
+test("preserves the underlying network error code", async () => {
+	const cause = new Error("connect failed");
+	cause.code = "ENETUNREACH";
+	const error = new TypeError("fetch failed");
+	error.cause = cause;
+	assert.equal(describeNetworkError(error), "fetch failed (ENETUNREACH)");
 });
 
 test("replaces only the generated output after a successful sync", async () => {

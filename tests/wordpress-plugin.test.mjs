@@ -16,7 +16,7 @@ async function phpFiles(directory = pluginRoot) {
 	return files;
 }
 
-test("plugin exposes only an explicit public snapshot route", async () => {
+test("plugin exposes a public snapshot and an authenticated AI content interface", async () => {
 	const source = await readFile(
 		path.join(pluginRoot, "includes/class-jg-rest.php"),
 		"utf8",
@@ -24,6 +24,21 @@ test("plugin exposes only an explicit public snapshot route", async () => {
 	assert.match(source, /jaisong1n\/v1/);
 	assert.match(source, /site-snapshot/);
 	assert.match(source, /'permission_callback'\s*=>\s*'__return_true'/);
+	const aiSource = await readFile(
+		path.join(pluginRoot, "includes/class-jg-ai-content.php"),
+		"utf8",
+	);
+	assert.match(aiSource, /jaisong1n\/v1\/ai/);
+	for (const route of [
+		"capabilities",
+		"content",
+		"publish",
+		"unpublish",
+		"claim",
+		"audit",
+	])
+		assert.match(aiSource, new RegExp(route));
+	assert.doesNotMatch(aiSource, /DELETE\s+\/content/);
 	assert.doesNotMatch(source, /register_rest_route[\s\S]*manual_dispatch/);
 });
 
@@ -86,20 +101,151 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.6.0 publishes schemaVersion 5 and deterministic ordering", async () => {
+test("version 0.8.3 preserves schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.6\.0/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.6\.0'/);
-	assert.match(readme, /Stable tag:\s*0\.6\.0/);
+	assert.match(entry, /Version:\s*0\.8\.3/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.8\.3'/);
+	assert.match(readme, /Stable tag:\s*0\.8\.3/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
 		/'orderby'\s*=>\s*array\('menu_order'\s*=>\s*'ASC',\s*'date'\s*=>\s*'DESC',\s*'ID'\s*=>\s*'ASC'\)/,
 	);
+});
+
+test("AI draft updates are diary-only and modifiedAt is nullable", async () => {
+	const source = await readFile(
+		path.join(pluginRoot, "includes/class-jg-ai-content.php"),
+		"utf8",
+	);
+	assert.match(source, /\$contract\['apiType'\] !== 'diary'/);
+	assert.match(source, /jg_ai_update_draft_unsupported/);
+	assert.match(
+		source,
+		/array\('contentType', 'id', 'expectedModifiedAt', 'title', 'slug', 'excerpt', 'content'\)/,
+	);
+	assert.match(source, /jg_ai_no_changes/);
+	assert.match(
+		source,
+		/private static function modified_at\(WP_Post \$post\): \?string/,
+	);
+	assert.match(source, /'0000-00-00 00:00:00'/);
+	assert.match(source, /\$timestamp === false \? null/);
+	assert.match(source, /'modifiedAt' => self::modified_at\(\$post\)/);
+	assert.match(source, /self::record\('updateDraft'.*\$changed/);
+});
+
+test("reviewed diary publishing uses a separate capability and one-time tokens", async () => {
+	const source = await readFile(
+		path.join(pluginRoot, "includes/class-jg-ai-content.php"),
+		"utf8",
+	);
+	assert.match(source, /prepare-publish/);
+	assert.match(source, /jg_ai_publish_diary_drafts/);
+	assert.match(source, /PUBLISH_TOKEN_TTL = 600/);
+	assert.match(source, /bin2hex\(random_bytes\(32\)\)/);
+	assert.match(source, /hash\('sha256', \$token\)/);
+	assert.match(source, /'action' => 'publish'/);
+	assert.match(source, /jg_ai_confirmation_token_expired/);
+	assert.match(source, /jg_ai_confirmation_token_used/);
+	assert.match(source, /idempotent_replay/);
+	assert.match(source, /publish_prepare/);
+	assert.match(source, /publish_success/);
+	assert.match(source, /publish_rejected/);
+	assert.match(source, /publish_conflict/);
+	assert.doesNotMatch(source, /add_cap\([^\n]*publish_jg_diary/);
+	assert.doesNotMatch(source, /workflow_dispatch|api\.github\.com/);
+});
+
+test("diary updates and reviewed publishing share one AI ownership check", async () => {
+	const source = await readFile(
+		path.join(pluginRoot, "includes/class-jg-ai-content.php"),
+		"utf8",
+	);
+	assert.match(source, /can_manage_ai_content/);
+	assert.match(source, /_jg_ai_owner_user_id/);
+	assert.match(source, /function can_manage_ai_content/);
+	assert.match(source, /current_user_can\('edit_post', \$post->ID\)/);
+	assert.match(source, /is_ai_owner\(\$post\)/);
+	assert.match(source, /_jg_ai_editable/);
+	assert.match(
+		source,
+		/can_publish\(array \$contract, \?WP_Post \$post\): bool \{[\s\S]*?can_manage_ai_content/,
+	);
+	assert.match(
+		source,
+		/can_manage_ai_content[\s\S]*?current_user_can\('edit_post', \$post->ID\)[\s\S]*?is_ai_owner\(\$post\)/,
+	);
+	assert.match(source, /function publish_rejection_reason/);
+	for (const reason of [
+		"setting_disabled",
+		"missing_publish_capability",
+		"ownership_denied",
+		"edit_denied",
+		"not_publishable",
+	]) {
+		assert.match(source, new RegExp(reason));
+	}
+	assert.match(source, /function repair_ai_ownership/);
+	assert.match(source, /jg_ai_sync_owner/);
+});
+
+test("deployment status API is read-only and keeps status layers separate", async () => {
+	const [aiSource, dispatchSource, settingsSource] = await Promise.all([
+		readFile(path.join(pluginRoot, "includes/class-jg-ai-content.php"), "utf8"),
+		readFile(path.join(pluginRoot, "includes/class-jg-dispatch.php"), "utf8"),
+		readFile(path.join(pluginRoot, "includes/class-jg-settings.php"), "utf8"),
+	]);
+	assert.match(aiSource, /deployment-status/);
+	assert.match(aiSource, /deployment_status/);
+	assert.match(aiSource, /deploymentStatus/);
+	assert.match(aiSource, /function get_canonical_public_url/);
+	assert.match(aiSource, /function probe_public_page/);
+	assert.match(aiSource, /'\/diary\/'/);
+	assert.match(aiSource, /'\/posts\/'/);
+	assert.match(aiSource, /rawurlencode/);
+	assert.match(aiSource, /limit_response_size/);
+	assert.match(aiSource, /'redirection'\s*=>\s*0/);
+	assert.match(aiSource, /public_site_url/);
+	assert.match(dispatchSource, /find_latest_record_for_content/);
+	assert.match(dispatchSource, /contentRefs/);
+	assert.match(dispatchSource, /query_run/);
+	assert.match(dispatchSource, /map_run_status/);
+	assert.match(dispatchSource, /RUN_CACHE_TTL = 20/);
+	assert.match(dispatchSource, /MAX_RECORDS = 50/);
+	assert.match(dispatchSource, /'dispatchStatus'\s*=>/);
+	assert.match(dispatchSource, /'buildStatus'\s*=>/);
+	assert.match(dispatchSource, /'deploymentStatus'\s*=>/);
+	assert.match(dispatchSource, /GITHUB_API_VERSION = '2026-03-10'/);
+	assert.match(dispatchSource, /workflow_run_id/);
+	assert.match(settingsSource, /public_site_url/);
+	assert.doesNotMatch(
+		dispatchSource,
+		/Authorization.*error_log|error_log.*Authorization/,
+	);
+});
+
+test("AI-owned diary drafts auto-enable reviewed publishing only under full conditions", async () => {
+	const [aiSource, settingsSource] = await Promise.all([
+		readFile(path.join(pluginRoot, "includes/class-jg-ai-content.php"), "utf8"),
+		readFile(path.join(pluginRoot, "includes/class-jg-settings.php"), "utf8"),
+	]);
+	assert.match(aiSource, /auto_publishable_diary/);
+	assert.match(
+		aiSource,
+		/update_post_meta\(\(int\) \$post_id, '_jg_ai_publishable', true\)/,
+	);
+	assert.match(aiSource, /\$contract\['apiType'\] !== 'diary'/);
+	assert.match(aiSource, /reviewed_diary_publish/);
+	assert.match(aiSource, /PUBLISH_CAPABILITY/);
+	assert.match(aiSource, /_jg_ai_owner_user_id/);
+	assert.match(settingsSource, /auto_publishable_ai_diaries/);
+	assert.match(settingsSource, /AI 自建日记自动允许进入受控发布流程/);
+	assert.match(settingsSource, /不是自动公开发布/);
 });
 
 test("only announcement links opt into validated root-relative paths", async () => {
@@ -310,6 +456,6 @@ test("plugin packaging fixes the basename and normalizes ZIP paths", async () =>
 	);
 	assert.match(packageJson, /package:wordpress-plugin/);
 	assert.match(packageJson, /verify:wordpress-plugin-package/);
-	assert.match(packageJson, /jaisong1n-site-manager-0\.6\.0\.zip/);
+	assert.match(packageJson, /jaisong1n-site-manager-0\.8\.3\.zip/);
 	assert.match(packageJson, /test:wordpress-upgrade/);
 });

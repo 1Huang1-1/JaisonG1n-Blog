@@ -22,14 +22,14 @@ const REPLACEMENT_ZIP = path.join(
 	REPOSITORY_ROOT,
 	"wordpress-plugin",
 	"dist",
-	`${PLUGIN_SLUG}-0.6.0.zip`,
+	`${PLUGIN_SLUG}-0.8.3.zip`,
 );
 
 const baselinePlugin = `<?php
 /**
  * Plugin Name: JaisonG1n Site Manager
- * Description: Minimal 0.5.0 upgrade-path fixture for dispatch upgrade testing.
- * Version: 0.5.0
+ * Description: Minimal 0.8.2 upgrade-path fixture for auto-publishable diary testing.
+ * Version: 0.8.2
  * Author: JaisonG1n
  * Text Domain: jaisong1n-site-manager
  */
@@ -39,6 +39,8 @@ if (!defined('ABSPATH')) { exit; }
 function jg_upgrade_fixture_activate(): void {
 	add_option('jg_site_settings', array('site_title' => 'Upgrade preserved'), '', false);
 	add_option('jg_github_token', 'upgrade-fixture-token', '', true);
+	add_option('jg_dispatch_pending', array('revision' => 'a' . str_repeat('0', 63)), '', false);
+	add_option('jg_dispatch_history', array(array('status' => 'success')), '', false);
 	register_post_type('jg_project', array('public' => false, 'show_ui' => true));
 	wp_insert_post(array(
 		'post_type' => 'jg_project',
@@ -47,6 +49,24 @@ function jg_upgrade_fixture_activate(): void {
 		'post_name' => 'upgrade-fixture-project',
 		'post_content' => 'Preserved content',
 	));
+	$editor = get_role('editor');
+	if ($editor) $editor->add_cap('jg_fixture_capability');
+	$ai_owner = wp_create_user('jg_upgrade_ai_owner', wp_generate_password(24), 'jg-upgrade-ai-owner@example.test');
+	if (!is_wp_error($ai_owner)) {
+		$draft_id = wp_insert_post(array(
+			'post_type' => 'jg_diary',
+			'post_status' => 'draft',
+			'post_author' => 1,
+			'post_title' => 'Upgrade AI draft',
+		));
+		if (!is_wp_error($draft_id)) {
+			add_option('jg_upgrade_ai_draft', (int) $draft_id, '', false);
+			update_post_meta((int) $draft_id, '_jg_ai_created', true);
+			update_post_meta((int) $draft_id, '_jg_ai_owner_user_id', (int) $ai_owner);
+			update_post_meta((int) $draft_id, '_jg_ai_editable', true);
+			update_post_meta((int) $draft_id, '_jg_ai_publishable', false);
+		}
+	}
 }
 
 register_activation_hook(__FILE__, 'jg_upgrade_fixture_activate');
@@ -95,7 +115,7 @@ function run(command, args) {
 async function main() {
 	await verifyPackage(REPLACEMENT_ZIP);
 	const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "jg-upgrade-test-"));
-	const baselineZip = path.join(temporaryDirectory, `${PLUGIN_SLUG}-0.5.0.zip`);
+	const baselineZip = path.join(temporaryDirectory, `${PLUGIN_SLUG}-0.8.2.zip`);
 	const pluginsDirectory = path.join(temporaryDirectory, "plugins");
 	const replacementDirectory = path.join(temporaryDirectory, "replacement");
 	try {
