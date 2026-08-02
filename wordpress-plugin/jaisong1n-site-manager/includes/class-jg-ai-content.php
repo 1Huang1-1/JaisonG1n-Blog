@@ -165,6 +165,9 @@ final class JG_AI_Content {
 			update_post_meta((int) $post_id, '_jg_ai_owner_user_id', get_current_user_id());
 			update_post_meta((int) $post_id, '_jg_ai_editable', true);
 			update_post_meta((int) $post_id, '_jg_ai_publishable', false);
+			if (self::auto_publishable_diary($contract, (int) $post_id)) {
+				update_post_meta((int) $post_id, '_jg_ai_publishable', true);
+			}
 			$post = get_post((int) $post_id);
 			$result = self::project($post, $contract, true) + array('idempotentReplay' => false);
 			self::store_idempotency(get_current_user_id(), 'create:' . $contract['apiType'], $key, $hash, $result, 201);
@@ -492,6 +495,16 @@ final class JG_AI_Content {
 	private static function safe_wp_error(WP_Error $error): WP_Error { return self::error('jg_ai_content_write_failed', 'The content could not be saved.', 400); }
 
 	private static function can_create(array $contract): bool { $object = get_post_type_object($contract['postType']); return !empty(self::settings()['create_drafts']) && $object && current_user_can($object->cap->create_posts); }
+	private static function auto_publishable_diary(array $contract, int $post_id): bool {
+		if ($contract['apiType'] !== 'diary') return false;
+		if (empty(self::settings()['reviewed_diary_publish'])) return false;
+		if (!current_user_can(self::PUBLISH_CAPABILITY)) return false;
+		if (empty(JG_Settings::get()['auto_publishable_ai_diaries'])) return false;
+		$post = get_post($post_id);
+		if (!$post || $post->post_status !== 'draft') return false;
+		$owner = (int) get_post_meta($post_id, '_jg_ai_owner_user_id', true);
+		return (int) $post->post_author === get_current_user_id() && $owner === get_current_user_id();
+	}
 	private static function can_read(array $contract, ?WP_Post $post): bool {
 		if ($post === null) return true;
 		$owner_id = (int) get_post_meta($post->ID, '_jg_ai_owner_user_id', true);

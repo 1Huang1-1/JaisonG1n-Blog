@@ -101,15 +101,15 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.8.2 preserves schemaVersion 5 and deterministic ordering", async () => {
+test("version 0.8.3 preserves schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.8\.2/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.8\.2'/);
-	assert.match(readme, /Stable tag:\s*0\.8\.2/);
+	assert.match(entry, /Version:\s*0\.8\.3/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.8\.3'/);
+	assert.match(readme, /Stable tag:\s*0\.8\.3/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
@@ -227,6 +227,25 @@ test("deployment status API is read-only and keeps status layers separate", asyn
 		dispatchSource,
 		/Authorization.*error_log|error_log.*Authorization/,
 	);
+});
+
+test("AI-owned diary drafts auto-enable reviewed publishing only under full conditions", async () => {
+	const [aiSource, settingsSource] = await Promise.all([
+		readFile(path.join(pluginRoot, "includes/class-jg-ai-content.php"), "utf8"),
+		readFile(path.join(pluginRoot, "includes/class-jg-settings.php"), "utf8"),
+	]);
+	assert.match(aiSource, /auto_publishable_diary/);
+	assert.match(
+		aiSource,
+		/update_post_meta\(\(int\) \$post_id, '_jg_ai_publishable', true\)/,
+	);
+	assert.match(aiSource, /\$contract\['apiType'\] !== 'diary'/);
+	assert.match(aiSource, /reviewed_diary_publish/);
+	assert.match(aiSource, /PUBLISH_CAPABILITY/);
+	assert.match(aiSource, /_jg_ai_owner_user_id/);
+	assert.match(settingsSource, /auto_publishable_ai_diaries/);
+	assert.match(settingsSource, /AI 自建日记自动允许进入受控发布流程/);
+	assert.match(settingsSource, /不是自动公开发布/);
 });
 
 test("only announcement links opt into validated root-relative paths", async () => {
@@ -437,6 +456,6 @@ test("plugin packaging fixes the basename and normalizes ZIP paths", async () =>
 	);
 	assert.match(packageJson, /package:wordpress-plugin/);
 	assert.match(packageJson, /verify:wordpress-plugin-package/);
-	assert.match(packageJson, /jaisong1n-site-manager-0\.8\.2\.zip/);
+	assert.match(packageJson, /jaisong1n-site-manager-0\.8\.3\.zip/);
 	assert.match(packageJson, /test:wordpress-upgrade/);
 });

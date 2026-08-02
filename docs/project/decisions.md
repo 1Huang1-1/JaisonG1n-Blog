@@ -1,5 +1,30 @@
 # 重要技术决策
 
+## 2026-08-02：AI 自建日记草稿自动进入受控发布流程（Site Manager 0.8.3）
+
+### 问题
+
+AI 通过 createDraft 创建的 diary 草稿仍需管理员进入 WordPress 后台逐篇勾选 publishable，破坏“微信创建→确认→发布”的完整流程。
+
+### 最终选择
+
+在“内容安全”新增开关 `auto_publishable_ai_diaries`（默认关闭）。开启后，仅当 createDraft 创建时同时满足：contentType=diary、状态 draft、`reviewed_diary_publish` 已开启、当前用户拥有 `jg_ai_publish_diary_drafts`、`post_author` 与 `_jg_ai_owner_user_id` 均为当前用户，才自动写入 `_jg_ai_publishable=1`。
+
+自动标记只意味着进入两阶段发布流程；`preparePublish`、一次性 confirmationToken、`expectedModifiedAt`、幂等键、精确确认短语与 status=draft 检查全部保留。后台人工创建、导入内容、其他作者内容、非 diary 类型、缺少 capability、全局设置关闭时一律不自动标记，仍需管理员逐篇授权。
+
+### 放弃或暂缓的方案
+
+- 不对历史草稿做批量修改；已手动设置的 `_jg_ai_publishable` 保持不变。
+- 不给角色增加 `edit_others_*`，不自动发布，不扩大管理员权限。
+
+### 影响
+
+schemaVersion 保持 5；0.8.2 → 0.8.3 升级保留设置、内容与 dispatch history。
+
+### 后续条件
+
+生产启用该开关前必须确认 reviewed diary publishing 与 `jg_ai_publish_diary_drafts` 已就绪；改变自动标记条件时需同步更新 API 文档、安全模型与测试。
+
 ## 2026-08-02：部署状态以五层分离并通过可信探测确认（Site Manager 0.8.2）
 
 ### 问题

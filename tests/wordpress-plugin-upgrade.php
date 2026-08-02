@@ -42,14 +42,14 @@ $main_file = WP_PLUGIN_DIR . '/' . $basename;
 $replacement_directory = '/workspace/replacement/jaisong1n-site-manager';
 
 $baseline_validation = validate_plugin($basename);
-jg_upgrade_assert($baseline_validation === 0, '0.8.1 baseline validate_plugin failed: ' . wp_json_encode($baseline_validation));
+jg_upgrade_assert($baseline_validation === 0, '0.8.2 baseline validate_plugin failed: ' . wp_json_encode($baseline_validation));
 $activation = activate_plugin($basename, '', false, false);
-jg_upgrade_assert(!is_wp_error($activation), '0.8.1 activation failed: ' . wp_json_encode($activation));
+jg_upgrade_assert(!is_wp_error($activation), '0.8.2 activation failed: ' . wp_json_encode($activation));
 $active_before = get_option('active_plugins', array());
 jg_upgrade_assert(in_array($basename, $active_before, true), '0.7.0 basename was not stored in active_plugins.');
-jg_upgrade_assert(get_option('jg_site_settings', array())['site_title'] === 'Upgrade preserved', '0.8.1 setting fixture is missing.');
-jg_upgrade_assert(count(get_posts(array('post_type' => 'jg_project', 'post_status' => 'publish', 'numberposts' => -1))) === 1, '0.8.1 content fixture is missing.');
-jg_upgrade_assert((int) get_option('jg_upgrade_ai_draft', 0) > 0, '0.8.1 AI draft fixture is missing.');
+jg_upgrade_assert(get_option('jg_site_settings', array())['site_title'] === 'Upgrade preserved', '0.8.2 setting fixture is missing.');
+jg_upgrade_assert(count(get_posts(array('post_type' => 'jg_project', 'post_status' => 'publish', 'numberposts' => -1))) === 1, '0.8.2 content fixture is missing.');
+jg_upgrade_assert((int) get_option('jg_upgrade_ai_draft', 0) > 0, '0.8.2 AI draft fixture is missing.');
 
 jg_upgrade_clear_directory($plugin_directory);
 jg_upgrade_copy_directory($replacement_directory, $plugin_directory);
@@ -60,10 +60,10 @@ $active_after = get_option('active_plugins', array());
 jg_upgrade_assert($active_after === $active_before, 'active_plugins changed during same-directory replacement.');
 jg_upgrade_assert(is_readable($main_file), 'Replacement main plugin file is not readable.');
 $replacement_validation = validate_plugin($basename);
-jg_upgrade_assert($replacement_validation === 0, '0.8.2 validate_plugin failed: ' . wp_json_encode($replacement_validation));
+jg_upgrade_assert($replacement_validation === 0, '0.8.3 validate_plugin failed: ' . wp_json_encode($replacement_validation));
 
 require $main_file;
-jg_upgrade_assert(defined('JG_SITE_MANAGER_VERSION') && JG_SITE_MANAGER_VERSION === '0.8.2', '0.8.2 plugin did not load.');
+jg_upgrade_assert(defined('JG_SITE_MANAGER_VERSION') && JG_SITE_MANAGER_VERSION === '0.8.3', '0.8.3 plugin did not load.');
 JG_Site_Manager::init();
 JG_Content_Types::register();
 JG_AI_Content::install();
@@ -73,6 +73,7 @@ jg_upgrade_assert(get_role('jg_ai_content_editor') !== null, 'AI content editor 
 jg_upgrade_assert(post_type_exists('jg_project'), 'Custom content type disappeared after upgrade.');
 jg_upgrade_assert(JG_Settings::get()['site_title'] === 'Upgrade preserved', 'Plugin settings did not survive the upgrade.');
 jg_upgrade_assert(JG_Settings::get()['public_site_url'] === 'https://jaisong1n.com', 'Deployment public site URL default is missing after upgrade.');
+jg_upgrade_assert(JG_Settings::get()['auto_publishable_ai_diaries'] === false, 'Auto-publishable AI diaries must default to off after upgrade.');
 global $wpdb;
 $token_autoload = $wpdb->get_var($wpdb->prepare('SELECT autoload FROM ' . $wpdb->options . ' WHERE option_name = %s', 'jg_github_token'));
 jg_upgrade_assert($token_autoload === 'no', 'GitHub token option was not corrected to autoload=no: ' . (string) $token_autoload);
@@ -96,6 +97,7 @@ $upgrade_draft = get_post($upgrade_draft_id);
 jg_upgrade_assert($upgrade_draft instanceof WP_Post && (int) $upgrade_draft->post_author === 1, 'Upgrade AI draft fixture author is invalid.');
 jg_upgrade_assert((int) get_post_meta($upgrade_draft_id, '_jg_ai_owner_user_id', true) === (int) $upgrade_owner->ID, 'AI owner meta did not survive the upgrade.');
 jg_upgrade_assert((bool) get_post_meta($upgrade_draft_id, '_jg_ai_created', true), 'AI created flag did not survive the upgrade.');
+jg_upgrade_assert((bool) get_post_meta($upgrade_draft_id, '_jg_ai_publishable', true) === false, 'Upgrade batch-modified historical AI drafts to publishable.');
 jg_upgrade_assert(JG_AI_Content::repair_ai_ownership($upgrade_draft_id), 'Guarded ownership repair failed after upgrade.');
 jg_upgrade_assert((int) get_post($upgrade_draft_id)->post_author === (int) $upgrade_owner->ID, 'Ownership repair did not sync the author.');
 $upgrade_stranger_id = wp_create_user('jg_upgrade_stranger', wp_generate_password(24), 'jg-upgrade-stranger@example.test');
@@ -115,7 +117,7 @@ jg_upgrade_assert(($snapshot['schemaVersion'] ?? null) === 5, 'schemaVersion is 
 
 echo wp_json_encode(array(
 	'ok' => true,
-	'baselineVersion' => '0.8.1',
+	'baselineVersion' => '0.8.2',
 	'replacementVersion' => JG_SITE_MANAGER_VERSION,
 	'pluginBasename' => $basename,
 	'activePluginsBefore' => $active_before,

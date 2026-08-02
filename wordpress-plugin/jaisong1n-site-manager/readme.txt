@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.8.2
+Stable tag: 0.8.3
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -24,6 +24,12 @@ The plugin accepts a fine-grained GitHub token with Actions Read and write for t
 Deactivation retains all data. Normal uninstall removes plugin-added role capabilities but retains content and settings. Destructive data cleanup runs only when an administrator explicitly enables it before uninstalling.
 
 == Changelog ==
+
+= 0.8.3 =
+
+* Automatically grants reviewed-publish eligibility to diary drafts created by AI users through the AI Content API when reviewed diary publishing, the diary publish capability, and the new "auto publishable AI diaries" setting are active.
+* Keeps the grant limited to API-created, AI-owned draft diaries; manual, imported, other-author, and non-diary content still requires the administrator's per-content publishable mark.
+* Adds an explicit "AI 自建日记自动允许进入受控发布流程" option under content security; enabling it only admits drafts to the two-stage prepare/publish flow, never publishes automatically.
 
 = 0.8.2 =
 

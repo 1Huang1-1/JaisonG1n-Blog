@@ -314,6 +314,76 @@ jg_ai_test_assert(get_option('jg_dispatch_pending', array()) === $pending_after_
 $repeat_publish = jg_ai_test_publish((int) $user_id, (int) $created_data['id'], $publish_body, 'publish-repeat-0002');
 jg_ai_test_assert($repeat_publish->get_status() === 409 && jg_ai_test_error_code($repeat_publish) === 'jg_ai_already_published', 'Repeated publication did not return a stable conflict.');
 
+// ---- 0.8.3: AI-owned diary drafts auto-enable reviewed publishing ---------
+$auto_settings_before = JG_AI_Content::settings();
+$auto_settings = $auto_settings_before;
+$auto_settings['reviewed_diary_publish'] = true;
+update_option('jg_ai_content_settings', $auto_settings, false);
+JG_AI_Content::settings_updated($auto_settings_before, $auto_settings);
+$auto_site_settings = JG_Settings::get();
+$auto_site_settings['auto_publishable_ai_diaries'] = true;
+update_option(JG_Settings::OPTION, $auto_site_settings, false);
+wp_set_current_user((int) $user_id);
+jg_ai_test_assert($user->has_cap('jg_ai_publish_diary_drafts'), 'Auto-publishable fixture requires the diary publish capability.');
+
+delete_option('jg_dispatch_pending');
+wp_clear_scheduled_hook(JG_Dispatch::CRON_HOOK);
+$auto_body = array('contentType' => 'diary', 'title' => 'Auto publishable diary', 'slug' => 'auto-publishable-diary', 'contentHtml' => '<p>body</p>', 'idempotencyKey' => 'playground-ai-diary-auto-0001');
+$auto_created = jg_ai_test_request('POST', '/jaisong1n/v1/ai/content', $auto_body, array('Idempotency-Key' => 'playground-ai-diary-auto-0001'));
+jg_ai_test_assert($auto_created->get_status() === 201, 'Auto-publishable diary creation failed.');
+$auto_id = (int) $auto_created->get_data()['id'];
+jg_ai_test_assert((bool) get_post_meta($auto_id, '_jg_ai_publishable', true), 'AI-owned diary draft was not auto-marked publishable.');
+jg_ai_test_assert(get_post_status($auto_id) === 'draft', 'Auto-publishable diary was not kept as a draft.');
+jg_ai_test_assert((int) get_post($auto_id)->post_author === (int) $user_id && (int) get_post_meta($auto_id, '_jg_ai_owner_user_id', true) === (int) $user_id, 'Auto-publishable diary ownership is incorrect.');
+jg_ai_test_assert(get_option('jg_dispatch_pending', false) === false && !wp_next_scheduled(JG_Dispatch::CRON_HOOK), 'Auto-publishable diary creation triggered a build.');
+$auto_prepare = jg_ai_test_prepare((int) $user_id, $auto_id);
+jg_ai_test_assert($auto_prepare->get_status() === 200 && preg_match('/^[a-f0-9]{64}$/', $auto_prepare->get_data()['confirmationToken']) === 1, 'Auto-publishable diary could not enter preparePublish without an admin claim.');
+jg_ai_test_assert(get_post_status($auto_id) === 'draft' && get_option('jg_dispatch_pending', false) === false, 'Auto-publishable prepare changed state or scheduled a build.');
+$no_token_publish = jg_ai_test_publish((int) $user_id, $auto_id, array('expectedModifiedAt' => $auto_prepare->get_data()['modifiedAt']), 'auto-publish-no-token-0001');
+jg_ai_test_assert($no_token_publish->get_status() === 403 && jg_ai_test_error_code($no_token_publish) === 'jg_ai_confirmation_token_invalid', 'Auto-publishable diary bypassed the confirmation token.');
+
+$auto_article_body = array('contentType' => 'article', 'title' => 'Auto article', 'contentHtml' => '<p>a</p>', 'idempotencyKey' => 'playground-ai-article-auto-0001');
+$auto_article = jg_ai_test_request('POST', '/jaisong1n/v1/ai/content', $auto_article_body, array('Idempotency-Key' => 'playground-ai-article-auto-0001'));
+$auto_article_id = (int) $auto_article->get_data()['id'];
+jg_ai_test_assert((bool) get_post_meta($auto_article_id, '_jg_ai_publishable', true) === false, 'Article draft must never be auto-publishable.');
+
+$manual_diary_id = wp_insert_post(array('post_type' => 'jg_diary', 'post_status' => 'draft', 'post_author' => (int) $admin_id, 'post_title' => 'Manual diary'));
+jg_ai_test_assert((bool) get_post_meta($manual_diary_id, '_jg_ai_publishable', true) === false, 'Manually created diary must not be auto-publishable.');
+
+$foreign_diary_id = wp_insert_post(array('post_type' => 'jg_diary', 'post_status' => 'draft', 'post_author' => (int) $admin_id, 'post_title' => 'Foreign diary'));
+update_post_meta($foreign_diary_id, '_jg_ai_created', true);
+update_post_meta($foreign_diary_id, '_jg_ai_owner_user_id', (int) $user_id);
+update_post_meta($foreign_diary_id, '_jg_ai_editable', true);
+jg_ai_test_assert((bool) get_post_meta($foreign_diary_id, '_jg_ai_publishable', true) === false, 'Non-owner content must not be auto-publishable.');
+
+$auto_no_cap_role = add_role('jg_ai_auto_no_cap', 'AI Auto No Cap', get_role('jg_ai_content_editor')->capabilities);
+jg_ai_test_assert($auto_no_cap_role instanceof WP_Role, 'Could not clone the AI editor role for auto-publishable testing.');
+$auto_no_cap_role->remove_cap('jg_ai_publish_diary_drafts');
+$auto_no_cap_user_id = wp_create_user('jg-ai-auto-no-cap', wp_generate_password(24), 'jg-ai-auto-no-cap@example.test');
+jg_ai_test_assert(!is_wp_error($auto_no_cap_user_id), 'Could not create the no-cap auto-publishable user.');
+(new WP_User((int) $auto_no_cap_user_id))->set_role('jg_ai_auto_no_cap');
+wp_set_current_user((int) $auto_no_cap_user_id);
+$no_cap_body = array('contentType' => 'diary', 'title' => 'No cap diary', 'slug' => 'no-cap-diary', 'contentHtml' => '<p>n</p>', 'idempotencyKey' => 'playground-ai-diary-nocap-0001');
+$no_cap_created = jg_ai_test_request('POST', '/jaisong1n/v1/ai/content', $no_cap_body, array('Idempotency-Key' => 'playground-ai-diary-nocap-0001'));
+jg_ai_test_assert($no_cap_created->get_status() === 201, 'No-cap diary creation failed.');
+$no_cap_id = (int) $no_cap_created->get_data()['id'];
+jg_ai_test_assert((bool) get_post_meta($no_cap_id, '_jg_ai_publishable', true) === false, 'Diary without the publish capability must not be auto-publishable.');
+wp_set_current_user((int) $user_id);
+remove_role('jg_ai_auto_no_cap');
+
+$off_settings = JG_AI_Content::settings();
+$off_settings['reviewed_diary_publish'] = false;
+$off_settings_before = JG_AI_Content::settings();
+update_option('jg_ai_content_settings', $off_settings, false);
+JG_AI_Content::settings_updated($off_settings_before, $off_settings);
+$off_body = array('contentType' => 'diary', 'title' => 'Setting off diary', 'slug' => 'setting-off-diary', 'contentHtml' => '<p>o</p>', 'idempotencyKey' => 'playground-ai-diary-off-0001');
+$off_created = jg_ai_test_request('POST', '/jaisong1n/v1/ai/content', $off_body, array('Idempotency-Key' => 'playground-ai-diary-off-0001'));
+jg_ai_test_assert($off_created->get_status() === 201, 'Setting-off diary creation failed.');
+$off_id = (int) $off_created->get_data()['id'];
+jg_ai_test_assert((bool) get_post_meta($off_id, '_jg_ai_publishable', true) === false, 'Setting-off diary was auto-publishable.');
+update_option('jg_ai_content_settings', $auto_settings, false);
+JG_AI_Content::settings_updated($off_settings, $auto_settings);
+
 $audit = get_option('jg_ai_content_audit', array());
 $audit_json = wp_json_encode($audit);
 foreach (array('publish_prepare', 'publish_success', 'publish_rejected', 'publish_conflict', 'idempotent_replay') as $action) {

@@ -1,6 +1,6 @@
 # AI Content API
 
-`JaisonG1n Site Manager 0.8.2` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
+`JaisonG1n Site Manager 0.8.3` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
 
 Use a dedicated WordPress user with the `jg_ai_content_editor` role and an Application Password. Clients must first request `GET /capabilities`; the response is the live authority for content types, fields, and operations. It never exposes internal meta keys, confirmation tokens, or site secrets.
 
@@ -17,6 +17,8 @@ Only diary drafts expose `updateDraft`. Send `PATCH /content/diary/{id}` with th
 `updateDraft` and reviewed publishing share one object-level authorization check. A diary is manageable by the current user when native WordPress `edit_post` passes, or when the user is the AI owner (`_jg_ai_owner_user_id` meta or the native post author) and the diary carries the `_jg_ai_editable` grant. This intentionally does not depend on `edit_others_jg_diarys`: an AI-created draft remains manageable by its AI owner even if its native author drifted.
 
 Creating a diary through `POST /content` always writes `post_author = get_current_user_id()`, `_jg_ai_owner_user_id = get_current_user_id()`, `_jg_ai_created = true`, and `_jg_ai_editable = true`. Read access requires being the native author, the AI owner, or an explicitly editable grant. The editable grant alone grants read, not write or publish; publishing additionally requires AI ownership, the reviewed-publish capability, and the per-content publishable mark.
+
+When the "AI 自建日记自动允许进入受控发布流程" setting (content security) is enabled, a diary draft created through the AI Content API is automatically marked `_jg_ai_publishable = true` only if all of the following hold at creation time: the content type is `diary`, the draft status is `draft`, reviewed diary publishing is enabled, the current user holds `jg_ai_publish_diary_drafts`, and both `post_author` and `_jg_ai_owner_user_id` equal the current user. This only admits the draft to the two-stage prepare/publish flow; it never publishes automatically, and the one-time confirmation token, `expectedModifiedAt`, and idempotency checks still apply. Manually created, imported, other-author, or non-diary content is never auto-marked and still requires the administrator's per-content publishable grant.
 
 ## Reviewed Diary Publishing
 

@@ -1,6 +1,6 @@
 # OpenClaw Adapter Guide
 
-## Site Manager 0.8.2 publish adapter
+## Site Manager 0.8.3 publish adapter
 
 OpenClaw must discover `preparePublish` and `publish` from live capabilities. It may expose the reviewed diary flow only after explicit user confirmation. The adapter keeps the one-time confirmation token in memory for the immediate publish request, never writes it to conversation history or logs, and discards it after success, rejection, or expiry. It must not call GitHub Actions directly.
 
