@@ -283,6 +283,16 @@ jg_ds_assert(is_array($still_associated) && (int) ($still_associated['workflowRu
 $no_record_diary = JG_Dispatch::find_latest_record_for_content('diary', (int) $diary_post, trim((string) get_post($diary_post)->post_modified_gmt));
 jg_ds_assert($no_record_diary === null, 'Legacy/no-ref records must not be bound to arbitrary content.');
 
+// Article deployment status: associates its own dispatch record and canonical URL.
+$jg_ds_http_responses['https://api.github.com/repos/1Huang1-1/JaisonG1n-Blog/actions/runs/789'] = array('code' => 200, 'body' => wp_json_encode(array('status' => 'completed', 'conclusion' => 'success', 'started_at' => '2026-08-01T11:00:00Z', 'completed_at' => '2026-08-01T11:05:00Z')));
+$jg_ds_http_responses['https://jaisong1n.com/posts/my-article/'] = array('code' => 200, 'body' => '<html>ok</html>');
+delete_transient('jg_dispatch_run_789');
+delete_transient('jg_page_probe_' . md5('https://jaisong1n.com/posts/my-article/'));
+$article_status = jg_ds_request('GET', '/jaisong1n/v1/ai/content/article/' . $article_post . '/deployment-status')->get_data();
+jg_ds_assert(($article_status['contentType'] ?? '') === 'article' && (int) ($article_status['workflowRunId'] ?? 0) === 789, 'Article deployment status did not associate its dispatch record.');
+jg_ds_assert(($article_status['publicUrl'] ?? '') === 'https://jaisong1n.com/posts/my-article/', 'Article canonical public URL is incorrect in deployment status.');
+jg_ds_assert(($article_status['buildStatus'] ?? '') === 'success' && ($article_status['pageStatus'] ?? '') === 'reachable' && ($article_status['deploymentStatus'] ?? '') === 'deployed', 'Article deployment status layers are incorrect.');
+
 // Legacy history entries without contentRefs are never hard-bound.
 $legacy_history = get_option('jg_dispatch_history', array());
 $legacy_history[] = array('state' => 'success', 'message' => 'legacy', 'time' => gmdate('c'), 'workflow_run_id' => 999);

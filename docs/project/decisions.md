@@ -1,5 +1,29 @@
 # 重要技术决策
 
+## 2026-08-02：article 复用 diary 受控发布管道并保持独立权限（Site Manager 0.9.0）
+
+### 问题
+
+article 只有 createDraft/read/deploymentStatus，缺少草稿更新与受控发布，微信端无法完成文章闭环；直接复用 diary 权限会混淆内容类型边界。
+
+### 最终选择
+
+article 复用 diary 已验证的安全基础，不另建发布系统：
+
+- `updateDraft` 扩展到 article，白名单为 title/content/excerpt/slug；status 必须 draft、`expectedModifiedAt` 必填且支持 null、乐观并发 409、no-op 拒绝、非 owner 404、审计只记字段名。
+- 新增独立 capability `jg_ai_publish_article_drafts`，不授予原生 publish_posts/edit_others；设置“审核制文章发布”与“AI 自建文章自动允许进入受控发布流程”（默认关闭）放入内容安全。
+- `prepare-publish`/`publish`/token/幂等/部署状态全部参数化为内容类型；token 绑定 contentType、ID、modifiedAt、action；发布只产生一次构建 pending。
+- 自动 publishable 条件与 diary 同构：AI API 创建、draft、作者与 AI owner 均为当前用户、article 受控能力与开关开启。
+
+### 放弃或暂缓的方案
+
+- 不把分类、标签、特色图写入纳入 0.9.0（契约未稳定，保留到媒体版本）。
+- 不复制整份 diary 逻辑只改字符串；不为此大规模重构。
+
+### 影响
+
+schemaVersion 保持 5；diary 能力与 article 能力互相独立；0.8.3→0.9.0 升级不改变任何既有权限默认值。
+
 ## 2026-08-02：AI 自建日记草稿自动进入受控发布流程（Site Manager 0.8.3）
 
 ### 问题

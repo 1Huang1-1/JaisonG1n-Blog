@@ -25,6 +25,8 @@ final class JG_Settings {
 			'home_subtitles' => '',
 			'public_site_url' => 'https://jaisong1n.com',
 			'auto_publishable_ai_diaries' => false,
+			'reviewed_article_publish' => false,
+			'auto_publishable_ai_articles' => false,
 			'banner_desktop_ids' => '',
 			'banner_mobile_ids' => '',
 			'carousel_interval' => 5,
@@ -105,6 +107,8 @@ final class JG_Settings {
 		$output['pio_model_url'] = esc_url_raw((string) ($input['pio_model_url'] ?? ''), array('https'));
 		$output['pio_position'] = self::enum($input['pio_position'] ?? '', array('left', 'right'), 'right');
 		$output['auto_publishable_ai_diaries'] = !empty($input['auto_publishable_ai_diaries']);
+		$output['reviewed_article_publish'] = !empty($input['reviewed_article_publish']);
+		$output['auto_publishable_ai_articles'] = !empty($input['auto_publishable_ai_articles']);
 		$output['cleanup_on_uninstall'] = !empty($input['cleanup_on_uninstall']);
 		$output['feature_pages'] = array();
 		foreach (array_keys($defaults['feature_pages']) as $page) {
@@ -238,6 +242,10 @@ final class JG_Settings {
 	private static function render_security_card(array $s): void {
 		echo '<section class="jg-settings-card"><h2>内容安全</h2>';
 		self::input('public_site_url', '生产博客地址（HTTPS）', $s['public_site_url'], 'url');
+		self::checkbox('reviewed_article_publish', '审核制文章发布', $s['reviewed_article_publish']);
+		echo '<p class="description">启用后为 AI 角色授予独立的文章受控发布能力，仅允许两阶段发布流程，不授予 WordPress 原生发布权限。</p>';
+		self::checkbox('auto_publishable_ai_articles', 'AI 自建文章自动允许进入受控发布流程', $s['auto_publishable_ai_articles']);
+		echo '<p class="description">自动允许的只是进入两阶段发布流程（preparePublish + 一次性 confirmationToken），不是自动公开发布。</p>';
 		self::checkbox('auto_publishable_ai_diaries', 'AI 自建日记自动允许进入受控发布流程', $s['auto_publishable_ai_diaries']);
 		echo '<p class="description">自动允许的只是进入两阶段发布流程（preparePublish + 一次性 confirmationToken），不是自动公开发布。</p>';
 		self::textarea('trusted_media_hosts', '可信 WordPress 媒体主机（每行一个）', $s['trusted_media_hosts']); self::textarea('embed_hosts', 'iframe/audio/video 白名单（每行一个）', $s['embed_hosts']);

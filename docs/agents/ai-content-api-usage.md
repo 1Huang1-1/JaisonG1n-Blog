@@ -1,10 +1,12 @@
 # AI Content API Usage
 
-## Reviewed publish protocol (Site Manager 0.8.3)
+## Reviewed publish protocol (Site Manager 0.9.0)
 
 Treat `publish` as a two-stage, server-authorized diary-only operation. It is available only when the live diary capabilities include both `preparePublish` and `publish`.
 
 `updateDraft` and reviewed publishing share the same object-level ownership check: the current user must be the AI owner (native author or `_jg_ai_owner_user_id`) with the editable grant, or hold native WordPress `edit_post`. The `_jg_ai_editable` mark alone grants read, not update or publish. A diary created through `POST /content` is authored by and owned by the calling AI user.
+
+`article` uses the same pipeline with its own capability (`jg_ai_publish_article_drafts`) and settings ("审核制文章发布", "AI 自建文章自动允许进入受控发布流程"). The diary capability never grants article publishing and vice versa. Article updates are limited to `title`, `content`, `excerpt`, and `slug`.
 
 When the server's auto-publishable setting is enabled, a diary created through the AI Content API arrives already marked publishable, so the WeChat flow can continue to `prepare-publish` without a WordPress admin step. The mark only means eligibility for the two-stage flow; publication still requires the confirmation token, unchanged `expectedModifiedAt`, a stable idempotency key, and the exact user confirmation phrase. Never treat an auto-marked draft as published.
 

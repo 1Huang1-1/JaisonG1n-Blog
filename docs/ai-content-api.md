@@ -1,6 +1,6 @@
 # AI Content API
 
-`JaisonG1n Site Manager 0.8.3` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
+`JaisonG1n Site Manager 0.9.0` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
 
 Use a dedicated WordPress user with the `jg_ai_content_editor` role and an Application Password. Clients must first request `GET /capabilities`; the response is the live authority for content types, fields, and operations. It never exposes internal meta keys, confirmation tokens, or site secrets.
 
@@ -10,7 +10,7 @@ Supported content types are `article`, `diary`, `project`, `timeline`, `skill`, 
 
 Create drafts with `POST /content` and an `Idempotency-Key` header. Read with `GET /content` or `GET /content/{contentType}/{id}`. `modifiedAt` is an ISO 8601 UTC string or `null` for an invalid WordPress zero date.
 
-Only diary drafts expose `updateDraft`. Send `PATCH /content/diary/{id}` with the exact `expectedModifiedAt` from the latest read and at least one changed `title`, `content`, `excerpt`, or `slug` field. The endpoint never changes status, ownership, dates, permissions, or internal metadata.
+`diary` and `article` drafts expose `updateDraft`. Send `PATCH /content/{type}/{id}` with the exact `expectedModifiedAt` from the latest read and at least one changed `title`, `content`, `excerpt`, or `slug` field. The endpoint never changes status, ownership, dates, permissions, or internal metadata; categories, tags, and featured images remain outside the update contract until the media version.
 
 ## Diary Ownership And Object Authorization
 
@@ -19,6 +19,12 @@ Only diary drafts expose `updateDraft`. Send `PATCH /content/diary/{id}` with th
 Creating a diary through `POST /content` always writes `post_author = get_current_user_id()`, `_jg_ai_owner_user_id = get_current_user_id()`, `_jg_ai_created = true`, and `_jg_ai_editable = true`. Read access requires being the native author, the AI owner, or an explicitly editable grant. The editable grant alone grants read, not write or publish; publishing additionally requires AI ownership, the reviewed-publish capability, and the per-content publishable mark.
 
 When the "AI 自建日记自动允许进入受控发布流程" setting (content security) is enabled, a diary draft created through the AI Content API is automatically marked `_jg_ai_publishable = true` only if all of the following hold at creation time: the content type is `diary`, the draft status is `draft`, reviewed diary publishing is enabled, the current user holds `jg_ai_publish_diary_drafts`, and both `post_author` and `_jg_ai_owner_user_id` equal the current user. This only admits the draft to the two-stage prepare/publish flow; it never publishes automatically, and the one-time confirmation token, `expectedModifiedAt`, and idempotency checks still apply. Manually created, imported, other-author, or non-diary content is never auto-marked and still requires the administrator's per-content publishable grant.
+
+## Reviewed Article Publishing
+
+Articles reuse the diary two-stage pipeline with a separate capability. An administrator enables "审核制文章发布" (content security), which grants only `jg_ai_publish_article_drafts` to the AI role and never native WordPress publishing. With "AI 自建文章自动允许进入受控发布流程" also enabled, an article created through the AI Content API is automatically marked publishable when it is a draft, the current user is both the post author and the AI owner, reviewed article publishing is on, and the user holds the article capability. Automatic eligibility only admits the draft to prepare/publish; it never publishes automatically.
+
+`prepare-publish` and `publish` behave identically to diary: a one-time ten-minute token bound to the user, article ID, content version, and publish action; `expectedModifiedAt`; a stable idempotency key; draft-only status; and one debounced build pending on success. The article canonical public URL is `https://jaisong1n.com/posts/{slug}/`, returned by the deployment status endpoint separately from the CMS edit URL.
 
 ## Reviewed Diary Publishing
 

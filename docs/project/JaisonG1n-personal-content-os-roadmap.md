@@ -277,15 +277,20 @@ WordPress：已发布
 
 服务端支撑已由 Site Manager 0.8.2 提供：`GET /content/{type}/{id}/deployment-status` 返回五层状态与 canonical 公开地址；客户端只读该接口，不得自行猜测 URL 或把 dispatch accepted 当作构建成功。
 
-### Site Manager 0.9.0：文章 article 完整工作流
+### Site Manager 0.9.0：文章 article 完整工作流（服务端已实现）
 
-为 `article` 增加：
+服务端已为 `article` 提供：
 
 ```text
+createDraft
+read
+deploymentStatus
 updateDraft
 preparePublish
 publish
 ```
+
+文章复用 diary 的受控发布管道，但使用独立的 `jg_ai_publish_article_drafts` capability 与“审核制文章发布”“AI 自建文章自动允许进入受控发布流程”设置（默认关闭）；文章更新白名单为 title/content/excerpt/slug。分类、标签与特色图写入保留到媒体版本，未在本版本实现。
 
 文章与日记应使用不同的内容模板和规则。
 

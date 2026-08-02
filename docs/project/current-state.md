@@ -1,5 +1,15 @@
 # Current project state
 
+## 2026-08-02 Site Manager 0.9.0 article 受控发布（本地实现）
+
+- 插件代码版本为 `0.9.0`，公开快照 `schemaVersion` 继续为 `5`。
+- article 新增 `updateDraft`（title/content/excerpt/slug 白名单、draft 限定、expectedModifiedAt 并发、no-op 拒绝、非 owner 404、审计只记字段名）。
+- article 新增受控发布：独立 capability `jg_ai_publish_article_drafts`，内容安全新增“审核制文章发布”与“AI 自建文章自动允许进入受控发布流程”（默认关闭）；不授予原生 publish_posts/edit_others。
+- prepare/publish/token/幂等/部署状态参数化为内容类型；token 绑定 contentType/ID/modifiedAt/action；发布只产生一次构建 pending；diary 与 article 权限互相独立。
+- 自动 publishable 条件：AI API 创建、draft、作者与 AI owner 均为当前用户、article 受控能力与开关开启；后台人工/导入/其他作者/仅 editable 不自动标记。
+- 本地测试：AI Content Playground 171 条断言（含 article 更新/权限/token/幂等/自动资格）、部署状态 97 条断言（含 article canonical URL 与记录关联）、smoke、0.8.3→0.9.0 升级（默认关闭、不扩大权限）、`pnpm test` 全通过、`pnpm check` 320 文件零问题。
+- 本版本为本地实现与本地测试结果；尚未安装到真实 WordPress，未执行生产验收。生产实时版本仍为 `0.8.3`。
+
 ## 2026-08-02 Site Manager 0.8.3 自动受控发布资格（生产已验收）
 
 - 插件代码版本为 `0.8.3`，公开快照 `schemaVersion` 继续为 `5`。
@@ -45,7 +55,7 @@
 ## 基本信息
 
 - 项目名称：JaisonG1n-Blog
-- 当前插件版本：JaisonG1n Site Manager `0.8.3`（生产已验收）
+- 当前插件版本：JaisonG1n Site Manager `0.9.0`（本地实现；生产实时版本为 `0.8.3`，未安装 0.9.0）
 - 当前快照 schemaVersion：`5`
 - 主分支：`master`（`origin/HEAD` 指向 `origin/master`）
 - 当前工作分支：`codex/ai-content-api-0-7`

@@ -2,7 +2,7 @@
 
 ## Reviewed diary publishing
 
-Site Manager 0.8.3 requires a two-stage server flow for AI diary publishing. A direct status update is prohibited. The Agent must first obtain a short-lived confirmation token from `prepare-publish`, then submit that token with the unchanged `expectedModifiedAt` and a stable idempotency key to `publish`.
+Site Manager 0.9.0 requires a two-stage server flow for AI diary and article publishing. A direct status update is prohibited. The Agent must first obtain a short-lived confirmation token from `prepare-publish`, then submit that token with the unchanged `expectedModifiedAt` and a stable idempotency key to `publish`.
 
 The preparation step is not publication and must not be described as success. A content change after preparation invalidates the confirmation and requires a new read, a new user confirmation, and a new token. The Agent must not expose or retain confirmation tokens, must not attempt unpublishing, and must not invoke GitHub deployment APIs directly.
 
@@ -11,6 +11,8 @@ Draft updates and reviewed publishing share one object-level authorization: AI o
 Publish confirmation must be followed by a deployment status read, not by an assumption that the front-end is live. `dispatchStatus=accepted` does not mean the build succeeded, GitHub build success does not mean Cloudflare has deployed, and a reachable public page does not prove the newest content is served. Only the deployment status endpoint's positive `deploymentStatus` and `pageStatus` signals may be reported as front-end availability.
 
 An auto-publishable mark on an AI-created diary draft only admits it to the two-stage flow. It is not publication, does not trigger a build, and never applies to manually created, imported, or other-author content.
+
+Article publication uses the same two-stage rules with the separate `jg_ai_publish_article_drafts` capability; an auto-publishable article mark is eligibility only, never automatic publication.
 
 本政策适用于 Codex、OpenClaw 和任何未来 Blog Agent。
 
