@@ -16,6 +16,16 @@ Explicit user requirements take precedence over default writing style. They do n
 
 ## Cross-session project records
 
+## 长期产品方向
+
+涉及 AI Content API、WordPress Site Manager、内容发布、媒体、配图、
+OpenClaw 集成或内容自动化的任务开始前，先阅读：
+
+- `docs/project/JaisonG1n-personal-content-os-roadmap.md`
+
+该文档描述长期产品愿景、安全边界和建议版本路线，不代表一次性实现全部功能。
+每次只完成用户当前明确授权的版本范围，不得因路线图内容擅自扩大任务。
+
 1. 开始实际开发任务前，读取：
    - `docs/project/current-state.md`
    - `docs/project/decisions.md`
