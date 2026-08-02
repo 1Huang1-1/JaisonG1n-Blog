@@ -477,9 +477,9 @@ test("central media limits match the production contract", () => {
 			files: 1000,
 			total: 250 * 1024 * 1024,
 			redirects: 3,
-			connect: 10_000,
-			headers: 15_000,
-			body: 30_000,
+			connect: 20_000,
+			headers: 20_000,
+			body: 45_000,
 		},
 	);
 });

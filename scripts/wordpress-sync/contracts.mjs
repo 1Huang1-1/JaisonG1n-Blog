@@ -13,12 +13,12 @@ export const SYNC_LIMITS = Object.freeze({
 	maxFiles: 1_000,
 	maxTotalBytes: 250 * 1024 * 1024,
 	maxRedirects: 3,
-	connectTimeoutMs: 10_000,
-	headersTimeoutMs: 15_000,
-	bodyTimeoutMs: 30_000,
-	requestTimeoutMs: 30_000,
-	maxRetries: 2,
-	retryDelayMs: 500,
+	connectTimeoutMs: 20_000,
+	headersTimeoutMs: 20_000,
+	bodyTimeoutMs: 45_000,
+	requestTimeoutMs: 45_000,
+	maxRetries: 4,
+	retryDelayMs: 1_000,
 	maxSnapshotBytes: 2 * 1024 * 1024,
 });
 

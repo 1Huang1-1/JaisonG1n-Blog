@@ -68,11 +68,28 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build site
+      - name: Sync WordPress content
+        shell: bash
         env:
           WP_BASE_URL: ${{ vars.WP_BASE_URL || 'https://cms.jaisong1n.com' }}
           WORDPRESS_STRUCTURED_CONTENT_ENABLED: ${{ vars.WORDPRESS_STRUCTURED_CONTENT_ENABLED || 'false' }}
-        run: pnpm build
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if pnpm sync-wordpress; then
+              echo "WordPress sync succeeded on attempt ${attempt}."
+              exit 0
+            fi
+            echo "WordPress sync failed on attempt ${attempt}; retrying in 10 seconds."
+            sleep 10
+          done
+          echo "WordPress sync failed after 3 attempts. Check CMS connectivity and retry the run."
+          exit 1
+
+      - name: Build site
+        env:
+          WORDPRESS_STRUCTURED_CONTENT_ENABLED: ${{ vars.WORDPRESS_STRUCTURED_CONTENT_ENABLED || 'false' }}
+        run: pnpm astro build && pnpm pagefind --site dist
 
       - name: Verify build output
         run: test -f dist/index.html
