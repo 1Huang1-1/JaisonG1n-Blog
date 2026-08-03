@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.10.1
+Stable tag: 0.11.0
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -24,6 +24,12 @@ The plugin accepts a fine-grained GitHub token with Actions Read and write for t
 Deactivation retains all data. Normal uninstall removes plugin-added role capabilities but retains content and settings. Destructive data cleanup runs only when an administrator explicitly enables it before uninstalling.
 
 == Changelog ==
+
+= 0.11.0 =
+
+* Adds privacy-safe public view counting for published article and diary detail pages through `POST /wp-json/jg-public/v1/content/{type}/{id}/view`.
+* Stores aggregated counts in dedicated `jg_content_stats`/`jg_view_events` tables with atomic increments, SHA-256 event hashes bound to content type, content id, and event id, bounded rate limiting, bot user-agent filtering, and CORS restricted to the production site and explicit dev origins.
+* View recording never modifies `wp_posts`, never calls `wp_update_post`, and never enters the content change or dispatch/build pipeline.
 
 = 0.10.1 =
 

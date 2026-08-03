@@ -16,6 +16,7 @@ import {
 	PostMeta,
 	PostNavigation,
 } from "@components/features/posts";
+import ContentViewCount from "@components/features/content/ContentViewCount.astro";
 import License from "@components/misc/License.astro";
 import Markdown from "@components/misc/Markdown.astro";
 import I18nKey from "@i18n/i18nKey";
@@ -74,6 +75,7 @@ export async function getStaticPaths() {
 }
 
 const { entry } = Astro.props;
+const routeSlug = Astro.params.permalink ?? entry.id;
 const { Content, headings } = await render(entry);
 
 const { remarkPluginFrontmatter } = await render(entry);
@@ -173,17 +175,24 @@ const jsonLd = {
 
 			<!-- title -->
 			<div class="relative onload-animation">
-				<div
-					data-pagefind-body
-					data-pagefind-weight="10"
-					data-pagefind-meta="title"
-					class="transition w-full block font-bold mb-3
-                    text-3xl md:text-[2.25rem]/[2.75rem]
-                    text-black/90 dark:text-white/90
-                    md:before:w-1 before:h-5 before:rounded-md before:bg-(--primary)
-                    before:absolute before:top-3 before:-left-4.5"
-				>
-					{entry.data.title}
+				<div class="flex items-start justify-between gap-3">
+					<div
+						data-pagefind-body
+						data-pagefind-weight="10"
+						data-pagefind-meta="title"
+						class="transition min-w-0 flex-1 block font-bold mb-3
+						text-3xl md:text-[2.25rem]/[2.75rem]
+						text-black/90 dark:text-white/90
+						md:before:w-1 before:h-5 before:rounded-md before:bg-(--primary)
+						before:absolute before:top-3 before:-left-4.5"
+					>
+						{entry.data.title}
+					</div>
+					<ContentViewCount
+						contentType="article"
+						contentId={routeSlug}
+						variant="title"
+					/>
 				</div>
 			</div>
 
@@ -196,7 +205,14 @@ const jsonLd = {
 					tags={entry.data.tags}
 					category={entry.data.category || undefined}
 					id={entry.id}
-				/>
+				>
+					<ContentViewCount
+						slot="extraMeta"
+						contentType="article"
+						contentId={routeSlug}
+						variant="meta"
+					/>
+				</PostMeta>
 				{
 					(!entry.data.image ||
 						(entry.data.image &&

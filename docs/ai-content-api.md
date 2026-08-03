@@ -1,10 +1,14 @@
 # AI Content API
 
-`JaisonG1n Site Manager 0.10.1` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
+`JaisonG1n Site Manager 0.11.0` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
 
 Use a dedicated WordPress user with the `jg_ai_content_editor` role and an Application Password. Clients must first request `GET /capabilities`; the response is the live authority for content types, fields, and operations. It never exposes internal meta keys, confirmation tokens, or site secrets.
 
 Supported content types are `article`, `diary`, `project`, `timeline`, `skill`, `aiTool`, `friend`, `announcement`, `techRadar`, and `learningResource`. `page` and `album` are rejected. There are no delete endpoints or album write operations.
+
+Public visitor view counting is intentionally separate from this authenticated
+API; see [docs/content-views-api.md](./content-views-api.md) for
+`POST /wp-json/jg-public/v1/content/{type}/{id}/view`.
 
 ## Draft Operations
 

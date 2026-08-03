@@ -2,6 +2,7 @@
 import path from "node:path";
 import { Icon } from "astro-icon/components";
 import { ShareCard } from "@components/features/posts";
+import ContentViewCount from "@components/features/content/ContentViewCount.astro";
 import StructuredHtmlContent from "../../components/misc/StructuredHtmlContent.astro";
 import { profileConfig, shareConfig, siteConfig } from "../../config";
 import type { DiaryImage, DiaryItem } from "../../data/diary";
@@ -98,11 +99,18 @@ if (profileConfig.avatar) {
 	cover={getImageUrl(item.coverImage) || undefined}
 	coverAlt={item.coverImage?.alt || displayTitle}
 >
+	<ContentViewCount
+		slot="viewCount"
+		contentType="diary"
+		contentId={item.id}
+		variant="title"
+	/>
 	<div slot="meta" class="flex flex-wrap items-center gap-3 text-sm text-black/65 dark:text-white/65">
 		<span class="inline-flex items-center gap-1.5"><Icon name="material-symbols:calendar-month" class="h-4 w-4 text-(--primary)" /><time datetime={item.date}>{dateLabel}</time></span>
 		{moodLabel && <span class="inline-flex items-center gap-1.5"><Icon name="material-symbols:sentiment-satisfied" class="h-4 w-4 text-(--primary)" />{moodLabel}</span>}
 		{item.location && <span class="inline-flex items-center gap-1.5"><Icon name="material-symbols:location-on" class="h-4 w-4 text-(--primary)" />{item.location}</span>}
 		{item.tags.length > 0 && <span class="flex flex-wrap items-center gap-2"><Icon name="material-symbols:tag" class="h-4 w-4 text-(--primary)" />{item.tags.map((tag) => <span class="rounded-md bg-(--btn-regular-bg) px-2.5 py-1">{tag}</span>)}</span>}
+		<ContentViewCount contentType="diary" contentId={item.id} variant="meta" />
 	</div>
 
 	{prepared.html ? <StructuredHtmlContent html={prepared.html} /> : <p class="text-black/55 dark:text-white/55">{item.description}</p>}

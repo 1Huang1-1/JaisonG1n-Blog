@@ -38,7 +38,6 @@ const {
 	tags,
 	hideUpdateDate,
 	hideTagsForMobile,
-	isHome,
 	className = "",
 	id,
 	showOnlyBasicMeta = false,
@@ -93,61 +92,9 @@ const {
         </div>
     )}
     
-    {!isHome && id && (
-        <div class="flex items-center umami-page-views hidden" data-id={id}>
-            <div class="meta-icon">
-                <Icon name="material-symbols:visibility-outline-rounded" class="text-xl"></Icon>
-            </div>
-            <span class="text-50 text-sm font-medium page-views-display">{i18n(I18nKey.pageViewsLoading)}</span>
-        </div>
-    )}
+    <slot name="extraMeta" />
 
     {showEncrypted && (
         <EncryptedBadge />
     )}
 </div>
-
-<script is:inline define:vars={{
-    pageViewsText: i18n(I18nKey.profileStatsPageViews),
-    visitsText: i18n(I18nKey.profileStatsVisits)
-}}>
-    function generateStatsText(pageViews, visits) {
-        return `${pageViewsText} ${pageViews} · ${visitsText} ${visits}`;
-    }
-
-    async function fetchPageViews() {
-        const container = document.querySelector('.umami-page-views');
-        if (!container) return;
-
-        if (!window.oddmisc) {
-            container.classList.add('hidden');
-            return;
-        }
-
-        const id = container.dataset.id;
-        if (!id) {return;}
-
-        try {
-            const stats = await window.oddmisc.getStats(`/posts/${id}/`);
-            const pageViews = stats.pageviews || 0;
-            const visits = stats.visits || 0;
-
-            if (pageViews === 0 && visits === 0) {
-                container.classList.add('hidden');
-                return;
-            }
-
-            container.classList.remove('hidden');
-            container.querySelector('.page-views-display').textContent = generateStatsText(pageViews, visits);
-        } catch (error) {
-            console.error('Error fetching page views:', error);
-            container.classList.add('hidden');
-        }
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', fetchPageViews);
-    } else {
-        fetchPageViews();
-    }
-</script>

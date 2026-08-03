@@ -1,0 +1,68 @@
+---
+import { Icon } from "astro-icon/components";
+
+const VIEW_API_BASE = "https://cms.jaisong1n.com/wp-json/jg-public/v1/content";
+
+interface Props {
+	contentType: "article" | "diary";
+	contentId: string | number;
+	variant?: "title" | "meta";
+	locale?: string;
+	label?: string;
+}
+
+const {
+	contentType,
+	contentId,
+	variant = "title",
+	locale = "zh-CN",
+	label = " 次浏览",
+} = Astro.props;
+
+const endpoint = `${VIEW_API_BASE}/${contentType}/${encodeURIComponent(
+	String(contentId),
+)}/view`;
+---
+
+<span
+	data-content-view
+	data-content-type={contentType}
+	data-content-id={String(contentId)}
+	data-endpoint={endpoint}
+	data-label={label}
+	data-locale={locale}
+	title="—"
+	class:list={[
+		"inline-flex items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400 whitespace-nowrap",
+		variant === "title"
+			? "hidden md:inline-flex shrink-0"
+			: "md:hidden",
+	]}
+>
+	<Icon
+		name="material-symbols:visibility-outline-rounded"
+		class="h-4 w-4"
+		aria-hidden="true"
+	/>
+	<span class="content-view-count tabular-nums min-w-7 text-right">—</span>
+</span>
+
+<script>
+	import { initViewCountMount } from "../../../utils/content-view-count";
+
+	function mountViewCounts() {
+		document.querySelectorAll<HTMLElement>("[data-content-view]").forEach((root) => {
+			initViewCountMount(
+				root,
+				root.dataset.contentType ?? "",
+				root.dataset.contentId ?? "",
+				root.dataset.endpoint ?? "",
+				root.dataset.label ?? "",
+				root.dataset.locale ?? "zh-CN",
+			);
+		});
+	}
+
+	document.addEventListener("astro:page-load", mountViewCounts);
+	mountViewCounts();
+</script>

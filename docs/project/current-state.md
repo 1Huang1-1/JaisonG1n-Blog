@@ -1,5 +1,15 @@
 # Current project state
 
+## 2026-08-03 Site Manager 0.11.0 内容浏览量（本地实现）
+
+- 插件代码版本为 `0.11.0`，公开快照 `schemaVersion` 继续为 `5`。
+- 新增公开只写接口 `POST /wp-json/jg-public/v1/content/{contentType}/{id}/view`（仅 article/diary 且 status=publish）：请求体 `eventId` 必须为 UUID，相同 eventId 不重复计数；浏览量只写入独立统计表，不修改 `wp_posts`、不进入 dispatch/构建链路。
+- 统计结构：`jg_content_stats`（content_type/content_id/view_count/updated_at，联合主键）与 `jg_view_events`（event_hash 主键；SHA-256 绑定 contentType:contentId:eventId；TTL 30 天；1% 概率清理）。计数使用 `INSERT IGNORE` + `ON DUPLICATE KEY UPDATE` 原子自增。
+- 防刷与隐私：不保存 eventId 明文与原始 IP；按 IP 哈希 60 次/分钟限流；明显机器人 UA 不计数；CORS 仅允许 `https://jaisong1n.com`、`https://www.jaisong1n.com` 与 `http://localhost:4321`、`http://localhost:3000`；请求体 ≤1KB。
+- 前端：article（`/posts/{slug}/` 与自定义 permalink 页）和 diary 详情页在标题右侧显示浏览量（桌面）/元信息行（移动端）；通过 history.state + `crypto.randomUUID()` 生成事件 ID，刷新/后退/前进复用同一事件，离开详情页后重新进入生成新事件；页面可见满 1 秒才提交；请求失败仅显示占位不影响正文；移除旧 Umami 页面浏览量展示块（Umami 分析采集保留）。
+- 本地测试：content-stats Playground 45 断言（首次 +1、同 eventId 去重、跨内容同 eventId 隔离、数字/ASCII slug/编码与解码 CJK slug 解析、草稿与缺失拒绝、bot 不计数、限流 429、并发原子性、CORS/OPTIONS、modifiedAt 不变、无 dispatch）；AI Content Playground 222 断言、deployment-status 108 断言、smoke、0.10.1→0.11.0 升级（新建两表）、`pnpm test` 73 项全通过、`pnpm check` 322 文件 0 错误。
+- 本版本为本地实现与本地测试结果；尚未安装到真实 WordPress，未执行生产验收。生产实时版本仍为 `0.10.1`。
+
 ## 2026-08-03 Site Manager 0.10.1 合并批次 dispatch 关联修复（本地实现）
 
 - 插件代码版本为 `0.10.1`，公开快照 `schemaVersion` 继续为 `5`。
@@ -74,7 +84,7 @@
 ## 基本信息
 
 - 项目名称：JaisonG1n-Blog
-- 当前插件版本：JaisonG1n Site Manager `0.10.1`（本地实现；生产实时版本为 `0.10.0`，未安装 0.10.1）
+- 当前插件版本：JaisonG1n Site Manager `0.11.0`（本地实现；生产实时版本为 `0.10.1`，未安装 0.11.0）
 - 当前快照 schemaVersion：`5`
 - 主分支：`master`（`origin/HEAD` 指向 `origin/master`）
 - 当前工作分支：`codex/ai-content-api-0-7`

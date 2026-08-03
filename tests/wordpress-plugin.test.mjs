@@ -101,15 +101,15 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.10.1 preserves schemaVersion 5 and deterministic ordering", async () => {
+test("version 0.11.0 preserves schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.10\.1/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.10\.1'/);
-	assert.match(readme, /Stable tag:\s*0\.10\.1/);
+	assert.match(entry, /Version:\s*0\.11\.0/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.11\.0'/);
+	assert.match(readme, /Stable tag:\s*0\.11\.0/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
@@ -523,6 +523,33 @@ test("plugin packaging fixes the basename and normalizes ZIP paths", async () =>
 	);
 	assert.match(packageJson, /package:wordpress-plugin/);
 	assert.match(packageJson, /verify:wordpress-plugin-package/);
-	assert.match(packageJson, /jaisong1n-site-manager-0\.10\.1\.zip/);
+	assert.match(packageJson, /jaisong1n-site-manager-0\.11\.0\.zip/);
 	assert.match(packageJson, /test:wordpress-upgrade/);
+});
+
+test("public content stats route is privacy-safe and isolated from dispatch", async () => {
+	const [source, entry] = await Promise.all([
+		readFile(
+			path.join(pluginRoot, "includes/class-jg-content-stats.php"),
+			"utf8",
+		),
+		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
+	]);
+	assert.match(source, /register_rest_route\('jg-public\/v1'/);
+	assert.match(
+		source,
+		/\/content\/\(\?P<contentType>\[a-z\]\+\)\/\(\?P<id>\[\^\/\]\+\)\/view/,
+	);
+	assert.match(source, /jg_content_stats/);
+	assert.match(source, /jg_view_events/);
+	assert.match(source, /event_hash char\(64\)/);
+	assert.match(
+		source,
+		/hash\('sha256', \$content_type \. ':' \. \$post_id \. ':' \. \$event_id\)/,
+	);
+	assert.match(source, /ON DUPLICATE KEY UPDATE view_count = view_count \+ 1/);
+	assert.match(source, /INSERT IGNORE INTO/);
+	assert.match(entry, /JG_Content_Stats::init/);
+	assert.doesNotMatch(source, /wp_update_post\s*\(/);
+	assert.doesNotMatch(source, /jg_dispatch_pending/);
 });

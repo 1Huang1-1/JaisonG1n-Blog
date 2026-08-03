@@ -60,13 +60,14 @@ $active_after = get_option('active_plugins', array());
 jg_upgrade_assert($active_after === $active_before, 'active_plugins changed during same-directory replacement.');
 jg_upgrade_assert(is_readable($main_file), 'Replacement main plugin file is not readable.');
 $replacement_validation = validate_plugin($basename);
-jg_upgrade_assert($replacement_validation === 0, '0.10.1 validate_plugin failed: ' . wp_json_encode($replacement_validation));
+jg_upgrade_assert($replacement_validation === 0, '0.11.0 validate_plugin failed: ' . wp_json_encode($replacement_validation));
 
 require $main_file;
-jg_upgrade_assert(defined('JG_SITE_MANAGER_VERSION') && JG_SITE_MANAGER_VERSION === '0.10.1', '0.10.1 plugin did not load.');
+jg_upgrade_assert(defined('JG_SITE_MANAGER_VERSION') && JG_SITE_MANAGER_VERSION === '0.11.0', '0.11.0 plugin did not load.');
 JG_Site_Manager::init();
 JG_Content_Types::register();
 JG_AI_Content::install();
+JG_Content_Stats::install();
 JG_REST::register_routes();
 do_action('rest_api_init');
 jg_upgrade_assert(get_role('jg_ai_content_editor') !== null, 'AI content editor role was not registered during upgrade.');
@@ -120,6 +121,13 @@ $snapshot_response = rest_do_request(new WP_REST_Request('GET', '/jaisong1n/v1/s
 $snapshot = $snapshot_response->get_data();
 jg_upgrade_assert($snapshot_response->get_status() === 200, 'Snapshot failed after upgrade: ' . wp_json_encode($snapshot));
 jg_upgrade_assert(($snapshot['schemaVersion'] ?? null) === 5, 'schemaVersion is not v5 after upgrade.');
+global $wpdb;
+$stats_table = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->prefix . 'jg_content_stats'));
+jg_upgrade_assert($stats_table === $wpdb->prefix . 'jg_content_stats', 'jg_content_stats table was not created during upgrade.');
+$events_table = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->prefix . 'jg_view_events'));
+jg_upgrade_assert($events_table === $wpdb->prefix . 'jg_view_events', 'jg_view_events table was not created during upgrade.');
+$event_key = $wpdb->get_row("SHOW INDEX FROM {$wpdb->prefix}jg_view_events WHERE Key_name = 'PRIMARY'");
+jg_upgrade_assert($event_key !== null, 'jg_view_events event_hash primary key is missing.');
 
 echo wp_json_encode(array(
 	'ok' => true,

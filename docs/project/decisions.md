@@ -1,5 +1,27 @@
 # 重要技术决策
 
+## 2026-08-03：浏览量采用独立统计表与内容绑定事件哈希（Site Manager 0.11.0）
+
+### 问题
+
+详情页需要展示浏览量，但不得修改文章 `modifiedAt`、不得进入 dispatch/构建链路，同时要防重复、防刷并保护访问者隐私。
+
+### 最终选择
+
+- 建立与 AI Content API 分离的公开命名空间 `jg-public/v1` 的只写接口 `POST /content/{type}/{id}/view`；仅 article/diary 且 `status=publish` 可计数，草稿/私密/不存在内容返回 404。
+- 独立表 `jg_content_stats` 与 `jg_view_events`；eventId 只存 SHA-256 哈希且绑定 `contentType:postId:eventId`（同一 eventId 跨内容可各自计数）；`INSERT IGNORE` + `ON DUPLICATE KEY UPDATE` 保证原子自增与去重。
+- 前端用 history.state + `crypto.randomUUID()` 表示一次真实详情页访问：刷新/后退/前进复用同一事件，离开后重新进入生成新事件；页面可见满 1 秒才提交。
+- 不保存原始 IP（限流使用 IP 哈希的短时 transient）、明显机器人 UA 不计数、CORS 白名单、请求体 ≤1KB。
+- 视图写入不调用 `wp_update_post`、不写 `wp_posts`、不触发任何 dispatch/构建；卸载遵循现有策略不删除统计数据。
+
+### 放弃或暂缓的方案
+
+- 不把浏览量并入 AI Content API；不使用“整个 session 只统计一次”的方案；不保存明文 eventId 或 IP；不新增泛型热门内容接口。
+
+### 影响
+
+schemaVersion 保持 5；0.10.1→0.11.0 升级自动创建两张统计表；前端移除旧 Umami 页面浏览量展示块（Umami 分析采集保留），article/diary 详情页新增桌面标题右侧、移动端元信息行的浏览量显示。
+
 ## 2026-08-03：已发布内容原地修改采用两阶段并保护不可变字段（Site Manager 0.10.0）
 
 ### 问题

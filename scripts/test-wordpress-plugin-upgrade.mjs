@@ -22,7 +22,7 @@ const REPLACEMENT_ZIP = path.join(
 	REPOSITORY_ROOT,
 	"wordpress-plugin",
 	"dist",
-	`${PLUGIN_SLUG}-0.10.1.zip`,
+	`${PLUGIN_SLUG}-0.11.0.zip`,
 );
 
 const baselinePlugin = `<?php

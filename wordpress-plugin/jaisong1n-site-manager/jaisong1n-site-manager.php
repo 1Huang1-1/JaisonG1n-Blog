@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JaisonG1n Site Manager
  * Description: JaisonG1n 博客的内容、安全配置、公开快照与构建通知管理插件。
- * Version: 0.10.1
+ * Version: 0.11.0
  * Author: JaisonG1n
  * Requires at least: 6.5
  * Requires PHP: 8.1
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
-define('JG_SITE_MANAGER_VERSION', '0.10.1');
+define('JG_SITE_MANAGER_VERSION', '0.11.0');
 define('JG_SITE_MANAGER_FILE', __FILE__);
 define('JG_SITE_MANAGER_DIR', plugin_dir_path(__FILE__));
 define('JG_SITE_MANAGER_URL', plugin_dir_url(__FILE__));
@@ -25,6 +25,7 @@ require_once JG_SITE_MANAGER_DIR . 'includes/class-jg-snapshot.php';
 require_once JG_SITE_MANAGER_DIR . 'includes/class-jg-rest.php';
 require_once JG_SITE_MANAGER_DIR . 'includes/class-jg-ai-content.php';
 require_once JG_SITE_MANAGER_DIR . 'includes/class-jg-media-index.php';
+require_once JG_SITE_MANAGER_DIR . 'includes/class-jg-content-stats.php';
 require_once JG_SITE_MANAGER_DIR . 'includes/class-jg-dispatch.php';
 
 final class JG_Site_Manager {
@@ -34,6 +35,7 @@ final class JG_Site_Manager {
 		JG_REST::init();
 		JG_AI_Content::init();
 		JG_Media_Index::init();
+		JG_Content_Stats::init();
 		JG_Dispatch::init();
 	}
 
@@ -43,6 +45,7 @@ final class JG_Site_Manager {
 		JG_Settings::install_defaults();
 		JG_AI_Content::install();
 		JG_Media_Index::install();
+		JG_Content_Stats::install();
 		JG_Dispatch::activate();
 		flush_rewrite_rules();
 	}
