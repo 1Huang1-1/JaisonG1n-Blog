@@ -5,8 +5,22 @@
   <link href="https://jaisong1n.com/" rel="alternate" type="text/html"/>
   <link href="https://jaisong1n.com/atom.xml" rel="self" type="application/atom+xml"/>
   <id>https://jaisong1n.com/</id>
-  <updated>2026-08-03T03:59:33.728Z</updated>
+  <updated>2026-08-03T04:11:40.743Z</updated>
   <language>zh_CN</language>
+  <entry>
+    <title>OpenClaw ????????</title>
+    <link href="https://jaisong1n.com/posts/openclaw-inplace-acceptance-article-2026-08-03/" rel="alternate" type="text/html"/>
+    <id>https://jaisong1n.com/posts/openclaw-inplace-acceptance-article-2026-08-03/</id>
+    <published>2026-08-03T04:11:02.000Z</published>
+    <updated>2026-08-03T04:11:02.000Z</updated>
+    <summary>OpenClaw 0.5.1 ????</summary>
+    <content type="html"><![CDATA[<p>OpenClaw 0.5.1 ??????</p>
+]]></content>
+    <author>
+      <name>JaisonG1n</name>
+    </author>
+    <category term="Uncategorized"></category>
+  </entry>
   <entry>
     <title>0.10.0 ??????????????</title>
     <link href="https://jaisong1n.com/posts/ai-acceptance-article-2026-08-03/" rel="alternate" type="text/html"/>
