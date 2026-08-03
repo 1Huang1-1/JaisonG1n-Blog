@@ -5,16 +5,17 @@
   <link href="https://jaisong1n.com/" rel="alternate" type="text/html"/>
   <link href="https://jaisong1n.com/atom.xml" rel="self" type="application/atom+xml"/>
   <id>https://jaisong1n.com/</id>
-  <updated>2026-08-03T04:11:40.743Z</updated>
+  <updated>2026-08-03T04:16:50.161Z</updated>
   <language>zh_CN</language>
   <entry>
-    <title>OpenClaw ????????</title>
+    <title>OpenClaw 原地修改验收文章（字节级核验 ✅）·CLAUDE 修订 v1</title>
     <link href="https://jaisong1n.com/posts/openclaw-inplace-acceptance-article-2026-08-03/" rel="alternate" type="text/html"/>
     <id>https://jaisong1n.com/posts/openclaw-inplace-acceptance-article-2026-08-03/</id>
     <published>2026-08-03T04:11:02.000Z</published>
-    <updated>2026-08-03T04:11:02.000Z</updated>
+    <updated>2026-08-03T04:15:45.000Z</updated>
     <summary>OpenClaw 0.5.1 ????</summary>
-    <content type="html"><![CDATA[<p>OpenClaw 0.5.1 ??????</p>
+    <content type="html"><![CDATA[<p>OpenClaw 0.5.1 原地修改验收文章正文（CLAUDE-ARTICLE-116）。</p>
+<p>受保护字段核验：slug、发布时间、作者与 ownership 保持不变。</p>
 ]]></content>
     <author>
       <name>JaisonG1n</name>
