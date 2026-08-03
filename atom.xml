@@ -5,75 +5,8 @@
   <link href="https://jaisong1n.com/" rel="alternate" type="text/html"/>
   <link href="https://jaisong1n.com/atom.xml" rel="self" type="application/atom+xml"/>
   <id>https://jaisong1n.com/</id>
-  <updated>2026-08-03T06:55:49.587Z</updated>
+  <updated>2026-08-03T07:03:56.068Z</updated>
   <language>zh_CN</language>
-  <entry>
-    <title>OpenClaw 原地修改验收文章（字节级核验 ✅）·CLAUDE 修订 v1</title>
-    <link href="https://jaisong1n.com/posts/openclaw-inplace-acceptance-article-2026-08-03/" rel="alternate" type="text/html"/>
-    <id>https://jaisong1n.com/posts/openclaw-inplace-acceptance-article-2026-08-03/</id>
-    <published>2026-08-03T04:11:02.000Z</published>
-    <updated>2026-08-03T04:15:45.000Z</updated>
-    <summary>OpenClaw 0.5.1 ????</summary>
-    <content type="html"><![CDATA[<p>OpenClaw 0.5.1 原地修改验收文章正文（CLAUDE-ARTICLE-116）。</p>
-<p>受保护字段核验：slug、发布时间、作者与 ownership 保持不变。</p>
-]]></content>
-    <author>
-      <name>JaisonG1n</name>
-    </author>
-    <category term="Uncategorized"></category>
-  </entry>
-  <entry>
-    <title>0.10.0 ??????????????</title>
-    <link href="https://jaisong1n.com/posts/ai-acceptance-article-2026-08-03/" rel="alternate" type="text/html"/>
-    <id>https://jaisong1n.com/posts/ai-acceptance-article-2026-08-03/</id>
-    <published>2026-08-03T03:57:36.000Z</published>
-    <updated>2026-08-03T03:58:08.000Z</updated>
-    <summary>??????</summary>
-    <content type="html"><![CDATA[<p>??????????</p>
-]]></content>
-    <author>
-      <name>JaisonG1n</name>
-    </author>
-    <category term="Uncategorized"></category>
-  </entry>
-  <entry>
-    <title>OpenClaw 微信博客助手 0.5.0 文章工作流验收测试（二）</title>
-    <link href="https://jaisong1n.com/posts/openclaw-blog-agent-article-workflow-acceptance-test-1/" rel="alternate" type="text/html"/>
-    <id>https://jaisong1n.com/posts/openclaw-blog-agent-article-workflow-acceptance-test-1/</id>
-    <published>2026-08-02T15:02:54.000Z</published>
-    <updated>2026-08-02T15:02:54.000Z</updated>
-    <summary>记录通过微信端完成文章创建、受控修改、确认发布与部署查询闭环验收测试的过程。当前已完成 article 草稿创建，正在验证 Site Manager 0.9.0 的受控修改流程。</summary>
-    <content type="html"><![CDATA[<h2>背景与目标</h2>
-<p>OpenClaw 博客助手（jaisong1n-blog 技能）在日记工作流之后新增了完整的文章工作流：微信端创建文章草稿、两阶段受控修改、两阶段确认发布、部署状态查询。本次验收的目标是让 article 类型走通「写文章 → 受控修改 → 确认发布 → 部署查询」的完整闭环，并对 Site Manager 0.9.0 的 article 受控发布支持做真实验证。</p>
-<h2>测试环境</h2>
-<ul>
-<li>渠道：OpenClaw 微信直连（openclaw-weixin）</li>
-<li>博客助手技能：jaisong1n-blog 0.5.0（文章工作流按类型分别检查 capabilities）</li>
-<li>Site Manager：AI Content API capabilities 返回 version 0.9.0、schemaVersion 5</li>
-<li>测试内容类型：article</li>
-</ul>
-<h2>能力真实验证：Site Manager 0.9.0 的 article 受控发布</h2>
-<p>2026-08-02 20:57 通过 <code>blog_get_capabilities</code> 读取运行时能力声明，article 类型可用操作：<code>createDraft</code>、<code>read</code>、<code>deploymentStatus</code>、<code>updateDraft</code>、<code>preparePublish</code>、<code>publish</code>。</p>
-<p>对比同日中午（Site Manager 0.8.3）article 仅有 <code>createDraft</code>、<code>read</code>、<code>deploymentStatus</code> 三项，0.9.0 新增了 <code>updateDraft</code>、<code>preparePublish</code>、<code>publish</code>，即受控修改与受控发布已对 article 类型开放。需要说明的是：diary 可发布不代表 article 可发布，本次是按 article 类型单独确认的。</p>
-<h2>闭环测试流程</h2>
-<ol>
-<li>微信端写文章：通过微信对话创建 article 草稿（本文即该步骤的产物）。</li>
-<li>受控修改：<code>blog_prepare_draft_update</code> 生成预览与一次性 proposalId，用户回复确认短语后由 <code>blog_update_draft</code> 执行；proposal 一次性使用、10 分钟过期，并发冲突返回 409。</li>
-<li>确认发布：<code>blog_prepare_publish</code> 生成发布预览与 proposalId，用户发送精确确认短语后由 <code>blog_publish</code> 执行；确认短语在代码层以 <code>===</code> 精确校验。</li>
-<li>部署查询：<code>blog_get_deployment_status</code> 分层报告 WordPress 发布状态、构建触发、GitHub Actions 构建结果、部署状态与前台页面可达性。</li>
-</ol>
-<h2>当前进度</h2>
-<p>本文即通过微信端创建的 article 草稿，属于闭环第 1 步。受控修改、确认发布与部署查询步骤将按计划继续执行，实测结果会在后续更新中如实记录，包括各阶段的状态、耗时与遇到的问题。</p>
-<h2>总结</h2>
-<p>能力层面已确认 Site Manager 0.9.0 对 article 开放了受控修改与受控发布；闭环各步骤的实际执行结果待完成后汇总。本文作为验收测试（一），先记录测试设计、环境与已验证的能力事实。</p>
-<h2>受控修改验收</h2>
-<p>本文已进入 article 两阶段修改验证环节。本次修改用于验证修改预览、精确确认、并发校验和单次写入，尚不代表文章已经公开发布。</p>
-]]></content>
-    <author>
-      <name>JaisonG1n</name>
-    </author>
-    <category term="Uncategorized"></category>
-  </entry>
   <entry>
     <title>从手动发布到自动部署：我的个人博客工作流升级记录</title>
     <link href="https://jaisong1n.com/posts/wordpress-astro-auto-deploy-workflow/" rel="alternate" type="text/html"/>
