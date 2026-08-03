@@ -10,6 +10,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { Agent } from "undici";
 import {
 	buildPostMarkdown,
 	createSafeFilename,
@@ -17,6 +18,12 @@ import {
 	htmlToMarkdown,
 	syncWordPress,
 } from "../scripts/sync-wordpress.mjs";
+import {
+	buildFetchDispatcher,
+	fetchDispatcherConnectOptions,
+	preferIpv4Addresses,
+	resolveHostAddresses,
+} from "../scripts/wordpress-sync/network.mjs";
 import { describeNetworkError } from "../scripts/wordpress-sync/retry.mjs";
 
 function post(overrides = {}) {
@@ -167,6 +174,131 @@ test("preserves the underlying network error code", async () => {
 	const error = new TypeError("fetch failed");
 	error.cause = cause;
 	assert.equal(describeNetworkError(error), "fetch failed (ENETUNREACH)");
+});
+
+test("prefers IPv4 addresses for the WordPress fetch dispatcher", () => {
+	const records = [
+		{ address: "2a02:4780:15:bd7b:2395:aa05:7f3c:89bf", family: 6 },
+		{ address: "179.61.189.222", family: 4 },
+		{ address: "77.37.48.86", family: 4 },
+		{ address: "2a02:4780:16:43cb:9466:575b:f68f:2007", family: 6 },
+	];
+	const ordered = preferIpv4Addresses(records);
+	assert.deepEqual(
+		ordered.map((record) => record.family),
+		[4, 4, 6, 6],
+	);
+	assert.equal(ordered[0].address, "179.61.189.222");
+	assert.equal(ordered[1].address, "77.37.48.86");
+	assert.deepEqual(
+		ordered.slice(2).map((record) => record.address),
+		[
+			"2a02:4780:15:bd7b:2395:aa05:7f3c:89bf",
+			"2a02:4780:16:43cb:9466:575b:f68f:2007",
+		],
+	);
+});
+
+test("resolves the sync host with all records and supports literal addresses", async () => {
+	const resolver = async (hostname, options) => {
+		assert.equal(hostname, "cms.jaisong1n.com");
+		assert.deepEqual(options, { all: true, verbatim: true });
+		return [
+			{ address: "2a02:4780:15:bd7b:2395:aa05:7f3c:89bf", family: 6 },
+			{ address: "77.37.48.86", family: 4 },
+		];
+	};
+	assert.deepEqual(await resolveHostAddresses("cms.jaisong1n.com", resolver), [
+		{ address: "2a02:4780:15:bd7b:2395:aa05:7f3c:89bf", family: 6 },
+		{ address: "77.37.48.86", family: 4 },
+	]);
+	assert.deepEqual(await resolveHostAddresses("1.2.3.4"), [
+		{ address: "1.2.3.4", family: 4 },
+	]);
+	await assert.rejects(
+		resolveHostAddresses("cms.jaisong1n.com", async () => []),
+		/did not resolve/,
+	);
+});
+
+test("the fetch dispatcher pins an IPv4-first lookup with a connect timeout", () => {
+	const url = new URL("https://cms.jaisong1n.com/wp-json/wp/v2/posts");
+	const connect = fetchDispatcherConnectOptions(
+		url,
+		[
+			{ address: "2a02:4780:15:bd7b:2395:aa05:7f3c:89bf", family: 6 },
+			{ address: "77.37.48.86", family: 4 },
+			{ address: "179.61.189.222", family: 4 },
+		],
+		20_000,
+	);
+	assert.equal(connect.timeout, 20_000);
+	assert.equal(connect.servername, "cms.jaisong1n.com");
+	assert.equal(connect.autoSelectFamily, true);
+	let allAddresses;
+	connect.lookup("cms.jaisong1n.com", { all: true }, (error, records) => {
+		allAddresses = { error, records };
+	});
+	assert.equal(allAddresses.error, null);
+	assert.deepEqual(
+		allAddresses.records.map((record) => record.family),
+		[4, 4, 6],
+	);
+	let first;
+	connect.lookup("cms.jaisong1n.com", {}, (error, address, family) => {
+		first = { error, address, family };
+	});
+	assert.equal(first.error, null);
+	assert.equal(first.address, "77.37.48.86");
+	assert.equal(first.family, 4);
+});
+
+test("builds an Undici Agent dispatcher for the sync host", async () => {
+	const dispatcher = await buildFetchDispatcher(
+		new URL("https://cms.jaisong1n.com"),
+		{
+			resolver: async () => [
+				{ address: "2a02:4780:15:bd7b:2395:aa05:7f3c:89bf", family: 6 },
+				{ address: "77.37.48.86", family: 4 },
+			],
+		},
+	);
+	assert.ok(dispatcher instanceof Agent);
+	await dispatcher.close();
+});
+
+test("native WordPress fetch requests receive the pinned IPv4-first dispatcher", async () => {
+	const originalFetch = globalThis.fetch;
+	const seen = [];
+	globalThis.fetch = async (url, options) => {
+		seen.push({ url, options });
+		return new Response(JSON.stringify([post()]), {
+			status: 200,
+			headers: { "X-WP-TotalPages": "1", "Content-Type": "application/json" },
+		});
+	};
+	try {
+		const posts = await fetchPublishedPosts({
+			baseUrl: "https://cms.jaisong1n.com",
+			resolver: async () => [
+				{ address: "2a02:4780:15:bd7b:2395:aa05:7f3c:89bf", family: 6 },
+				{ address: "77.37.48.86", family: 4 },
+				{ address: "179.61.189.222", family: 4 },
+			],
+			logger: { info() {} },
+		});
+		assert.equal(seen.length, 1);
+		assert.ok(
+			seen[0].options.dispatcher instanceof Agent,
+			"Native fetch did not receive an Agent dispatcher.",
+		);
+		assert.deepEqual(
+			posts.map((value) => value.id),
+			[6],
+		);
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
 });
 
 test("replaces only the generated output after a successful sync", async () => {
