@@ -2,7 +2,7 @@
 
 ## Reviewed diary publishing
 
-Site Manager 0.9.0 requires a two-stage server flow for AI diary and article publishing. A direct status update is prohibited. The Agent must first obtain a short-lived confirmation token from `prepare-publish`, then submit that token with the unchanged `expectedModifiedAt` and a stable idempotency key to `publish`.
+Site Manager 0.10.0 requires a two-stage server flow for AI diary and article publishing. A direct status update is prohibited. The Agent must first obtain a short-lived confirmation token from `prepare-publish`, then submit that token with the unchanged `expectedModifiedAt` and a stable idempotency key to `publish`.
 
 The preparation step is not publication and must not be described as success. A content change after preparation invalidates the confirmation and requires a new read, a new user confirmation, and a new token. The Agent must not expose or retain confirmation tokens, must not attempt unpublishing, and must not invoke GitHub deployment APIs directly.
 
@@ -13,6 +13,8 @@ Publish confirmation must be followed by a deployment status read, not by an ass
 An auto-publishable mark on an AI-created diary draft only admits it to the two-stage flow. It is not publication, does not trigger a build, and never applies to manually created, imported, or other-author content.
 
 Article publication uses the same two-stage rules with the separate `jg_ai_publish_article_drafts` capability; an auto-publishable article mark is eligibility only, never automatic publication.
+
+Modifying already published diary or article content is also a two-stage, server-authorized operation (`prepare-update-published` / `update-published`). It is not a re-publication: the original publish date, slug, status, author, and ownership stay unchanged, and only title, excerpt, and content may change. A success message must report the WordPress update separately from build and deployment status, and the public page is not considered updated until the deployment status endpoint confirms it.
 
 本政策适用于 Codex、OpenClaw 和任何未来 Blog Agent。
 

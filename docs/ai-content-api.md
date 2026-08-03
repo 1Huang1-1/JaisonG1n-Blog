@@ -1,6 +1,6 @@
 # AI Content API
 
-`JaisonG1n Site Manager 0.9.0` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
+`JaisonG1n Site Manager 0.10.0` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
 
 Use a dedicated WordPress user with the `jg_ai_content_editor` role and an Application Password. Clients must first request `GET /capabilities`; the response is the live authority for content types, fields, and operations. It never exposes internal meta keys, confirmation tokens, or site secrets.
 
@@ -25,6 +25,35 @@ When the "AI 自建日记自动允许进入受控发布流程" setting (content 
 Articles reuse the diary two-stage pipeline with a separate capability. An administrator enables "审核制文章发布" (content security), which grants only `jg_ai_publish_article_drafts` to the AI role and never native WordPress publishing. With "AI 自建文章自动允许进入受控发布流程" also enabled, an article created through the AI Content API is automatically marked publishable when it is a draft, the current user is both the post author and the AI owner, reviewed article publishing is on, and the user holds the article capability. Automatic eligibility only admits the draft to prepare/publish; it never publishes automatically.
 
 `prepare-publish` and `publish` behave identically to diary: a one-time ten-minute token bound to the user, article ID, content version, and publish action; `expectedModifiedAt`; a stable idempotency key; draft-only status; and one debounced build pending on success. The article canonical public URL is `https://jaisong1n.com/posts/{slug}/`, returned by the deployment status endpoint separately from the CMS edit URL.
+
+## Published In-Place Updates
+
+Published diary and article content can be modified in place through a two-stage flow. Draft `updateDraft` never accepts published content, and these operations never unpublish, never create copies, and never change slugs, publish dates, authors, or ownership.
+
+### Read Contract
+
+Content reads now include stable `publishedAt` (from the original publish date), `canonicalUrl`, safe `ownership` information (`isAuthor`, `isAiOwner`, `aiOwned`, `editable`), and per-object `availableOperations` listing the operations currently usable on that object by the caller.
+
+### Prepare
+
+```http
+POST /wp-json/jaisong1n/v1/ai/content/{contentType}/{id}/prepare-update-published
+```
+
+Body: `expectedModifiedAt` plus at least one changed `proposedTitle`, `proposedExcerpt`, or `proposedContent`. The target must exist, match the content type, be `publish`, be owned/editable by the caller, and be covered by the type's published-update capability and setting. The response contains the change summary, the exact `confirmationPhrase`, a short-lived `confirmationToken`, `expiresAt`, and the list of `protectedFields`. Preparation never writes content or triggers a build.
+
+### Execute
+
+```http
+POST /wp-json/jaisong1n/v1/ai/content/{contentType}/{id}/update-published
+Idempotency-Key: stable-client-key
+```
+
+Body: `expectedModifiedAt`, `confirmationToken`, `idempotencyKey`, and the same proposed fields. The token is bound to the user, content type, object ID, content version, proposed-content hash, and `update_published` action; it is one-time, expires after ten minutes, and is invalidated by any content change after preparation. The server saves the protected fields before the write and verifies them after: ID, content type, slug, status, `post_date`, `post_date_gmt`, author, and AI ownership metadata must be byte-identical, and `post_modified` must change. A violation returns `jg_ai_protected_field_changed` or `jg_ai_readback_verification_failed` and never attempts a republish recovery. Success keeps `status=publish`, preserves `publishedAt`, and enters the existing debounced deployment tracking.
+
+Capabilities: `jg_ai_update_published_diaries` and `jg_ai_update_published_articles`, enabled by the "审核制已发布日记修改" and "审核制已发布文章修改" settings (default off). Neither grants native WordPress permissions, and the diary and article capabilities are isolated.
+
+Stable error codes include `jg_ai_update_published_unsupported`, `jg_ai_content_type_mismatch`, `jg_ai_update_published_not_published`, `jg_ai_update_published_disabled`, `jg_ai_update_published_forbidden`, `jg_ai_update_published_ownership_required`, `jg_ai_update_published_not_editable`, `jg_ai_stale_content`, `jg_ai_confirmation_required`, `jg_ai_confirmation_token_invalid`, `jg_ai_confirmation_token_expired`, `jg_ai_confirmation_token_used`, `jg_ai_idempotency_conflict`, `jg_ai_protected_field_changed`, and `jg_ai_readback_verification_failed`.
 
 ## Reviewed Diary Publishing
 

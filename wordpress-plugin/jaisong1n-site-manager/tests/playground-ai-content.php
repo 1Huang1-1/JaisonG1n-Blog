@@ -22,6 +22,18 @@ function jg_ai_test_error_code(WP_REST_Response $response): string {
 function jg_ai_test_clear_publish_limit(int $user_id): void {
 	delete_transient('jg_ai_rate_' . $user_id . '_publish');
 }
+function jg_ai_test_clear_operation_limit(int $user_id, string $operation): void {
+	delete_transient('jg_ai_rate_' . $user_id . '_' . $operation);
+}
+function jg_ai_test_prepare_update_published(int $user_id, string $content_type, int $post_id, array $body): WP_REST_Response {
+	jg_ai_test_clear_operation_limit($user_id, 'prepareUpdatePublished');
+	return jg_ai_test_request('POST', '/jaisong1n/v1/ai/content/' . $content_type . '/' . $post_id . '/prepare-update-published', $body);
+}
+function jg_ai_test_update_published(int $user_id, string $content_type, int $post_id, array $body, string $key): WP_REST_Response {
+	jg_ai_test_clear_operation_limit($user_id, 'updatePublished');
+	$body['idempotencyKey'] = $key;
+	return jg_ai_test_request('POST', '/jaisong1n/v1/ai/content/' . $content_type . '/' . $post_id . '/update-published', $body, array('Idempotency-Key' => $key));
+}
 function jg_ai_test_prepare(int $user_id, int $post_id, string $content_type = 'diary'): WP_REST_Response {
 	jg_ai_test_clear_publish_limit($user_id);
 	return jg_ai_test_request('POST', '/jaisong1n/v1/ai/content/' . $content_type . '/' . $post_id . '/prepare-publish');
@@ -491,6 +503,162 @@ jg_ai_test_assert($article_replay->get_status() === 200 && ($article_replay->get
 jg_ai_test_assert(get_option('jg_dispatch_pending', array()) === $article_pending, 'Article publish replay duplicated the pending build.');
 $article_repeat = jg_ai_test_publish((int) $user_id, $article_auto_id, $article_publish_body, 'article-publish-repeat-0002', 'article');
 jg_ai_test_assert($article_repeat->get_status() === 409 && jg_ai_test_error_code($article_repeat) === 'jg_ai_already_published', 'Repeated article publication did not return a stable conflict.');
+
+// ---- 0.10.0: published in-place updates -----------------------------------
+$update_settings = JG_Settings::get();
+$update_settings['update_published_diaries'] = true;
+$update_settings['update_published_articles'] = true;
+update_option(JG_Settings::OPTION, $update_settings, false);
+wp_set_current_user(0);
+wp_set_current_user((int) $user_id);
+jg_ai_test_assert(current_user_can('jg_ai_update_published_diaries') && current_user_can('jg_ai_update_published_articles'), 'Published-update capabilities were not granted.');
+$update_caps = jg_ai_test_request('GET', '/jaisong1n/v1/ai/capabilities')->get_data();
+foreach (array('diary', 'article') as $type) {
+	jg_ai_test_assert(in_array('prepareUpdatePublished', $update_caps['contentTypes'][$type]['operations'], true) && in_array('updatePublished', $update_caps['contentTypes'][$type]['operations'], true), $type . ' capabilities are missing published-update operations.');
+}
+foreach ($update_caps['contentTypes'] as $type => $definition) {
+	if (in_array($type, array('diary', 'article'), true)) continue;
+	jg_ai_test_assert(!in_array('prepareUpdatePublished', $definition['operations'], true), 'Published-update operations leaked to ' . $type . '.');
+}
+
+$pub_diary_read = jg_ai_test_request('GET', '/jaisong1n/v1/ai/content/diary/' . $created_data['id'])->get_data();
+jg_ai_test_assert(is_string($pub_diary_read['publishedAt'] ?? null) && ($pub_diary_read['canonicalUrl'] ?? '') === 'https://jaisong1n.com/diary/' . rawurlencode($pub_diary_read['slug']) . '/', 'Published diary read is missing stable publishedAt or canonicalUrl.');
+jg_ai_test_assert(in_array('prepareUpdatePublished', $pub_diary_read['availableOperations'] ?? array(), true) && in_array('updatePublished', $pub_diary_read['availableOperations'] ?? array(), true), 'Published diary availableOperations are missing update operations.');
+jg_ai_test_assert(($pub_diary_read['ownership']['aiOwned'] ?? false) === true && ($pub_diary_read['ownership']['editable'] ?? false) === true, 'Published diary ownership info is incorrect.');
+
+$diary_pre = get_post($created_data['id']);
+delete_option('jg_dispatch_pending');
+wp_clear_scheduled_hook(JG_Dispatch::CRON_HOOK);
+$diary_proposal = jg_ai_test_prepare_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $pub_diary_read['modifiedAt'], 'proposedTitle' => 'Updated published diary title', 'proposedExcerpt' => 'New published excerpt', 'proposedContent' => '<p>Updated published diary body</p>'))->get_data();
+jg_ai_test_assert(($diary_proposal['contentType'] ?? '') === 'diary' && ($diary_proposal['status'] ?? '') === 'publish' && preg_match('/^[a-f0-9]{64}$/', $diary_proposal['confirmationToken']) === 1 && ($diary_proposal['confirmationPhrase'] ?? '') !== '', 'Diary prepare-update-published response is incomplete.');
+jg_ai_test_assert(($diary_proposal['proposedTitle'] ?? '') === 'Updated published diary title' && ($diary_proposal['contentChanged'] ?? false) === true && ($diary_proposal['excerptChanged'] ?? false) === true, 'Diary proposal content summary is incorrect.');
+jg_ai_test_assert(get_post_status($created_data['id']) === 'publish' && get_post($created_data['id'])->post_title === $pub_diary_read['title'] && get_option('jg_dispatch_pending', false) === false, 'Diary prepare modified content or triggered a build.');
+$diary_update_body = array('expectedModifiedAt' => $pub_diary_read['modifiedAt'], 'confirmationToken' => $diary_proposal['confirmationToken'], 'proposedTitle' => 'Updated published diary title', 'proposedExcerpt' => 'New published excerpt', 'proposedContent' => '<p>Updated published diary body</p>');
+$diary_executed = jg_ai_test_update_published((int) $user_id, 'diary', (int) $created_data['id'], $diary_update_body, 'diary-update-published-0001');
+jg_ai_test_assert($diary_executed->get_status() === 200 && ($diary_executed->get_data()['title'] ?? '') === 'Updated published diary title' && ($diary_executed->get_data()['idempotentReplay'] ?? false) === false, 'Diary published update failed: ' . wp_json_encode($diary_executed->get_data()));
+$diary_post = get_post($created_data['id']);
+jg_ai_test_assert($diary_post->post_name === $diary_pre->post_name && $diary_post->post_status === 'publish' && $diary_post->post_date === $diary_pre->post_date && $diary_post->post_date_gmt === $diary_pre->post_date_gmt && (int) $diary_post->post_author === (int) $diary_pre->post_author, 'Diary protected identity or date fields changed.');
+jg_ai_test_assert((int) get_post_meta($created_data['id'], '_jg_ai_owner_user_id', true) === (int) $user_id && $diary_post->post_modified_gmt !== $diary_pre->post_modified_gmt, 'Diary ownership changed or modifiedAt did not update.');
+$diary_pending = get_option('jg_dispatch_pending', array());
+jg_ai_test_assert(in_array('content', $diary_pending['types'] ?? array(), true) && count((array) ($diary_pending['types'] ?? array())) === 1, 'Diary published update did not create one debounced content pending record.');
+$diary_replay = jg_ai_test_update_published((int) $user_id, 'diary', (int) $created_data['id'], $diary_update_body, 'diary-update-published-0001');
+jg_ai_test_assert($diary_replay->get_status() === 200 && ($diary_replay->get_data()['idempotentReplay'] ?? false) === true, 'Diary published update idempotency replay failed.');
+jg_ai_test_assert(get_option('jg_dispatch_pending', array()) === $diary_pending, 'Diary published update replay duplicated the build pending.');
+$diary_conflict = jg_ai_test_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $pub_diary_read['modifiedAt'], 'confirmationToken' => str_repeat('c', 64), 'proposedTitle' => 'Different title'), 'diary-update-published-0001');
+jg_ai_test_assert($diary_conflict->get_status() === 409 && jg_ai_test_error_code($diary_conflict) === 'jg_ai_idempotency_conflict', 'Same idempotency key with a different payload did not conflict.');
+
+$diary_expired_proposal = jg_ai_test_prepare_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $diary_executed->get_data()['modifiedAt'], 'proposedExcerpt' => 'Expired excerpt'))->get_data();
+$diary_expired_hash = hash('sha256', $diary_expired_proposal['confirmationToken']);
+$upd_entries = get_option('jg_ai_publish_confirmation_tokens', array());
+$upd_entries[$diary_expired_hash]['expiresAt'] = time() - 1;
+update_option('jg_ai_publish_confirmation_tokens', $upd_entries, false);
+$diary_expired = jg_ai_test_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $diary_executed->get_data()['modifiedAt'], 'confirmationToken' => $diary_expired_proposal['confirmationToken'], 'proposedExcerpt' => 'Expired excerpt'), 'diary-update-expired-0001');
+jg_ai_test_assert($diary_expired->get_status() === 410 && jg_ai_test_error_code($diary_expired) === 'jg_ai_confirmation_token_expired', 'Diary published update accepted an expired token.');
+$diary_tampered = jg_ai_test_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $diary_executed->get_data()['modifiedAt'], 'confirmationToken' => str_repeat('d', 64), 'proposedExcerpt' => 'Tampered'), 'diary-update-tampered-0001');
+jg_ai_test_assert($diary_tampered->get_status() === 403 && jg_ai_test_error_code($diary_tampered) === 'jg_ai_confirmation_token_invalid', 'Diary published update accepted a tampered token.');
+$diary_used_proposal = jg_ai_test_prepare_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $diary_executed->get_data()['modifiedAt'], 'proposedContent' => '<p>Used token body</p>'))->get_data();
+$diary_used_hash = hash('sha256', $diary_used_proposal['confirmationToken']);
+$upd_entries = get_option('jg_ai_publish_confirmation_tokens', array());
+$upd_entries[$diary_used_hash]['usedAt'] = time();
+update_option('jg_ai_publish_confirmation_tokens', $upd_entries, false);
+$diary_used = jg_ai_test_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $diary_executed->get_data()['modifiedAt'], 'confirmationToken' => $diary_used_proposal['confirmationToken'], 'proposedContent' => '<p>Used token body</p>'), 'diary-update-used-0001');
+jg_ai_test_assert($diary_used->get_status() === 409 && jg_ai_test_error_code($diary_used) === 'jg_ai_confirmation_token_used', 'Diary published update reused a consumed token.');
+
+$diary_stale_proposal = jg_ai_test_prepare_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $diary_executed->get_data()['modifiedAt'], 'proposedTitle' => 'Stale race title'))->get_data();
+$wpdb->update($wpdb->posts, array('post_modified' => '2025-01-03 00:00:00', 'post_modified_gmt' => '2025-01-03 00:00:00'), array('ID' => $created_data['id']));
+clean_post_cache($created_data['id']);
+$diary_stale = jg_ai_test_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $diary_executed->get_data()['modifiedAt'], 'confirmationToken' => $diary_stale_proposal['confirmationToken'], 'proposedTitle' => 'Stale race title'), 'diary-update-stale-0001');
+jg_ai_test_assert($diary_stale->get_status() === 409 && jg_ai_test_error_code($diary_stale) === 'jg_ai_update_published_conflict', 'Diary published update did not reject a stale version.');
+
+$pub_diary_now = jg_ai_test_request('GET', '/jaisong1n/v1/ai/content/diary/' . $created_data['id'])->get_data();
+$diary_noop = jg_ai_test_prepare_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $pub_diary_now['modifiedAt'], 'proposedTitle' => $pub_diary_now['title']));
+jg_ai_test_assert($diary_noop->get_status() === 400 && jg_ai_test_error_code($diary_noop) === 'jg_ai_no_changes', 'Diary no-op published prepare was not rejected.');
+$diary_inject = jg_ai_test_prepare_update_published((int) $user_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $pub_diary_now['modifiedAt'], 'proposedTitle' => 'X', 'slug' => 'hacked'));
+jg_ai_test_assert($diary_inject->get_status() === 400 && jg_ai_test_error_code($diary_inject) === 'jg_ai_unknown_field', 'Diary published prepare accepted a forbidden field.');
+$draft_update_published = jg_ai_test_prepare_update_published((int) $user_id, 'diary', (int) $zero_date_id, array('expectedModifiedAt' => null, 'proposedTitle' => 'Draft'));
+jg_ai_test_assert($draft_update_published->get_status() === 409 && jg_ai_test_error_code($draft_update_published) === 'jg_ai_update_published_not_published', 'Draft diary accepted a published update prepare.');
+$article_published_patch = jg_ai_test_request('PATCH', '/jaisong1n/v1/ai/content/article/' . $article_auto_id, array('expectedModifiedAt' => $article_published->get_data()['modifiedAt'], 'title' => 'Forbidden'));
+jg_ai_test_assert($article_published_patch->get_status() === 409 && jg_ai_test_error_code($article_published_patch) === 'jg_ai_draft_required', 'updateDraft modified a published article.');
+$type_mismatch = jg_ai_test_prepare_update_published((int) $user_id, 'article', (int) $created_data['id'], array('expectedModifiedAt' => $pub_diary_now['modifiedAt'], 'proposedTitle' => 'X'));
+jg_ai_test_assert($type_mismatch->get_status() === 400 && jg_ai_test_error_code($type_mismatch) === 'jg_ai_content_type_mismatch', 'Content type mismatch was not detected.');
+
+$upd_no_article_role = add_role('jg_ai_upd_no_article', 'AI Upd No Article', get_role('jg_ai_content_editor')->capabilities);
+jg_ai_test_assert($upd_no_article_role instanceof WP_Role, 'Could not clone the AI editor role for update isolation testing.');
+$upd_no_article_role->remove_cap('jg_ai_update_published_articles');
+$upd_no_article_user = wp_create_user('jg-ai-upd-no-article', wp_generate_password(24), 'jg-ai-upd-no-article@example.test');
+jg_ai_test_assert(!is_wp_error($upd_no_article_user), 'Could not create the update isolation user.');
+(new WP_User((int) $upd_no_article_user))->set_role('jg_ai_upd_no_article');
+wp_set_current_user((int) $upd_no_article_user);
+$article_cap_denied = jg_ai_test_prepare_update_published((int) $upd_no_article_user, 'article', (int) $article_auto_id, array('expectedModifiedAt' => $article_published->get_data()['modifiedAt'], 'proposedTitle' => 'Denied'));
+jg_ai_test_assert($article_cap_denied->get_status() === 403 && jg_ai_test_error_code($article_cap_denied) === 'jg_ai_update_published_forbidden', 'Article published update leaked without its own capability.');
+$iso_caps = jg_ai_test_request('GET', '/jaisong1n/v1/ai/capabilities')->get_data();
+jg_ai_test_assert(in_array('prepareUpdatePublished', $iso_caps['contentTypes']['diary']['operations'], true) && !in_array('prepareUpdatePublished', $iso_caps['contentTypes']['article']['operations'], true), 'Diary and article published-update capabilities are not isolated.');
+wp_set_current_user((int) $user_id);
+remove_role('jg_ai_upd_no_article');
+
+$other_upd_editor_id = wp_create_user('jg-ai-other-upd-editor', wp_generate_password(24), 'jg-ai-other-upd-editor@example.test');
+jg_ai_test_assert(!is_wp_error($other_upd_editor_id), 'Could not create the other update editor.');
+(new WP_User((int) $other_upd_editor_id))->set_role('jg_ai_content_editor');
+wp_set_current_user((int) $other_upd_editor_id);
+$cross_author = jg_ai_test_prepare_update_published((int) $other_upd_editor_id, 'diary', (int) $created_data['id'], array('expectedModifiedAt' => $pub_diary_now['modifiedAt'], 'proposedTitle' => 'X'));
+jg_ai_test_assert($cross_author->get_status() === 403 && jg_ai_test_error_code($cross_author) === 'jg_ai_update_published_ownership_required', 'Cross-author published update was not rejected.');
+wp_set_current_user((int) $user_id);
+
+$drift_published_id = wp_insert_post(array('post_type' => 'jg_diary', 'post_status' => 'publish', 'post_author' => (int) $admin_id, 'post_title' => 'Drift published', 'post_name' => 'drift-published', 'post_content' => '<p>drift</p>'));
+update_post_meta($drift_published_id, '_jg_ai_owner_user_id', (int) $user_id);
+update_post_meta($drift_published_id, '_jg_ai_created', true);
+update_post_meta($drift_published_id, '_jg_ai_editable', false);
+update_post_meta($drift_published_id, '_jg_ai_publishable', true);
+$drift_read = jg_ai_test_request('GET', '/jaisong1n/v1/ai/content/diary/' . $drift_published_id)->get_data();
+$not_editable = jg_ai_test_prepare_update_published((int) $user_id, 'diary', (int) $drift_published_id, array('expectedModifiedAt' => $drift_read['modifiedAt'], 'proposedTitle' => 'X'));
+jg_ai_test_assert($not_editable->get_status() === 403 && jg_ai_test_error_code($not_editable) === 'jg_ai_update_published_not_editable', 'Published update without the editable grant was not rejected.');
+
+$off_update_settings = JG_Settings::get();
+$off_update_settings['update_published_articles'] = false;
+update_option(JG_Settings::OPTION, $off_update_settings, false);
+wp_set_current_user(0);
+wp_set_current_user((int) $user_id);
+$article_disabled = jg_ai_test_prepare_update_published((int) $user_id, 'article', (int) $article_auto_id, array('expectedModifiedAt' => $article_published->get_data()['modifiedAt'], 'proposedTitle' => 'X'));
+jg_ai_test_assert($article_disabled->get_status() === 403 && jg_ai_test_error_code($article_disabled) === 'jg_ai_update_published_disabled', 'Article published update was not rejected when disabled.');
+update_option(JG_Settings::OPTION, $update_settings, false);
+wp_set_current_user(0);
+wp_set_current_user((int) $user_id);
+
+$race_diary_id = wp_insert_post(array('post_type' => 'jg_diary', 'post_status' => 'publish', 'post_author' => (int) $user_id, 'post_title' => 'Race diary', 'post_name' => 'race-diary', 'post_content' => '<p>race</p>'));
+update_post_meta($race_diary_id, '_jg_ai_owner_user_id', (int) $user_id);
+update_post_meta($race_diary_id, '_jg_ai_editable', true);
+update_post_meta($race_diary_id, '_jg_ai_created', true);
+update_post_meta($race_diary_id, '_jg_ai_publishable', true);
+$race_read = jg_ai_test_request('GET', '/jaisong1n/v1/ai/content/diary/' . $race_diary_id)->get_data();
+$race_proposal = jg_ai_test_prepare_update_published((int) $user_id, 'diary', (int) $race_diary_id, array('expectedModifiedAt' => $race_read['modifiedAt'], 'proposedTitle' => 'Race updated'))->get_data();
+$race_guard = static function ($data, $postarr) use ($race_diary_id) {
+	if ((int) ($postarr['ID'] ?? 0) === (int) $race_diary_id) $data['post_name'] = 'race-hacked-slug';
+	return $data;
+};
+add_filter('wp_insert_post_data', $race_guard, 10, 2);
+$race_execute = jg_ai_test_update_published((int) $user_id, 'diary', (int) $race_diary_id, array('expectedModifiedAt' => $race_read['modifiedAt'], 'confirmationToken' => $race_proposal['confirmationToken'], 'proposedTitle' => 'Race updated'), 'race-update-0001');
+jg_ai_test_assert($race_execute->get_status() === 409 && jg_ai_test_error_code($race_execute) === 'jg_ai_protected_field_changed', 'Protected field change during update was not detected.');
+remove_filter('wp_insert_post_data', $race_guard, 10);
+
+$pub_article_read = jg_ai_test_request('GET', '/jaisong1n/v1/ai/content/article/' . $article_auto_id)->get_data();
+jg_ai_test_assert(($pub_article_read['canonicalUrl'] ?? '') === 'https://jaisong1n.com/posts/auto-article-publishable/', 'Published article canonicalUrl is incorrect.');
+jg_ai_test_assert(in_array('updatePublished', $pub_article_read['availableOperations'] ?? array(), true), 'Published article availableOperations are missing updatePublished.');
+$article_pre = get_post($article_auto_id);
+delete_option('jg_dispatch_pending');
+wp_clear_scheduled_hook(JG_Dispatch::CRON_HOOK);
+$article_proposal = jg_ai_test_prepare_update_published((int) $user_id, 'article', (int) $article_auto_id, array('expectedModifiedAt' => $pub_article_read['modifiedAt'], 'proposedTitle' => 'Updated published article', 'proposedContent' => '<p>Updated article body</p>'))->get_data();
+jg_ai_test_assert(($article_proposal['contentType'] ?? '') === 'article' && preg_match('/^[a-f0-9]{64}$/', $article_proposal['confirmationToken']) === 1 && ($article_proposal['confirmationPhrase'] ?? '') !== '', 'Article prepare-update-published response is incomplete.');
+$article_update_body = array('expectedModifiedAt' => $pub_article_read['modifiedAt'], 'confirmationToken' => $article_proposal['confirmationToken'], 'proposedTitle' => 'Updated published article', 'proposedContent' => '<p>Updated article body</p>');
+$article_executed = jg_ai_test_update_published((int) $user_id, 'article', (int) $article_auto_id, $article_update_body, 'article-update-published-0001');
+jg_ai_test_assert($article_executed->get_status() === 200 && ($article_executed->get_data()['title'] ?? '') === 'Updated published article' && ($article_executed->get_data()['status'] ?? '') === 'publish', 'Article published update failed.');
+$article_after = get_post($article_auto_id);
+jg_ai_test_assert($article_after->post_name === $article_pre->post_name && $article_after->post_date === $article_pre->post_date && $article_after->post_date_gmt === $article_pre->post_date_gmt && (int) $article_after->post_author === (int) $article_pre->post_author && $article_after->post_status === 'publish', 'Article protected fields changed during published update.');
+$article_pending = get_option('jg_dispatch_pending', array());
+jg_ai_test_assert(in_array('content', $article_pending['types'] ?? array(), true), 'Article published update did not create a debounced content pending record: ' . wp_json_encode($article_pending));
+$article_replay_upd = jg_ai_test_update_published((int) $user_id, 'article', (int) $article_auto_id, $article_update_body, 'article-update-published-0001');
+jg_ai_test_assert($article_replay_upd->get_status() === 200 && ($article_replay_upd->get_data()['idempotentReplay'] ?? false) === true, 'Article published update replay failed.');
+jg_ai_test_assert(get_option('jg_dispatch_pending', array()) === $article_pending, 'Article published update replay duplicated the build pending.');
+jg_ai_test_assert(!str_contains(wp_json_encode($article_executed->get_data()), 'confirmationToken') && !str_contains(wp_json_encode($diary_executed->get_data()), 'confirmationToken'), 'Published update response leaked a confirmation token.');
 
 $audit = get_option('jg_ai_content_audit', array());
 $audit_json = wp_json_encode($audit);

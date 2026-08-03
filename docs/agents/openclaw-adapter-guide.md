@@ -1,12 +1,14 @@
 # OpenClaw Adapter Guide
 
-## Site Manager 0.9.0 publish adapter
+## Site Manager 0.10.0 publish adapter
 
 OpenClaw must discover `preparePublish` and `publish` from live capabilities. It may expose the reviewed diary flow only after explicit user confirmation. The adapter keeps the one-time confirmation token in memory for the immediate publish request, never writes it to conversation history or logs, and discards it after success, rejection, or expiry. It must not call GitHub Actions directly.
 
 OpenClaw 0.4.0 uses the read-only `deployment-status` endpoint to distinguish WordPress publication, build progress, and public page availability. It must not report deployment success from WordPress status or dispatch acceptance alone.
 
 Site Manager 0.9.0 extends the reviewed publish adapter to articles with the independent `jg_ai_publish_article_drafts` capability; the diary and article flows share the same prepare/token/publish rules.
+
+Site Manager 0.10.0 adds in-place updates for published diary and article content through `prepare-update-published` and `update-published`, gated by `jg_ai_update_published_diaries` / `jg_ai_update_published_articles`. The client must read live capabilities before offering the flow and must not expose the confirmation token to the model or the user.
 
 本文件仅为未来接入 OpenClaw 的说明，不实现 OpenClaw Skill。OpenClaw Blog Skill 应保持精简：识别博客意图、加载 `docs/agents/` 通用规则、收集必要上下文、调用 AI Content API，并返回草稿或发布结果。它不应复制整份写作风格或日记工作流。
 

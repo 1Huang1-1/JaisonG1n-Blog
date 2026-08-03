@@ -15,6 +15,9 @@ final class JG_AI_Content {
 	private const PUBLISH_TOKENS_OPTION = 'jg_ai_publish_confirmation_tokens';
 	private const PUBLISH_CAPABILITY = 'jg_ai_publish_diary_drafts';
 	private const ARTICLE_PUBLISH_CAPABILITY = 'jg_ai_publish_article_drafts';
+	private const UPDATE_PUBLISHED_DIARY_CAPABILITY = 'jg_ai_update_published_diaries';
+	private const UPDATE_PUBLISHED_ARTICLE_CAPABILITY = 'jg_ai_update_published_articles';
+	private const UPDATE_PUBLISHED_ACTION = 'update_published';
 	private const PUBLISH_TOKEN_TTL = 600;
 	private const MAX_AUDIT_ENTRIES = 100;
 	private const MAX_IDEMPOTENCY_ENTRIES = 200;
@@ -49,6 +52,7 @@ final class JG_AI_Content {
 		}
 		self::sync_publish_capability(!empty(self::settings()['reviewed_diary_publish']));
 		self::sync_article_publish_capability(!empty(JG_Settings::get()['reviewed_article_publish']));
+		self::sync_update_published_capabilities(!empty(JG_Settings::get()['update_published_diaries']), !empty(JG_Settings::get()['update_published_articles']));
 		if (get_option(self::PUBLISH_TOKENS_OPTION, null) === null) add_option(self::PUBLISH_TOKENS_OPTION, array(), '', false);
 		else update_option(self::PUBLISH_TOKENS_OPTION, get_option(self::PUBLISH_TOKENS_OPTION, array()), false);
 		// Native publish and destructive capabilities are intentionally never granted here.
@@ -59,7 +63,9 @@ final class JG_AI_Content {
 	}
 
 	public static function site_settings_updated($old_value, $new_value): void {
-		self::sync_article_publish_capability(is_array($new_value) && !empty($new_value['reviewed_article_publish']));
+		$new = is_array($new_value) ? $new_value : array();
+		self::sync_article_publish_capability(!empty($new['reviewed_article_publish']));
+		self::sync_update_published_capabilities(!empty($new['update_published_diaries']), !empty($new['update_published_articles']));
 	}
 
 	private static function sync_publish_capability(bool $enabled): void {
@@ -74,6 +80,15 @@ final class JG_AI_Content {
 		if (!$role) return;
 		if ($enabled) $role->add_cap(self::ARTICLE_PUBLISH_CAPABILITY);
 		else $role->remove_cap(self::ARTICLE_PUBLISH_CAPABILITY);
+	}
+
+	private static function sync_update_published_capabilities(bool $diary, bool $article): void {
+		$role = get_role(self::ROLE);
+		if (!$role) return;
+		if ($diary) $role->add_cap(self::UPDATE_PUBLISHED_DIARY_CAPABILITY);
+		else $role->remove_cap(self::UPDATE_PUBLISHED_DIARY_CAPABILITY);
+		if ($article) $role->add_cap(self::UPDATE_PUBLISHED_ARTICLE_CAPABILITY);
+		else $role->remove_cap(self::UPDATE_PUBLISHED_ARTICLE_CAPABILITY);
 	}
 
 	public static function settings(): array {
@@ -123,6 +138,8 @@ final class JG_AI_Content {
 		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/deployment-status', WP_REST_Server::READABLE, 'deployment_status', 'deploymentStatus', self::detail_args());
 		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/prepare-publish', WP_REST_Server::CREATABLE, 'prepare_publish', 'publish', self::detail_args());
 		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/publish', WP_REST_Server::CREATABLE, 'publish_content', 'publish', self::publish_args());
+		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/prepare-update-published', WP_REST_Server::CREATABLE, 'prepare_update_published', 'prepareUpdatePublished', self::detail_args());
+		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/update-published', WP_REST_Server::CREATABLE, 'update_published_content', 'updatePublished', self::detail_args());
 		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/unpublish', WP_REST_Server::CREATABLE, 'unpublish_content', 'publish', self::expected_args());
 		self::route($namespace, '/content/(?P<contentType>[A-Za-z][A-Za-z0-9]*)/(?P<id>\d+)/claim', WP_REST_Server::CREATABLE, 'claim_content', 'claim', self::claim_args());
 		self::route($namespace, '/audit', WP_REST_Server::READABLE, 'audit', 'audit');
@@ -150,6 +167,7 @@ final class JG_AI_Content {
 			if (self::can_read($contract, null)) $operations[] = 'deploymentStatus';
 			if (self::can_update_type($contract)) $operations[] = 'updateDraft';
 			if (self::can_publish_type($contract)) { $operations[] = 'preparePublish'; $operations[] = 'publish'; }
+			if (self::can_update_published_type($contract)) { $operations[] = 'prepareUpdatePublished'; $operations[] = 'updatePublished'; }
 			$types[$name] = array('operations' => $operations, 'fields' => self::public_fields($contract));
 		}
 		return new WP_REST_Response(array('version' => JG_SITE_MANAGER_VERSION, 'schemaVersion' => 5, 'contentTypes' => $types), 200);
@@ -467,6 +485,183 @@ final class JG_AI_Content {
 		} finally { delete_option($lock); }
 	}
 
+	public static function prepare_update_published(WP_REST_Request $request) {
+		$post_id = (int) $request['id'];
+		$contract = self::contract((string) $request['contentType']);
+		if (is_wp_error($contract)) {
+			self::record('prepareUpdatePublished', sanitize_key((string) $request['contentType']), $post_id, 400, array(), false, array('reason' => 'unsupported_type'));
+			return $contract;
+		}
+		if (!in_array($contract['apiType'], array('diary', 'article'), true)) {
+			self::record('prepareUpdatePublished', $contract['apiType'], $post_id, 403, array(), false, array('reason' => 'unsupported_type'));
+			return self::error('jg_ai_update_published_unsupported', 'In-place updates are only available for published diary and article content.', 403);
+		}
+		$post = get_post($post_id);
+		if (!$post) {
+			self::record('prepareUpdatePublished', $contract['apiType'], $post_id, 404, array(), false, array('reason' => 'not_found'));
+			return self::not_found();
+		}
+		if ($post->post_type !== $contract['postType']) {
+			self::record('prepareUpdatePublished', $contract['apiType'], $post_id, 400, array(), false, array('reason' => 'content_type_mismatch'));
+			return self::error('jg_ai_content_type_mismatch', 'The content type does not match the requested object.', 400);
+		}
+		$reason = self::update_published_rejection_reason($contract, $post);
+		if ($reason !== 'ok') {
+			$status = $reason === 'not_published' ? 409 : ($reason === 'not_found' ? 404 : 403);
+			self::record('prepareUpdatePublished', $contract['apiType'], $post_id, $status, array(), false, array('reason' => $reason));
+			return self::update_published_error($reason);
+		}
+		$input = $request->get_json_params(); if (!is_array($input)) $input = $request->get_params();
+		if (!array_key_exists('expectedModifiedAt', $input) || (!is_string($input['expectedModifiedAt']) && $input['expectedModifiedAt'] !== null) || $input['expectedModifiedAt'] === '') {
+			self::record('prepareUpdatePublished', $contract['apiType'], $post_id, 400, array(), false, array('reason' => 'expected_modified_at_required'));
+			return self::error('jg_ai_expected_modified_at_required', 'expectedModifiedAt is required.', 400);
+		}
+		if (!self::modified_matches($post, $input['expectedModifiedAt'])) {
+			self::record('prepareUpdatePublished', $contract['apiType'], $post_id, 409, array(), false, array('reason' => 'modified'));
+			return self::error('jg_ai_stale_content', 'Content has changed. Read it again before updating.', 409);
+		}
+		$normalized = self::normalize_published_update($input);
+		if (is_wp_error($normalized)) return $normalized;
+		$changed = self::changed_published_fields($post, $normalized);
+		if (!$changed) {
+			self::record('prepareUpdatePublished', $contract['apiType'], $post_id, 400, array(), false, array('reason' => 'no_changes'));
+			return self::error('jg_ai_no_changes', 'No published field contains a new value.', 400);
+		}
+		$content_hash = self::published_content_hash($normalized);
+		$issued = self::issue_update_published_token($post, $contract['apiType'], $content_hash);
+		if (is_wp_error($issued)) {
+			self::record('prepareUpdatePublished', $contract['apiType'], $post_id, 500, array(), false, array('reason' => 'token_issue_failed'));
+			return $issued;
+		}
+		self::record('prepareUpdatePublished', $contract['apiType'], $post_id, 200, $changed, false, array('tokenFingerprint' => $issued['fingerprint']));
+		return new WP_REST_Response(array(
+			'contentType' => $contract['apiType'],
+			'id' => $post->ID,
+			'slug' => $post->post_name,
+			'status' => $post->post_status,
+			'publishedAt' => self::published_at($post),
+			'modifiedAt' => self::modified_at($post),
+			'currentTitle' => $post->post_title,
+			'proposedTitle' => $normalized['title'] ?? null,
+			'currentExcerpt' => $post->post_excerpt,
+			'proposedExcerpt' => $normalized['excerpt'] ?? null,
+			'titleChanged' => in_array('title', $changed, true),
+			'excerptChanged' => in_array('excerpt', $changed, true),
+			'contentChanged' => in_array('content', $changed, true),
+			'confirmationPhrase' => self::update_confirmation_phrase($contract['apiType'], $post->ID, $issued['fingerprint']),
+			'confirmationToken' => $issued['token'],
+			'expiresAt' => $issued['expiresAt'],
+			'protectedFields' => array('id', 'contentType', 'slug', 'status', 'publishedAt', 'postDate', 'postDateGmt', 'author', 'ownership'),
+		), 200);
+	}
+
+	public static function update_published_content(WP_REST_Request $request) {
+		$post_id = (int) $request['id'];
+		$contract = self::contract((string) $request['contentType']);
+		if (is_wp_error($contract)) {
+			self::record('updatePublished', sanitize_key((string) $request['contentType']), $post_id, 400, array(), false, array('reason' => 'unsupported_type'));
+			return $contract;
+		}
+		if (!in_array($contract['apiType'], array('diary', 'article'), true)) {
+			self::record('updatePublished', $contract['apiType'], $post_id, 403, array(), false, array('reason' => 'unsupported_type'));
+			return self::error('jg_ai_update_published_unsupported', 'In-place updates are only available for published diary and article content.', 403);
+		}
+		$post = get_post($post_id);
+		if (!$post) {
+			self::record('updatePublished', $contract['apiType'], $post_id, 404, array(), false, array('reason' => 'not_found'));
+			return self::not_found();
+		}
+		if ($post->post_type !== $contract['postType']) {
+			self::record('updatePublished', $contract['apiType'], $post_id, 400, array(), false, array('reason' => 'content_type_mismatch'));
+			return self::error('jg_ai_content_type_mismatch', 'The content type does not match the requested object.', 400);
+		}
+		$reason = self::update_published_rejection_reason($contract, $post);
+		if ($reason !== 'ok') {
+			$status = $reason === 'not_published' ? 409 : ($reason === 'not_found' ? 404 : 403);
+			self::record('updatePublished', $contract['apiType'], $post_id, $status, array(), false, array('reason' => $reason));
+			return self::update_published_error($reason);
+		}
+		$input = $request->get_json_params(); if (!is_array($input)) $input = $request->get_params();
+		if (!array_key_exists('expectedModifiedAt', $input) || (!is_string($input['expectedModifiedAt']) && $input['expectedModifiedAt'] !== null) || $input['expectedModifiedAt'] === '') {
+			self::record('updatePublished', $contract['apiType'], $post_id, 400, array(), false, array('reason' => 'expected_modified_at_required'));
+			return self::error('jg_ai_expected_modified_at_required', 'expectedModifiedAt is required.', 400);
+		}
+		$key = self::idempotency_key($request);
+		if (is_wp_error($key)) {
+			self::record('updatePublished', $contract['apiType'], $post_id, 400, array(), false, array('reason' => 'idempotency_required'));
+			return $key;
+		}
+		$token = $input['confirmationToken'] ?? '';
+		if (!is_string($token) || preg_match('/^[a-f0-9]{64}$/', $token) !== 1) {
+			self::record('updatePublished', $contract['apiType'], $post_id, 403, array(), false, array('reason' => 'token_invalid'));
+			return self::error('jg_ai_confirmation_token_invalid', 'The confirmation token is invalid.', 403);
+		}
+		$normalized = self::normalize_published_update($input);
+		if (is_wp_error($normalized)) return $normalized;
+		$token_hash = hash('sha256', $token);
+		$content_hash = self::published_content_hash($normalized);
+		$request_hash = hash('sha256', wp_json_encode(array('contentType' => $contract['apiType'], 'contentId' => $post_id, 'expectedModifiedAt' => $input['expectedModifiedAt'], 'confirmationTokenHash' => $token_hash, 'contentHash' => $content_hash)));
+		$action = 'update_published:' . $contract['apiType'];
+		$replay = self::idempotency_replay(get_current_user_id(), $action, $key, $request_hash);
+		if (is_wp_error($replay)) {
+			self::record('updatePublished', $contract['apiType'], $post_id, 409, array(), false, array('reason' => 'idempotency_conflict'));
+			return $replay;
+		}
+		if (is_array($replay)) {
+			self::record('idempotent_replay', $contract['apiType'], $post_id, 200, array(), true, array('idempotencyFingerprint' => substr(hash('sha256', $key), 0, 12)));
+			return new WP_REST_Response(array_replace($replay, array('idempotentReplay' => true)), 200);
+		}
+		$lock = 'jg_ai_update_published_lock_' . substr($token_hash, 0, 40);
+		if (!add_option($lock, time(), '', false)) return self::error('jg_ai_update_published_in_progress', 'This update confirmation is already being processed.', 409);
+		try {
+			$post = get_post($post_id);
+			$validated = self::validate_update_published_token($token_hash, $post_id, $input['expectedModifiedAt'], $contract['apiType'], $content_hash);
+			if (is_wp_error($validated)) {
+				$error_data = (array) $validated->get_error_data();
+				self::record('updatePublished', $contract['apiType'], $post_id, (int) ($error_data['status'] ?? 403), array(), false, array('reason' => $validated->get_error_code(), 'tokenFingerprint' => substr($token_hash, 0, 12)));
+				return $validated;
+			}
+			$before = self::protected_fields($post);
+			$reason = self::update_published_rejection_reason($contract, $post);
+			if ($reason !== 'ok' || !self::modified_matches($post, $input['expectedModifiedAt'])) {
+				self::record('updatePublished', $contract['apiType'], $post_id, 409, array(), false, array('reason' => 'changed_during_prepare'));
+				return self::error('jg_ai_update_published_conflict', 'The content changed after preparation. Prepare it again.', 409);
+			}
+			$changed = self::changed_published_fields($post, $normalized);
+			if (!$changed) {
+				self::record('updatePublished', $contract['apiType'], $post_id, 400, array(), false, array('reason' => 'no_changes'));
+				return self::error('jg_ai_no_changes', 'No published field contains a new value.', 400);
+			}
+			$data = array('ID' => $post_id);
+			foreach (array('title' => 'post_title', 'excerpt' => 'post_excerpt', 'content' => 'post_content') as $input_key => $post_key) {
+				if (in_array($input_key, $changed, true)) $data[$post_key] = $normalized[$input_key];
+			}
+			$result = wp_update_post($data, true);
+			if (is_wp_error($result)) {
+				self::record('updatePublished', $contract['apiType'], $post_id, 500, array(), false, array('reason' => 'write_failed', 'tokenFingerprint' => substr($token_hash, 0, 12)));
+				return self::safe_wp_error($result);
+			}
+			$after = get_post($post_id);
+			if (!self::protected_fields_match($before, $after)) {
+				self::record('updatePublished', $contract['apiType'], $post_id, 409, array(), false, array('reason' => 'protected_field_changed', 'tokenFingerprint' => substr($token_hash, 0, 12)));
+				return self::error('jg_ai_protected_field_changed', 'A protected field changed during the update. No publish recovery was attempted.', 409);
+			}
+			foreach ($changed as $field) {
+				$expected = $normalized[$field];
+				$actual = $field === 'title' ? $after->post_title : ($field === 'excerpt' ? $after->post_excerpt : $after->post_content);
+				if ($actual !== $expected) {
+					self::record('updatePublished', $contract['apiType'], $post_id, 500, array(), false, array('reason' => 'readback_verification_failed', 'tokenFingerprint' => substr($token_hash, 0, 12)));
+					return self::error('jg_ai_readback_verification_failed', 'The updated content could not be verified.', 500);
+				}
+			}
+			self::consume_publish_token($token_hash);
+			$response = self::project($after, $contract, true) + array('idempotentReplay' => false);
+			self::store_idempotency(get_current_user_id(), $action, $key, $request_hash, $response, 200);
+			self::record('updatePublished', $contract['apiType'], $post_id, 200, $changed, false, array('tokenFingerprint' => substr($token_hash, 0, 12), 'idempotencyFingerprint' => substr(hash('sha256', $key), 0, 12)));
+			return new WP_REST_Response($response, 200);
+		} finally { delete_option($lock); }
+	}
+
 	public static function unpublish_content(WP_REST_Request $request) {
 		self::record('publish_rejected', sanitize_key((string) $request['contentType']), (int) $request['id'], 403, array(), false, array('reason' => 'unpublish_unsupported'));
 		return self::error('jg_ai_unpublish_unsupported', 'AI unpublishing is not available.', 403);
@@ -582,6 +777,57 @@ final class JG_AI_Content {
 		return 'ok';
 	}
 
+	private static function can_update_published_type(array $contract): bool {
+		$site_settings = JG_Settings::get();
+		if ($contract['apiType'] === 'diary') {
+			return !empty($site_settings['update_published_diaries']) && current_user_can(self::UPDATE_PUBLISHED_DIARY_CAPABILITY);
+		}
+		if ($contract['apiType'] === 'article') {
+			return !empty($site_settings['update_published_articles']) && current_user_can(self::UPDATE_PUBLISHED_ARTICLE_CAPABILITY);
+		}
+		return false;
+	}
+
+	private static function can_update_published(array $contract, ?WP_Post $post): bool {
+		if ($post === null || $post->post_status !== 'publish') return false;
+		return self::can_update_published_type($contract) && self::can_manage_ai_content($contract, $post);
+	}
+
+	private static function update_published_rejection_reason(array $contract, ?WP_Post $post): string {
+		if (!in_array($contract['apiType'], array('diary', 'article'), true)) return 'unsupported_type';
+		if ($post === null) return 'not_found';
+		if ($post->post_status !== 'publish') return 'not_published';
+		if (!self::can_update_published_type($contract)) {
+			$site_settings = JG_Settings::get();
+			$setting = $contract['apiType'] === 'diary' ? $site_settings['update_published_diaries'] : $site_settings['update_published_articles'];
+			return empty($setting) ? 'setting_disabled' : 'missing_capability';
+		}
+		if (!self::is_ai_owner($post)) return 'ownership_denied';
+		if (!(bool) get_post_meta($post->ID, '_jg_ai_editable', true) && !current_user_can('edit_post', $post->ID)) return 'edit_denied';
+		return 'ok';
+	}
+
+	private static function available_operations(array $contract, WP_Post $post): array {
+		$operations = array('read', 'deploymentStatus');
+		if (self::can_update($contract, $post)) $operations[] = 'updateDraft';
+		if ($post->post_status === 'draft' && self::can_publish($contract, $post)) {
+			$operations[] = 'preparePublish';
+			$operations[] = 'publish';
+		}
+		if (self::can_update_published($contract, $post)) {
+			$operations[] = 'prepareUpdatePublished';
+			$operations[] = 'updatePublished';
+		}
+		return $operations;
+	}
+
+	private static function published_at(WP_Post $post): ?string {
+		$value = trim((string) $post->post_date_gmt);
+		if ($value === '' || $value === '0000-00-00 00:00:00') return null;
+		$timestamp = strtotime($value . ' GMT');
+		return $timestamp === false ? null : gmdate('Y-m-d\\TH:i:s\\Z', $timestamp);
+	}
+
 	private static function normalize_input(array $input, array $contract, bool $creating) {
 		$allowed = array('contentType', 'title', 'slug', 'excerpt', 'contentHtml', 'fields', 'idempotencyKey', 'expectedModifiedAt');
 		foreach (array_keys($input) as $key) if (!in_array($key, $allowed, true)) return self::error('jg_ai_unknown_field', 'An unsupported request field was provided.', 400);
@@ -633,6 +879,51 @@ final class JG_AI_Content {
 		}
 		if (!$output) return self::error('jg_ai_no_changes', 'At least one draft field must be provided.', 400);
 		return $output;
+	}
+
+	private static function normalize_published_update(array $input) {
+		$allowed = array('contentType', 'id', 'expectedModifiedAt', 'confirmationToken', 'idempotencyKey', 'proposedTitle', 'proposedExcerpt', 'proposedContent');
+		foreach (array_keys($input) as $key) if (!in_array($key, $allowed, true)) return self::error('jg_ai_unknown_field', 'An unsupported request field was provided.', 400);
+		$output = array();
+		foreach (array('proposedTitle' => 'title', 'proposedExcerpt' => 'excerpt', 'proposedContent' => 'content') as $input_key => $output_key) {
+			if (!array_key_exists($input_key, $input)) continue;
+			if (!is_string($input[$input_key])) return self::error('jg_ai_invalid_field_type', 'Published update fields must be strings.', 400);
+			$value = $input[$input_key];
+			if ($output_key === 'title') {
+				$value = mb_substr(sanitize_text_field($value), 0, 200);
+				if ($value === '') return self::error('jg_ai_invalid_title', 'Title cannot be empty.', 400);
+			} elseif ($output_key === 'excerpt') {
+				$value = mb_substr(wp_strip_all_tags($value), 0, 1000);
+			} else {
+				if ($value === '') return self::error('jg_ai_invalid_content', 'Content cannot be empty.', 400);
+				if (strlen($value) > JG_Content_Policy::MAX_RICH_TEXT_BYTES) return self::error('jg_ai_content_too_large', 'Content exceeds the size limit.', 413);
+				$value = wp_kses_post($value);
+			}
+			$output[$output_key] = $value;
+		}
+		if (!$output) return self::error('jg_ai_no_changes', 'At least one published field must be provided.', 400);
+		return $output;
+	}
+
+	private static function published_content_hash(array $normalized): string {
+		return hash('sha256', wp_json_encode(array(
+			'title' => $normalized['title'] ?? null,
+			'excerpt' => $normalized['excerpt'] ?? null,
+			'content' => $normalized['content'] ?? null,
+		)));
+	}
+
+	private static function changed_published_fields(WP_Post $post, array $normalized): array {
+		$changed = array();
+		foreach (array('title' => 'post_title', 'excerpt' => 'post_excerpt', 'content' => 'post_content') as $input_key => $post_key) {
+			if (isset($normalized[$input_key]) && $normalized[$input_key] !== $post->$post_key) $changed[] = $input_key;
+		}
+		return $changed;
+	}
+
+	private static function update_confirmation_phrase(string $content_type, int $post_id, string $fingerprint): string {
+		$label = $content_type === 'article' ? '文章' : '日记';
+		return sprintf('确认修改%s #%d %s', $label, $post_id, strtoupper(substr($fingerprint, 0, 6)));
 	}
 
 	private static function write_fields(int $post_id, array $contract, array $fields): bool { foreach ($fields as $key => $value) { if (($contract['taxonomy'] ?? false) && in_array($key, array('tags', 'categories'), true)) { if (is_wp_error(wp_set_post_terms($post_id, $value, $key === 'tags' ? 'post_tag' : 'category', false))) return false; continue; } if (update_post_meta($post_id, '_jg_' . $key, $value) === false && get_post_meta($post_id, '_jg_' . $key, true) !== $value) return false; } return true; }
@@ -708,14 +999,133 @@ final class JG_AI_Content {
 		$entries[$hash]['usedAt'] = time();
 		update_option(self::PUBLISH_TOKENS_OPTION, $entries, false);
 	}
-	private static function project(WP_Post $post, array $contract, bool $detail): array { $result = array('id' => $post->ID, 'contentType' => $contract['apiType'], 'status' => $post->post_status, 'title' => $post->post_title, 'slug' => $post->post_name, 'modifiedAt' => self::modified_at($post)); if (!$detail) return $result; $fields = array(); foreach (self::contract_fields($contract) as $key => $definition) $fields[$key] = !empty($definition['taxonomy']) ? wp_get_post_terms($post->ID, $key === 'tags' ? 'post_tag' : 'category', array('fields' => 'ids')) : get_post_meta($post->ID, '_jg_' . $key, true); $result += array('excerpt' => $post->post_excerpt, 'contentHtml' => $post->post_content, 'fields' => $fields, 'editUrl' => admin_url('post.php?post=' . $post->ID . '&action=edit'), 'previewUrl' => $post->post_status === 'publish' ? get_permalink($post) : null); return $result; }
+
+	private static function issue_update_published_token(WP_Post $post, string $content_type, string $content_hash) {
+		try {
+			$token = bin2hex(random_bytes(32));
+		} catch (Throwable $error) {
+			return self::error('jg_ai_confirmation_token_unavailable', 'A confirmation token could not be created.', 500);
+		}
+		$now = time();
+		$hash = hash('sha256', $token);
+		$entries = array_filter((array) get_option(self::PUBLISH_TOKENS_OPTION, array()), static fn($entry) => is_array($entry) && (int) ($entry['expiresAt'] ?? 0) + DAY_IN_SECONDS >= $now);
+		$entries[$hash] = array(
+			'userId' => get_current_user_id(),
+			'contentType' => $content_type,
+			'contentId' => $post->ID,
+			'expectedModifiedAt' => self::modified_at($post),
+			'action' => self::UPDATE_PUBLISHED_ACTION,
+			'contentHash' => $content_hash,
+			'createdAt' => $now,
+			'expiresAt' => $now + self::PUBLISH_TOKEN_TTL,
+			'usedAt' => null,
+		);
+		if (count($entries) > self::MAX_PUBLISH_TOKENS) {
+			$entries = array_slice($entries, -self::MAX_PUBLISH_TOKENS, null, true);
+		}
+		if (!update_option(self::PUBLISH_TOKENS_OPTION, $entries, false)
+			&& get_option(self::PUBLISH_TOKENS_OPTION, array()) !== $entries) {
+			return self::error('jg_ai_confirmation_token_unavailable', 'A confirmation token could not be created.', 500);
+		}
+		return array(
+			'token' => $token,
+			'expiresAt' => gmdate('Y-m-d\\TH:i:s\\Z', $now + self::PUBLISH_TOKEN_TTL),
+			'fingerprint' => substr($hash, 0, 12),
+		);
+	}
+
+	private static function validate_update_published_token(string $hash, int $post_id, $expected, string $content_type, string $content_hash) {
+		$entries = (array) get_option(self::PUBLISH_TOKENS_OPTION, array());
+		$entry = $entries[$hash] ?? null;
+		if (!is_array($entry)) return self::error('jg_ai_confirmation_token_invalid', 'The confirmation token is invalid.', 403);
+		if (!empty($entry['usedAt'])) return self::error('jg_ai_confirmation_token_used', 'The confirmation token has already been used.', 409);
+		if ((int) ($entry['expiresAt'] ?? 0) <= time()) return self::error('jg_ai_confirmation_token_expired', 'The confirmation token has expired.', 410);
+		if ((int) ($entry['userId'] ?? 0) !== get_current_user_id()
+			|| ($entry['contentType'] ?? '') !== $content_type
+			|| (int) ($entry['contentId'] ?? 0) !== $post_id
+			|| ($entry['action'] ?? '') !== self::UPDATE_PUBLISHED_ACTION
+			|| ($entry['contentHash'] ?? '') !== $content_hash) {
+			return self::error('jg_ai_confirmation_token_mismatch', 'The confirmation token does not match this request.', 403);
+		}
+		$bound = $entry['expectedModifiedAt'] ?? null;
+		if (($bound === null && $expected !== null)
+			|| (is_string($bound) && (!is_string($expected) || !hash_equals($bound, $expected)))) {
+			return self::error('jg_ai_confirmation_token_conflict', 'The confirmation does not match the expected content version.', 409);
+		}
+		return true;
+	}
+
+	private static function protected_fields(WP_Post $post): array {
+		return array(
+			'id' => (int) $post->ID,
+			'postType' => $post->post_type,
+			'slug' => $post->post_name,
+			'status' => $post->post_status,
+			'postDate' => $post->post_date,
+			'postDateGmt' => $post->post_date_gmt,
+			'postAuthor' => (int) $post->post_author,
+			'aiOwner' => (int) get_post_meta($post->ID, '_jg_ai_owner_user_id', true),
+			'aiCreated' => (bool) get_post_meta($post->ID, '_jg_ai_created', true),
+			'editable' => (bool) get_post_meta($post->ID, '_jg_ai_editable', true),
+			'publishable' => (bool) get_post_meta($post->ID, '_jg_ai_publishable', true),
+		);
+	}
+
+	private static function protected_fields_match(array $before, WP_Post $after): bool {
+		return $before === self::protected_fields($after);
+	}
+
+	private static function update_published_error(string $reason): WP_Error {
+		switch ($reason) {
+			case 'unsupported_type':
+				return self::error('jg_ai_update_published_unsupported', 'In-place updates are only available for published diary and article content.', 403);
+			case 'not_found':
+				return self::not_found();
+			case 'not_published':
+				return self::error('jg_ai_update_published_not_published', 'Only published content can be updated in place.', 409);
+			case 'setting_disabled':
+				return self::error('jg_ai_update_published_disabled', 'In-place published updates are disabled for this content type.', 403);
+			case 'missing_capability':
+				return self::error('jg_ai_update_published_forbidden', 'You do not have permission to update published content.', 403);
+			case 'ownership_denied':
+				return self::error('jg_ai_update_published_ownership_required', 'You must be the author or AI owner of this content.', 403);
+			case 'edit_denied':
+				return self::error('jg_ai_update_published_not_editable', 'This content is not editable by the AI content editor.', 403);
+		}
+		return self::error('jg_ai_update_published_forbidden', 'In-place published updates are not authorized.', 403);
+	}
+
+	private static function project(WP_Post $post, array $contract, bool $detail): array {
+		$result = array('id' => $post->ID, 'contentType' => $contract['apiType'], 'status' => $post->post_status, 'title' => $post->post_title, 'slug' => $post->post_name, 'modifiedAt' => self::modified_at($post));
+		if (!$detail) return $result;
+		$fields = array();
+		foreach (self::contract_fields($contract) as $key => $definition) $fields[$key] = !empty($definition['taxonomy']) ? wp_get_post_terms($post->ID, $key === 'tags' ? 'post_tag' : 'category', array('fields' => 'ids')) : get_post_meta($post->ID, '_jg_' . $key, true);
+		$owner_id = (int) get_post_meta($post->ID, '_jg_ai_owner_user_id', true);
+		$result += array(
+			'excerpt' => $post->post_excerpt,
+			'contentHtml' => $post->post_content,
+			'fields' => $fields,
+			'editUrl' => admin_url('post.php?post=' . $post->ID . '&action=edit'),
+			'previewUrl' => $post->post_status === 'publish' ? get_permalink($post) : null,
+			'publishedAt' => self::published_at($post),
+			'canonicalUrl' => self::get_canonical_public_url($contract['apiType'], $post),
+			'ownership' => array(
+				'isAuthor' => (int) $post->post_author === get_current_user_id(),
+				'isAiOwner' => $owner_id > 0 && $owner_id === get_current_user_id(),
+				'aiOwned' => self::is_ai_owner($post),
+				'editable' => (bool) get_post_meta($post->ID, '_jg_ai_editable', true),
+			),
+			'availableOperations' => self::available_operations($contract, $post),
+		);
+		return $result;
+	}
 	private static function public_fields(array $contract): array { $can_update = in_array($contract['apiType'], array('diary', 'article'), true); $fields = array('title' => array('type' => 'string', 'required' => true, 'maxLength' => 200, 'create' => true, 'update' => $can_update), 'slug' => array('type' => 'string', 'required' => false, 'maxLength' => 200, 'create' => true, 'update' => $can_update), 'excerpt' => array('type' => 'string', 'required' => false, 'maxLength' => 1000, 'create' => true, 'update' => $can_update), 'contentHtml' => array('type' => 'html', 'required' => false, 'create' => true, 'update' => false)); if ($can_update) $fields['content'] = array('type' => 'html', 'required' => false, 'create' => false, 'update' => true); foreach (self::contract_fields($contract) as $key => $field) $fields[$key] = array_filter(array('type' => !empty($field['taxonomy']) ? 'array' : $field['type'], 'enum' => $field['options'] ?? null, 'minimum' => $field['min'] ?? null, 'maximum' => $field['max'] ?? null, 'create' => true, 'update' => false), static fn($value) => $value !== null); return $fields; }
 	private static function contract_fields(array $contract): array { $fields = JG_Content_Types::field_definitions()[$contract['postType']] ?? array(); if (!empty($contract['taxonomy'])) { $fields['tags'] = array('type' => 'array', 'taxonomy' => true); $fields['categories'] = array('type' => 'array', 'taxonomy' => true); } return $fields; }
 	private static function statuses($value): array { $allowed = array('draft', 'publish', 'pending', 'private', 'future'); return in_array($value, $allowed, true) ? array($value) : $allowed; }
 	private static function idempotency_key(WP_REST_Request $request) { $key = $request->get_header('Idempotency-Key') ?: (string) $request->get_param('idempotencyKey'); return preg_match('/^[A-Za-z0-9._:-]{8,128}$/', $key) ? $key : self::error('jg_ai_idempotency_required', 'A valid idempotency key is required.', 400); }
 	private static function idempotency_replay(int $user_id, string $action, string $key, string $hash) { $entries = get_option(self::IDEMPOTENCY_OPTION, array()); $entry = $entries[$user_id . ':' . $action . ':' . $key] ?? null; if (!$entry || ($entry['expiresAt'] ?? 0) < time()) return null; return !hash_equals($entry['hash'], $hash) ? self::error('jg_ai_idempotency_conflict', 'This idempotency key was used with a different request.', 409) : $entry['result']; }
 	private static function store_idempotency(int $user_id, string $action, string $key, string $hash, array $result, int $status): void { $entries = array_filter(get_option(self::IDEMPOTENCY_OPTION, array()), static fn($entry) => ($entry['expiresAt'] ?? 0) >= time()); $entries[$user_id . ':' . $action . ':' . $key] = array('hash' => $hash, 'result' => $result, 'status' => $status, 'createdAt' => time(), 'expiresAt' => time() + DAY_IN_SECONDS); if (count($entries) > self::MAX_IDEMPOTENCY_ENTRIES) $entries = array_slice($entries, -self::MAX_IDEMPOTENCY_ENTRIES, null, true); update_option(self::IDEMPOTENCY_OPTION, $entries, false); }
-	private static function rate_limit(string $operation) { $limits = array('create' => 10, 'update' => 30, 'publish' => 5, 'read' => 60, 'deploymentStatus' => 60, 'audit' => 60, 'claim' => 10); $limit = $limits[$operation] ?? 10; $key = 'jg_ai_rate_' . get_current_user_id() . '_' . $operation; $count = (int) get_transient($key); if ($count >= $limit) return self::error('jg_ai_rate_limited', 'Too many requests. Try again later.', 429, array('retryAfter' => 60)); set_transient($key, $count + 1, MINUTE_IN_SECONDS); return true; }
+	private static function rate_limit(string $operation) { $limits = array('create' => 10, 'update' => 30, 'publish' => 5, 'prepareUpdatePublished' => 10, 'updatePublished' => 5, 'read' => 60, 'deploymentStatus' => 60, 'audit' => 60, 'claim' => 10); $limit = $limits[$operation] ?? 10; $key = 'jg_ai_rate_' . get_current_user_id() . '_' . $operation; $count = (int) get_transient($key); if ($count >= $limit) return self::error('jg_ai_rate_limited', 'Too many requests. Try again later.', 429, array('retryAfter' => 60)); set_transient($key, $count + 1, MINUTE_IN_SECONDS); return true; }
 	private static function record(string $action, string $type, int $post_id, int $status, array $fields, bool $replay, array $details = array()): void {
 		$safe_details = array();
 		if (isset($details['reason']) && is_string($details['reason'])) $safe_details['reason'] = sanitize_key($details['reason']);

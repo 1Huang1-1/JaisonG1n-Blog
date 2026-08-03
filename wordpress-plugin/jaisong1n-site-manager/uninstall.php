@@ -52,6 +52,8 @@ $ai_role = get_role('jg_ai_content_editor');
 if ($ai_role) {
 	$ai_role->remove_cap('jg_ai_publish_diary_drafts');
 	$ai_role->remove_cap('jg_ai_publish_article_drafts');
+	$ai_role->remove_cap('jg_ai_update_published_diaries');
+	$ai_role->remove_cap('jg_ai_update_published_articles');
 }
 
 foreach (array('administrator', 'editor') as $role_name) {

@@ -1,5 +1,16 @@
 # Current project state
 
+## 2026-08-03 Site Manager 0.10.0 已发布内容原地修改（本地实现）
+
+- 插件代码版本为 `0.10.0`，公开快照 `schemaVersion` 继续为 `5`。
+- 新增 `prepareUpdatePublished` / `updatePublished`（diary 与 article 分别声明）：两阶段准备→精确确认→执行；只允许修改 title/excerpt/content。
+- 受保护字段策略：ID、contentType、slug、status、post_date、post_date_gmt、作者与 AI 所有权元数据在更新前后逐项比对；变化返回 `jg_ai_protected_field_changed` / `jg_ai_readback_verification_failed`，不执行重新发布补救。
+- token 绑定用户/类型/对象/expectedModifiedAt/内容哈希/update_published action，10 分钟一次性；幂等键防重放；成功后进入既有防抖构建与部署状态跟踪。
+- 独立 capability `jg_ai_update_published_diaries` / `jg_ai_update_published_articles` 与“审核制已发布日记修改”“审核制已发布文章修改”开关（默认关闭）；diary/article 隔离，不授予原生权限。
+- read 契约补充稳定 `publishedAt`、`canonicalUrl`、安全 ownership 信息（isAuthor/isAiOwner/aiOwned/editable）与 `availableOperations`。
+- 本地测试：AI Content Playground 222 条断言（含 diary/article 原地修改、受保护字段、token、幂等、并发、能力隔离）、部署状态 97 条断言、smoke、0.9.0→0.10.0 升级（默认关闭、不扩大权限）、`pnpm test` 全通过、`pnpm check` 320 文件零问题。
+- 本版本为本地实现与本地测试结果；尚未安装到真实 WordPress，未执行生产验收。生产实时版本仍为 `0.9.0`。
+
 ## 2026-08-02 Site Manager 0.9.0 article 受控发布（本地实现）
 
 - 插件代码版本为 `0.9.0`，公开快照 `schemaVersion` 继续为 `5`。
@@ -55,7 +66,7 @@
 ## 基本信息
 
 - 项目名称：JaisonG1n-Blog
-- 当前插件版本：JaisonG1n Site Manager `0.9.0`（本地实现；生产实时版本为 `0.8.3`，未安装 0.9.0）
+- 当前插件版本：JaisonG1n Site Manager `0.10.0`（本地实现；生产实时版本为 `0.9.0`，未安装 0.10.0）
 - 当前快照 schemaVersion：`5`
 - 主分支：`master`（`origin/HEAD` 指向 `origin/master`）
 - 当前工作分支：`codex/ai-content-api-0-7`

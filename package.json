@@ -9,7 +9,7 @@
 		"test:wordpress-ai-content": "npx @wp-playground/cli@latest php --auto-mount wordpress-plugin/jaisong1n-site-manager --php=8.3 --wp=latest --verbosity=quiet -- /wordpress/wp-content/plugins/jaisong1n-site-manager/tests/playground-ai-content.php",
 		"test:wordpress-deployment-status": "npx @wp-playground/cli@latest php --auto-mount wordpress-plugin/jaisong1n-site-manager --php=8.3 --wp=latest --verbosity=quiet -- /wordpress/wp-content/plugins/jaisong1n-site-manager/tests/playground-deployment-status.php",
 		"package:wordpress-plugin": "node scripts/package-wordpress-plugin.mjs",
-		"verify:wordpress-plugin-package": "node scripts/verify-wordpress-plugin-package.mjs wordpress-plugin/dist/jaisong1n-site-manager-0.9.0.zip",
+		"verify:wordpress-plugin-package": "node scripts/verify-wordpress-plugin-package.mjs wordpress-plugin/dist/jaisong1n-site-manager-0.10.0.zip",
 		"test:wordpress-upgrade": "node scripts/test-wordpress-plugin-upgrade.mjs",
 		"sync-content": "node scripts/sync-content.js",
 		"sync-wordpress": "node scripts/sync-wordpress.mjs",

@@ -27,6 +27,8 @@ final class JG_Settings {
 			'auto_publishable_ai_diaries' => false,
 			'reviewed_article_publish' => false,
 			'auto_publishable_ai_articles' => false,
+			'update_published_diaries' => false,
+			'update_published_articles' => false,
 			'banner_desktop_ids' => '',
 			'banner_mobile_ids' => '',
 			'carousel_interval' => 5,
@@ -109,6 +111,8 @@ final class JG_Settings {
 		$output['auto_publishable_ai_diaries'] = !empty($input['auto_publishable_ai_diaries']);
 		$output['reviewed_article_publish'] = !empty($input['reviewed_article_publish']);
 		$output['auto_publishable_ai_articles'] = !empty($input['auto_publishable_ai_articles']);
+		$output['update_published_diaries'] = !empty($input['update_published_diaries']);
+		$output['update_published_articles'] = !empty($input['update_published_articles']);
 		$output['cleanup_on_uninstall'] = !empty($input['cleanup_on_uninstall']);
 		$output['feature_pages'] = array();
 		foreach (array_keys($defaults['feature_pages']) as $page) {
@@ -246,6 +250,10 @@ final class JG_Settings {
 		echo '<p class="description">启用后为 AI 角色授予独立的文章受控发布能力，仅允许两阶段发布流程，不授予 WordPress 原生发布权限。</p>';
 		self::checkbox('auto_publishable_ai_articles', 'AI 自建文章自动允许进入受控发布流程', $s['auto_publishable_ai_articles']);
 		echo '<p class="description">自动允许的只是进入两阶段发布流程（preparePublish + 一次性 confirmationToken），不是自动公开发布。</p>';
+		self::checkbox('update_published_diaries', '审核制已发布日记修改', $s['update_published_diaries']);
+		echo '<p class="description">开启后 AI 角色可对已发布日记执行“准备→精确确认→原地修改”，不改 slug、发布时间与作者。</p>';
+		self::checkbox('update_published_articles', '审核制已发布文章修改', $s['update_published_articles']);
+		echo '<p class="description">开启后 AI 角色可对已发布文章执行“准备→精确确认→原地修改”，不改 slug、发布时间与作者。</p>';
 		self::checkbox('auto_publishable_ai_diaries', 'AI 自建日记自动允许进入受控发布流程', $s['auto_publishable_ai_diaries']);
 		echo '<p class="description">自动允许的只是进入两阶段发布流程（preparePublish + 一次性 confirmationToken），不是自动公开发布。</p>';
 		self::textarea('trusted_media_hosts', '可信 WordPress 媒体主机（每行一个）', $s['trusted_media_hosts']); self::textarea('embed_hosts', 'iframe/audio/video 白名单（每行一个）', $s['embed_hosts']);

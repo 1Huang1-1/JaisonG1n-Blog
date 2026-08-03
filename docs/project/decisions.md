@@ -1,5 +1,29 @@
 # 重要技术决策
 
+## 2026-08-03：已发布内容原地修改采用两阶段并保护不可变字段（Site Manager 0.10.0）
+
+### 问题
+
+用户需要修改已发布的日记/文章，但不能走“转草稿再发布”或新建副本；WordPress 更新本身不会主动改写发布时间，但不能依赖隐式行为。
+
+### 最终选择
+
+新增独立 operation `prepareUpdatePublished` / `updatePublished`，与 `updateDraft` 完全分离：
+
+- 仅允许修改 title/excerpt/content；slug、status、post_date、post_date_gmt、作者与 AI 所有权元数据为受保护字段，更新前保存原值、更新后逐项比对，任何变化返回 `jg_ai_protected_field_changed` 且不做重新发布补救。
+- 两阶段：prepare 返回变更预览、精确确认短语与绑定（用户、类型、对象、版本、内容哈希、action）的一次性 10 分钟 token；execute 校验 token 与幂等键后执行，`post_modified` 正常更新并进入既有防抖构建链路。
+- 独立类型级 capability `jg_ai_update_published_diaries` / `jg_ai_update_published_articles` 与“审核制已发布日记修改”“审核制已发布文章修改”开关（默认关闭）；不授予原生权限，diary/article 能力隔离。
+- read 契约补充稳定 `publishedAt`、`canonicalUrl`、安全 ownership 信息与 `availableOperations`，不返回内部 meta 或凭据。
+
+### 放弃或暂缓的方案
+
+- 分类、标签、特色图修改保留到媒体版本，不纳入本次。
+- 不把 `updateDraft` 扩展为接受 publish 状态。
+
+### 影响
+
+schemaVersion 保持 5（新增 operation 与响应字段向后兼容）；0.9.0→0.10.0 升级默认关闭新能力。
+
 ## 2026-08-02：article 复用 diary 受控发布管道并保持独立权限（Site Manager 0.9.0）
 
 ### 问题
