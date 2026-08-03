@@ -1,6 +1,6 @@
 # OpenClaw Blog Agent：已发布内容原地修改实施规范
 
-状态：Site Manager 0.10.0 服务端已实现并本地测试通过，但尚未部署到生产 WordPress；OpenClaw 仓库不在当前 Codex 工作区。**OpenClaw 侧实现必须等待实时 capabilities 出现 `prepareUpdatePublished` / `updatePublished` 后再启用**，不得伪造支持。
+状态：Site Manager 0.10.1 服务端已实现；生产已部署 0.10.0 并开启两个开关。**OpenClaw 侧实现必须等待实时 capabilities 出现 `prepareUpdatePublished` / `updatePublished` 后再启用**，不得伪造支持。
 
 ## 1. 前置条件检查
 

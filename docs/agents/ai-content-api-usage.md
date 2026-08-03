@@ -1,6 +1,6 @@
 # AI Content API Usage
 
-## Reviewed publish protocol (Site Manager 0.10.0)
+## Reviewed publish protocol (Site Manager 0.10.1)
 
 Treat `publish` as a two-stage, server-authorized diary-only operation. It is available only when the live diary capabilities include both `preparePublish` and `publish`.
 

@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.10.0
+Stable tag: 0.10.1
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -24,6 +24,11 @@ The plugin accepts a fine-grained GitHub token with Actions Read and write for t
 Deactivation retains all data. Normal uninstall removes plugin-added role capabilities but retains content and settings. Destructive data cleanup runs only when an administrator explicitly enables it before uninstalling.
 
 == Changelog ==
+
+= 0.10.1 =
+
+* Fixes deployment-status association for content merged into a debounce batch after the batch started: dispatch records now store the actual `dispatchedAt`, and legacy records without it fall back to their trusted `lastCheckedAt` (record creation time) before the batch `triggeredAt`.
+* New and historical dispatch records therefore associate correctly with later-merged diary/article changes without re-modifying content or re-dispatching.
 
 = 0.10.0 =
 

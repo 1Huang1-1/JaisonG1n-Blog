@@ -2,7 +2,7 @@
 
 ## Reviewed diary publishing
 
-Site Manager 0.10.0 requires a two-stage server flow for AI diary and article publishing. A direct status update is prohibited. The Agent must first obtain a short-lived confirmation token from `prepare-publish`, then submit that token with the unchanged `expectedModifiedAt` and a stable idempotency key to `publish`.
+Site Manager 0.10.1 requires a two-stage server flow for AI diary and article publishing. A direct status update is prohibited. The Agent must first obtain a short-lived confirmation token from `prepare-publish`, then submit that token with the unchanged `expectedModifiedAt` and a stable idempotency key to `publish`.
 
 The preparation step is not publication and must not be described as success. A content change after preparation invalidates the confirmation and requires a new read, a new user confirmation, and a new token. The Agent must not expose or retain confirmation tokens, must not attempt unpublishing, and must not invoke GitHub deployment APIs directly.
 

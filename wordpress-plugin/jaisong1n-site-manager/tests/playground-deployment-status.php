@@ -327,6 +327,26 @@ jg_ds_assert(is_array($batch_article_found) && (int) ($batch_article_found['work
 $batch_diary_found = JG_Dispatch::find_latest_record_for_content('diary', (int) $batch_diary_id, trim((string) get_post($batch_diary_id)->post_modified_gmt));
 jg_ds_assert(is_array($batch_diary_found) && (int) ($batch_diary_found['workflowRunId'] ?? 0) === 555, 'First content of the merged batch lost its dispatch record.');
 
+// Legacy records without dispatchedAt fall back to lastCheckedAt (the record
+// creation time, which equals the dispatch attempt time) so historical merged
+// batches stay associable; records predating the change are not traceable.
+$legacy_copy = $batch_record;
+unset($legacy_copy['dispatchedAt']);
+jg_ds_assert(!isset($legacy_copy['dispatchedAt']), 'Legacy fixture unexpectedly has dispatchedAt.');
+$legacy_history = get_option('jg_dispatch_history', array());
+array_unshift($legacy_history, $legacy_copy);
+update_option('jg_dispatch_history', $legacy_history, false);
+$legacy_found = JG_Dispatch::find_latest_record_for_content('article', (int) $batch_article_id, $batch_article_mod);
+jg_ds_assert(is_array($legacy_found) && (int) ($legacy_found['workflowRunId'] ?? 0) === 555, 'Legacy record without dispatchedAt could not associate via lastCheckedAt.');
+$stale_legacy = $legacy_copy;
+$stale_legacy['lastCheckedAt'] = '2026-08-03T04:00:00+00:00';
+$stale_legacy['contentRefs'] = array(array('contentType' => 'article', 'contentId' => 999991, 'modifiedAt' => '2026-08-03T04:30:00+00:00'));
+$legacy_history = get_option('jg_dispatch_history', array());
+array_unshift($legacy_history, $stale_legacy);
+update_option('jg_dispatch_history', $legacy_history, false);
+$stale_found = JG_Dispatch::find_latest_record_for_content('article', 999991, '2026-08-03 05:00:00');
+jg_ds_assert($stale_found === null, 'Legacy record predating the content change must not be associated.');
+
 // Legacy history entries without contentRefs are never hard-bound.
 $legacy_history = get_option('jg_dispatch_history', array());
 $legacy_history[] = array('state' => 'success', 'message' => 'legacy', 'time' => gmdate('c'), 'workflow_run_id' => 999);

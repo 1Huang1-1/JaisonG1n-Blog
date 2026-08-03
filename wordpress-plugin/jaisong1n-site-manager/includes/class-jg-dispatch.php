@@ -334,7 +334,11 @@ final class JG_Dispatch {
 				}
 			}
 			if (!$found) continue;
+			// Coverage time: prefer the actual dispatch time. Legacy records
+			// predating dispatchedAt store lastCheckedAt at record creation,
+			// which equals the dispatch attempt time and stays trusted.
 			$coverage_ts = isset($record['dispatchedAt']) && is_string($record['dispatchedAt']) ? strtotime($record['dispatchedAt']) : 0;
+			if ($coverage_ts <= 0 && isset($record['lastCheckedAt']) && is_string($record['lastCheckedAt'])) $coverage_ts = strtotime($record['lastCheckedAt']);
 			if ($coverage_ts <= 0 && isset($record['triggeredAt']) && is_string($record['triggeredAt'])) $coverage_ts = strtotime($record['triggeredAt']);
 			if ($modified_ts > 0 && $coverage_ts > 0 && $coverage_ts < $modified_ts) continue;
 			return $record;

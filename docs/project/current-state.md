@@ -1,5 +1,13 @@
 # Current project state
 
+## 2026-08-03 Site Manager 0.10.1 合并批次 dispatch 关联修复（本地实现）
+
+- 插件代码版本为 `0.10.1`，公开快照 `schemaVersion` 继续为 `5`。
+- 修复已发布内容原地修改后 deployment-status 关联：dispatch 记录新增实际 `dispatchedAt`；旧记录（无 dispatchedAt）回退可信的 `lastCheckedAt`（记录创建时间=实际 dispatch 尝试时间），再回退批次 `triggeredAt`。
+- 新记录与历史记录均能正确关联到合并批次中后加入的 diary/article 变更，无需重新修改内容或重复 dispatch；时间早于内容变更的记录仍明确不可追溯（返回无记录）。
+- 本地测试：部署状态 Playground 113 条断言（新增历史记录兼容：新格式带 dispatchedAt、旧格式无 dispatchedAt、后加入内容、可关联/不可追溯、不影响新记录、不重复 dispatch）、AI Content 222 条断言、smoke、0.10.0→0.10.1 升级、`pnpm test`、`pnpm check` 320 文件零问题。
+- 生产实时版本仍为 `0.10.0`；0.10.1 为待部署热修复包。
+
 ## 2026-08-03 Site Manager 0.10.0 已发布内容原地修改（本地实现）
 
 - 插件代码版本为 `0.10.0`，公开快照 `schemaVersion` 继续为 `5`。
@@ -66,7 +74,7 @@
 ## 基本信息
 
 - 项目名称：JaisonG1n-Blog
-- 当前插件版本：JaisonG1n Site Manager `0.10.0`（本地实现；生产实时版本为 `0.9.0`，未安装 0.10.0）
+- 当前插件版本：JaisonG1n Site Manager `0.10.1`（本地实现；生产实时版本为 `0.10.0`，未安装 0.10.1）
 - 当前快照 schemaVersion：`5`
 - 主分支：`master`（`origin/HEAD` 指向 `origin/master`）
 - 当前工作分支：`codex/ai-content-api-0-7`
