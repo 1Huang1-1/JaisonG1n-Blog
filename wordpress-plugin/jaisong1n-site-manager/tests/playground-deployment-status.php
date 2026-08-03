@@ -293,6 +293,40 @@ jg_ds_assert(($article_status['contentType'] ?? '') === 'article' && (int) ($art
 jg_ds_assert(($article_status['publicUrl'] ?? '') === 'https://jaisong1n.com/posts/my-article/', 'Article canonical public URL is incorrect in deployment status.');
 jg_ds_assert(($article_status['buildStatus'] ?? '') === 'success' && ($article_status['pageStatus'] ?? '') === 'reachable' && ($article_status['deploymentStatus'] ?? '') === 'deployed', 'Article deployment status layers are incorrect.');
 
+// Regression: content merged into an existing debounce batch after the batch
+// started must still associate with the resulting dispatch record. The record
+// stores the batch-start triggeredAt, so association must use the actual
+// dispatch time (dispatchedAt) when deciding whether a change was covered.
+$batch_diary_id = wp_insert_post(array('post_type' => 'jg_diary', 'post_status' => 'publish', 'post_author' => (int) $user_id, 'post_title' => 'Batch diary', 'post_name' => 'batch-diary', 'post_content' => '<p>d</p>'));
+$batch_article_id = wp_insert_post(array('post_type' => 'post', 'post_status' => 'publish', 'post_author' => (int) $user_id, 'post_title' => 'Batch article', 'post_name' => 'batch-article', 'post_content' => '<p>a</p>'));
+update_post_meta($batch_diary_id, '_jg_ai_owner_user_id', (int) $user_id);
+update_post_meta($batch_article_id, '_jg_ai_owner_user_id', (int) $user_id);
+delete_option('jg_dispatch_pending');
+wp_clear_scheduled_hook(JG_Dispatch::CRON_HOOK);
+JG_Dispatch::post_saved((int) $batch_diary_id, get_post($batch_diary_id), true);
+$batch_start = get_option('jg_dispatch_pending', array())['triggeredAt'] ?? '';
+jg_ds_assert($batch_start !== '', 'Debounce batch start is missing.');
+global $wpdb;
+$wpdb->update($wpdb->posts, array('post_modified' => '2026-08-03 05:00:00', 'post_modified_gmt' => '2026-08-03 05:00:00'), array('ID' => (int) $batch_article_id));
+clean_post_cache((int) $batch_article_id);
+JG_Dispatch::post_saved((int) $batch_article_id, get_post($batch_article_id), true);
+$merged_pending = get_option('jg_dispatch_pending', array());
+jg_ds_assert(($merged_pending['triggeredAt'] ?? '') === $batch_start, 'Debounce merge reset the batch start.');
+jg_ds_assert(count($merged_pending['contentRefs'] ?? array()) === 2, 'Debounce merge did not accumulate both content refs.');
+$batch_article_mod = trim((string) get_post($batch_article_id)->post_modified_gmt);
+$jg_ds_http_responses[$dispatch_endpoint] = array('code' => 200, 'body' => wp_json_encode(array('workflow_run_id' => 555, 'run_url' => 'https://api.github.com/repos/1Huang1-1/JaisonG1n-Blog/actions/runs/555', 'html_url' => 'https://github.com/1Huang1-1/JaisonG1n-Blog/actions/runs/555')));
+delete_option('jg_last_dispatched_revision');
+JG_Dispatch::dispatch_if_changed();
+$batch_history = get_option('jg_dispatch_history', array());
+$batch_record = $batch_history[0] ?? null;
+jg_ds_assert(is_array($batch_record) && (int) ($batch_record['workflowRunId'] ?? 0) === 555, 'Merged batch did not dispatch once with run id 555.');
+jg_ds_assert(count($batch_record['contentRefs'] ?? array()) === 2, 'Merged batch record lost content refs.');
+jg_ds_assert(isset($batch_record['dispatchedAt']) && strtotime($batch_record['dispatchedAt']) >= strtotime($batch_article_mod), 'Dispatch record dispatchedAt predates a merged content change.');
+$batch_article_found = JG_Dispatch::find_latest_record_for_content('article', (int) $batch_article_id, $batch_article_mod);
+jg_ds_assert(is_array($batch_article_found) && (int) ($batch_article_found['workflowRunId'] ?? 0) === 555, 'Later-merged article could not associate with the dispatch record.');
+$batch_diary_found = JG_Dispatch::find_latest_record_for_content('diary', (int) $batch_diary_id, trim((string) get_post($batch_diary_id)->post_modified_gmt));
+jg_ds_assert(is_array($batch_diary_found) && (int) ($batch_diary_found['workflowRunId'] ?? 0) === 555, 'First content of the merged batch lost its dispatch record.');
+
 // Legacy history entries without contentRefs are never hard-bound.
 $legacy_history = get_option('jg_dispatch_history', array());
 $legacy_history[] = array('state' => 'success', 'message' => 'legacy', 'time' => gmdate('c'), 'workflow_run_id' => 999);

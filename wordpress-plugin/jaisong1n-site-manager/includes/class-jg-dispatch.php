@@ -334,8 +334,9 @@ final class JG_Dispatch {
 				}
 			}
 			if (!$found) continue;
-			$triggered = isset($record['triggeredAt']) && is_string($record['triggeredAt']) ? strtotime($record['triggeredAt']) : 0;
-			if ($modified_ts > 0 && $triggered > 0 && $triggered < $modified_ts) continue;
+			$coverage_ts = isset($record['dispatchedAt']) && is_string($record['dispatchedAt']) ? strtotime($record['dispatchedAt']) : 0;
+			if ($coverage_ts <= 0 && isset($record['triggeredAt']) && is_string($record['triggeredAt'])) $coverage_ts = strtotime($record['triggeredAt']);
+			if ($modified_ts > 0 && $coverage_ts > 0 && $coverage_ts < $modified_ts) continue;
 			return $record;
 		}
 		return null;
@@ -447,6 +448,7 @@ final class JG_Dispatch {
 			'buildConclusion' => null,
 			'deploymentStatus' => 'unknown',
 			'triggeredAt' => isset($pending['triggeredAt']) && is_string($pending['triggeredAt']) ? $pending['triggeredAt'] : gmdate('c'),
+			'dispatchedAt' => gmdate('c'),
 			'startedAt' => null,
 			'completedAt' => null,
 			'lastCheckedAt' => gmdate('c'),
