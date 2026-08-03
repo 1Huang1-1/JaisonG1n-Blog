@@ -1,5 +1,28 @@
 # Project Instructions
 
+## Feature-first development mode
+
+The project now has a production-verified baseline.
+
+Prioritize implementation progress over repeatedly re-validating established
+capabilities.
+
+During development:
+
+- Run targeted tests for the changed module.
+- Do not repeat full production acceptance for unchanged behavior.
+- Do not create a release, tag, or lengthy acceptance report for every small
+  patch.
+- Reuse previously verified security, transport, publishing, and deployment
+  foundations.
+- Perform the full test suite and one production acceptance only when the
+  complete version is ready for release.
+- Keep status reports focused on completed functionality, blockers, tests,
+  risks, and commit hashes.
+
+Do not reduce safety checks for genuinely new high-risk write operations, but
+avoid re-proving unchanged guarantees.
+
 ## Blog Content Assistant
 
 This file is the Codex entry point for the cross-agent blog rules in `docs/agents/`. Those rules are shared by Codex and future agents such as OpenClaw; do not create a separate Codex-only copy.
