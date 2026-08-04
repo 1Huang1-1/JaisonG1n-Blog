@@ -5,8 +5,165 @@
   <link href="https://jaisong1n.com/" rel="alternate" type="text/html"/>
   <link href="https://jaisong1n.com/atom.xml" rel="self" type="application/atom+xml"/>
   <id>https://jaisong1n.com/</id>
-  <updated>2026-08-04T02:19:24.655Z</updated>
+  <updated>2026-08-04T05:52:28.284Z</updated>
   <language>zh_CN</language>
+  <entry>
+    <title>Tool、Skill 与 MCP：能力、工作流与标准协议，不在同一个层次</title>
+    <link href="https://jaisong1n.com/posts/tool-skill-mcp-capability-workflow-protocol/" rel="alternate" type="text/html"/>
+    <id>https://jaisong1n.com/posts/tool-skill-mcp-capability-workflow-protocol/</id>
+    <published>2026-08-04T03:49:37.000Z</published>
+    <updated>2026-08-04T03:49:37.000Z</updated>
+    <summary>Tool、Skill 与 MCP：能力、工作流与标准协议，不在同一个层次 打开任意一个 Agent 相关文档， […]</summary>
+    <content type="html"><![CDATA[<h1>Tool、Skill 与 MCP：能力、工作流与标准协议，不在同一个层次</h1>
+<p>打开任意一个 Agent 相关文档，你都会同时看到三个词：Tool、Skill、MCP。有人把 Skill 当成”更复杂的 Tool”，有人把 MCP 称为”插件系统”，还有人以为接入 MCP 就不需要本地工具了。这些说法不是完全错误，但都混淆了一个关键事实：<strong>三者解决的并不是同一个问题，它们位于同一个 Agent 系统的不同层次</strong>。</p>
+<p>这篇文章用三层框架拆开它们：Tool 是 Agent 可以执行的<strong>原子能力</strong>，Skill 是围绕任务组织起来的<strong>可复用工作流与规则</strong>，MCP 是客户端与外部能力之间的<strong>标准连接协议</strong>。为了让讨论落地，我会结合当前 OpenClaw 博客 Agent 的真实结构——它同时包含本地插件 Tool（如 <code>generate_academic_figure</code>）与 Skill（如 <code>academic-figure-prompt</code>），目前尚未接入 MCP Server。</p>
+<h2>先给结论：它们属于不同层次</h2>
+<p>先把三者并排放一张表，便于后文展开：</p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>主要解决的问题</th>
+<th>典型内容</th>
+<th>是否属于协议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tool</td>
+<td>让模型执行一个具体动作</td>
+<td>函数、API 调用、文件操作，带结构化输入输出</td>
+<td>否</td>
+</tr>
+<tr>
+<td>Skill</td>
+<td>让 Agent 按稳定流程完成一类任务</td>
+<td>规则、步骤、模板、工具调用策略与安全边界</td>
+<td>通常不是（各平台实现不同）</td>
+</tr>
+<tr>
+<td>MCP</td>
+<td>让客户端以标准方式连接外部能力</td>
+<td>tools、resources、prompts 等服务器侧能力</td>
+<td>是</td>
+</tr>
+</tbody>
+</table>
+<p>一个关键前提必须先说清：<strong>Skill 不是所有 AI 产品共同遵循的统一技术标准</strong>。OpenAI 的”tools”、Anthropic 的”tool use”、OpenClaw 的 Skill 目录、MCP 的 prompts——它们对”能力”和”工作流”的包装方式各不相同。后文凡是提到 Skill，指的是本仓库这类”以 SKILL.md 描述任务规则”的实现，不代表所有平台都相同。</p>
+<p><em>图：Tool、Skill 与 MCP 的三层关系总览。上层是 Agent 与用户意图，中层是 Skill 的任务编排，下层是本地 Tool 与 MCP 标准连接两条能力供给路径；图片由 qwen-image-2.0 生成，文字与箭头细节等待人工核验。</em></p>
+<h2>Tool：让模型真正执行动作</h2>
+<p><img src="https://cms.jaisong1n.com/wp-content/uploads/2026/08/mcp-progressive-discovery.png" alt="MCP 工具按需发现流程" /></p>
+<p>MCP 官方文档对 Tool 调用流程的示意：按需发现、检查与调用三阶段。来源：Model Context Protocol project，许可 CC BY 4.0，未修改。</p>
+<p>大模型本身只能输出文本。要让它查询数据库、调用 API、读写文件，就需要把”动作”包装成模型可调用、可校验、可反馈的对象——这就是 Tool。</p>
+<p>Tool 的核心特征有四条：</p>
+<ol>
+<li><strong>结构化输入输出</strong>：Tool 用参数 Schema 声明它接受什么、返回什么。OpenAI 的 function calling 中，每个 function tool 由 <code>name</code>、<code>description</code> 和 <code>parameters</code>（JSON Schema）定义；Anthropic 的 tool use 同样通过 <code>tools</code> 参数把函数定义交给模型，模型在需要时返回 <code>tool_use</code> 消息，系统执行后把结果作为 <code>tool_result</code> 交回。</li>
+<li><strong>参数校验与权限</strong>：工具在调用前校验参数合法性，在调用时遵循权限边界，错误以结构化方式返回，而不是让模型”猜”结果。</li>
+<li><strong>与自然语言回复区分</strong>：Tool 调用是”动作”，模型回复是”文本”。一个负责改变世界，一个负责说明。</li>
+<li><strong>来源不限</strong>：Tool 可以由客户端进程直接注册（本地 Tool），也可以由 MCP Server 暴露——但”由 MCP 暴露”只是 Tool 的一种供给渠道，不是唯一渠道。</li>
+</ol>
+<p>以当前 OpenClaw 插件为例，<code>generate_academic_figure</code> 就是一个本地注册的 Tool：它声明了 <code>prompt</code>、<code>figureSpec</code>、<code>size</code> 等参数（TypeBox Schema），执行时校验参数、调用 DashScope API、下载图片并返回本地路径。简化后的结构大致是：</p>
+<pre><code>tool {
+  name: "generate_academic_figure",
+  parameters: { prompt: string, size?: string, ... },
+  execute: (params) =&gt; { 校验 → 调 API → 保存 → 返回结果 }
+}
+</code></pre>
+<p>这个例子里还藏着 Tool 的另外两个关键设计：</p>
+<ul>
+<li><strong>错误处理是 Tool 的一部分</strong>。参数非法、鉴权失败、限流、超时、下载到的内容不是图片——这些都要由 Tool 转成模型能理解的错误摘要，而不是让模型凭空猜测发生了什么。本地实现里，网络错误、服务端 5xx、429 限流各有明确处理：429 与 5xx 最多退避重试一次，参数与鉴权错误不重试，超时后绝不自动重试（因为无法确认服务端是否已经成功生成）。</li>
+<li><strong>Tool 是权限的边界</strong>。谁在什么条件下可以调用、调用后能碰哪些资源，都由 Tool 这一层把关。它调用百炼 API 时只携带最小必要的权限，下载图片时校验协议、内容类型与文件大小，把结果保存在受控目录——这些约束写在 Tool 代码里，而不是留给模型”自觉”。</li>
+</ul>
+<p><strong>Tool 不等于自然语言能力</strong>：它把”执行”从”表达”中分离出来，是 Agent 能够行动的物理基础。</p>
+<h2>Skill：把工具组织成可重复的任务方法</h2>
+<p><img src="https://cms.jaisong1n.com/wp-content/uploads/2026/08/output.png" alt="Skill Workflow 与 Tool 执行的分工" /></p>
+<p>Skill 负责编排（Figure Spec、Prompt、审查规则），Tool 负责真实执行（DashScope 生图）。本站原创，根据 openclaw-blog-agent 实际实现整理。</p>
+<p>Tool 解决了”能不能做”，但没解决”该怎么做、按什么顺序、受什么约束”。当任务有一类稳定的流程——比如”写一篇 AI 科技日报”或”为文章生成配图”——需要把规则、步骤、模板和调用条件固化下来，这就是 Skill。</p>
+<p>Skill 更接近<strong>任务说明书</strong>：它描述目标、步骤、边界和判断标准，本身不一定执行真实动作。Skill 通常包含：</p>
+<ul>
+<li>研究策略与来源优先级；</li>
+<li>写作模板与风格要求；</li>
+<li>安全边界与禁止行为；</li>
+<li>Tool 的调用条件（什么时候调、参数怎么填）。</li>
+</ul>
+<p>因此，<strong>没有 Tool 时，Skill 可能只能生成规划或 Prompt</strong>——这一点在本地实现里看得很清楚。<code>academic-figure-prompt</code> 这个 Skill 负责：分析文章、生成 Figure Spec（节点/连线/层次）、选择配色、给出比例与图注建议、生成英文生图 Prompt 和审查清单。它<strong>不调用任何生图接口</strong>；真正的图片生成由 Tool <code>generate_academic_figure</code> 完成。Skill 与 Tool 的分工是：<strong>Skill 决定”画什么、按什么规范画”，Tool 决定”真的画出来”</strong>。</p>
+<p>同样要注意：不同系统的 Skill 机制并不相同。本仓库的 Skill 是”SKILL.md 规则文件 + 由 Agent 读取执行”；其他平台可能有完全不同的目录结构和加载方式。把某一家的 Skill 当成通用标准，是常见误解。</p>
+<p>还需要区分 Skill 与 MCP 的 prompts：MCP 规范里的 prompts 是服务器侧暴露的”模板化消息与工作流”，本质是一个可发现、可检索、可传参的协议对象；而本文讨论的 Skill 是客户端本地组织任务规则的文档。两者名字相近、定位不同——一个属于协议层，一个属于编排层。</p>
+<p>Skill 的另一个特征是<strong>可组合性</strong>：一个 Skill 可以调用另一个 Skill 的结果。本仓库里 <code>jaisong1n-blog</code> 负责识别任务类型并决定调用哪个 Skill，<code>academic-figure-prompt</code> 负责配图规划，<code>blog-news-research</code> 负责研究——它们各管一段，通过 Agent 串联成完整流程。这种”任务分解 + 各自为政”的组织方式，正是 Skill 与”把所有逻辑写进一个 Tool”的差别所在。</p>
+<p>另一个诚实的边界：当前博客 Agent 的 Skill 只能做规划和 Prompt，<strong>WordPress 媒体上传并未实现</strong>——所以”生成图片并插入文章”目前止步于”生成本地图片 + 返回路径”，这一点不能因为文章叙事而写成已实现。</p>
+<h2>MCP：解决外部能力如何标准连接</h2>
+<p><img src="https://cms.jaisong1n.com/wp-content/uploads/2026/08/mcp-simple-diagram-scaled.png" alt="MCP 的 Client/Server 架构与 Tools、Resources、Prompts 三类能力" /></p>
+<p>MCP 的 Client/Server 结构：Host（AI 应用）通过标准协议连接 Server，Server 暴露 Tools、Resources、Prompts 三类能力。来源：Model Context Protocol project，许可 CC BY 4.0，未修改。</p>
+<p>当你要接的不是一个 API，而是一整类外部系统（数据库、GitHub、搜索服务）时，逐个写适配代码会变得昂贵。MCP（Model Context Protocol）的定位是：<strong>一个开放的、标准化的连接协议</strong>，让 AI 应用通过统一方式连接外部数据源与工具。官方文档把它类比为”AI 应用的 USB-C 接口”。</p>
+<p>MCP 的核心结构是 <strong>Client 与 Server</strong>：</p>
+<ul>
+<li>Client 是 AI 应用（如 Claude、ChatGPT、IDE）；</li>
+<li>Server 暴露能力，能力分为三类（官方规范定义）：<strong>tools</strong>（模型可执行的函数）、<strong>resources</strong>（提供上下文的数据，按 URI 标识）、<strong>prompts</strong>（可复用的模板化消息与工作流）。</li>
+</ul>
+<p>需要特别说清 MCP 的三条边界：</p>
+<ol>
+<li><strong>MCP 解决的是连接与互操作</strong>，不是替 Agent 设计工作流。Server 暴露 tools/resources/prompts，但”任务该怎么编排、何时调用、结果怎么审查”仍然由客户端与上层 Agent 逻辑决定。</li>
+<li><strong>MCP Server 暴露 Tool，不代表 Tool 只能通过 MCP 提供</strong>。本地直接注册的 Tool（如当前 OpenClaw 的 <code>generate_academic_figure</code>）完全合法且常见。</li>
+<li><strong>MCP 不自动提供业务安全、确认机制与内容质量规则</strong>。协议规范本身强调实现方必须校验输入输出、防止注入与未授权访问——也就是说，安全策略在协议之外，靠具体实现。</li>
+</ol>
+<p>因此，把 MCP 描述成”万能 Agent 框架”是不准确的：它是一层连接标准，不是任务编排层，也不是安全层。</p>
+<h2>三者如何在一个 Agent 系统里协作</h2>
+<p>以当前博客 Agent 的真实链路为例。用户提出：”给这篇文章生成一张技术配图。”</p>
+<ol>
+<li><code>jaisong1n-blog</code> Skill 识别这是文章配图任务，决定调用配图 Skill；</li>
+<li><code>academic-figure-prompt</code> Skill 分析内容，生成 Figure Spec（节点、连线、层次）、配色与比例建议、正式文字标签清单，以及最终英文生图 Prompt；</li>
+<li><code>generate_academic_figure</code> Tool 接收 Prompt，校验参数，调用 DashScope 百炼（qwen-image-2.0），下载图片并保存到本地生成目录；</li>
+<li>通过 OpenClaw 微信通道把本地图片返回给用户（message 工具携带本地媒体路径）；</li>
+<li>后续如接入 Site Manager 媒体接口，再由它负责上传与插入正文——<strong>目前尚未实现</strong>；</li>
+<li>未来某些外部能力（如第三方图片素材库、内容审核服务）也可以通过 MCP Server 提供，但当前没有接入。</li>
+</ol>
+<p>值得强调：<strong>当前 OpenClaw 的图片工具是本地插件 Tool，不是通过 MCP 提供的</strong>。三层（Skill 编排 → 本地 Tool 执行 → 未来 MCP 标准接入）在同一条链路上各司其职。</p>
+<h2>最容易混淆的五个问题</h2>
+<p><strong>1. Skill 是不是更复杂的 Tool？</strong><br />
+不是。Tool 是执行单元，Skill 是任务组织单元。一个 Skill 可以调用多个 Tool，也可以一个都不调（只出规划）。复杂度不是区分标准，层次才是。</p>
+<p><strong>2. MCP Server 是不是一个 Skill？</strong><br />
+不是。MCP Server 暴露的是可发现、可调用的能力（tools/resources/prompts）；Skill 是客户端一侧的任务规则。两者可能都涉及”prompt”，但一个是协议对象，一个是本地编排文档。</p>
+<p><strong>3. 有了 MCP 还需要本地 Tool 吗？</strong><br />
+需要。MCP 是连接标准，不是执行引擎。本地 Tool 承担客户端自身业务逻辑（权限校验、确认流程、内容规则），这些恰好是 MCP 协议不覆盖的部分。</p>
+<p><strong>4. Skill 能不能不包含代码？</strong><br />
+能。本仓库的 Skill 就是纯 Markdown 规则文件（SKILL.md + references），不含可执行代码；”执行”交给 Tool。Skill 定义策略，Tool 提供能力。</p>
+<p><strong>5. Tool、Skill 和 Agent 的关系是什么？</strong><br />
+Agent 是使用工具、遵循 Skill、与用户交互的主体；Tool 是它的”手”，Skill 是它的”操作手册”。MCP 则是”手”可以通过标准接口触碰外部设备的方式之一。</p>
+<h2>我对这三层设计的判断</h2>
+<p>基于当前项目的实际结构，我的判断是：</p>
+<ul>
+<li><strong>把业务规范全塞进 Tool 会导致工具过重</strong>。Tool 的参数和执行逻辑应该保持原子；”什么时候用、按什么标准”应该放 Skill。<code>generate_academic_figure</code> 只负责”调 API、保存、返回路径”，生图规范全在 <code>academic-figure-prompt</code> 里——这层分离让两边都能独立演进。</li>
+<li><strong>只写 Skill 而没有 Tool，最终只能停留在规划层</strong>。Skill 出得了 Figure Spec 和 Prompt，但没 Tool 就永远没有 PNG。规划与执行缺一不可。</li>
+<li><strong>MCP 适合解决外部能力接入，但不能代替应用内部的审批与安全策略</strong>。MCP 规范自身也强调实现方要自己做输入输出校验与访问控制——协议给了连接，没给信任。</li>
+<li><strong>对个人博客 Agent 来说，本地 Tool + Skill 已经能解决很多问题</strong>，不必为了”用了 MCP”而强行引入。当某类能力需要被多个客户端复用（比如同一生图服务同时给 OpenClaw、Claude Code 和其他应用用）时，MCP 的价值才会更明显。</li>
+</ul>
+<p>还有一个容易被忽视的现实：<strong>“Skill”这个词在不同工具链里含义漂移严重</strong>。在 Claude Code 里，Skill 是 <code>~/.claude/skills</code> 下的目录与 SKILL.md；在 OpenClaw 里，Skill 是 <code>workspace/skills</code> 下的规则文件；在 MCP 规范里根本没有”Skill”这个概念，只有 prompts。这意味着你读到”Skill”时，必须先确认对方指的是哪个平台、哪一层。本文所有关于 Skill 的表述，都限定在 OpenClaw 这类”SKILL.md 规则文件”的实现语境里，不推广成普适定义。</p>
+<p>以上是个人判断，基于当前项目可验证的事实；没有做过的性能测试、尚不存在的 MCP 集成，我不作任何”已实现”或”最佳实践”的声称。</p>
+<h2>总结</h2>
+<p>读完这篇文章，你可以带走三个结论：</p>
+<ol>
+<li><strong>Tool、Skill、MCP 不互相替代</strong>——它们分别是执行层、编排层和连接层的产物，可以共存于同一个 Agent。</li>
+<li><strong>判断一个名词，先看它解决什么问题</strong>：执行动作（Tool）、稳定流程（Skill）、标准连接（MCP）。三者混为一谈的根源，是只盯着”都是给模型加能力”这个表象。</li>
+<li><strong>对个人 Agent 而言，本地 Tool + Skill 是主力，MCP 是可选的标准通道</strong>：先让业务闭环跑起来，再在能力需要跨客户端复用时考虑 MCP。</li>
+</ol>
+<h2>资料来源</h2>
+<p>以下为实际读取并支撑本文的官方资料与本地实现：</p>
+<ul>
+<li>Model Context Protocol 官方规范（2025-06-18 / 2026-07-28）：https://modelcontextprotocol.io/specification/ — 定义 server features（tools/resources/prompts）、Client/Server 结构与消息格式</li>
+<li>MCP 官方介绍页：https://modelcontextprotocol.io/introduction — “USB-C for AI applications” 定位</li>
+<li>MCP 规范 Server Features 页（Resources / Prompts / Tools）：https://modelcontextprotocol.io/specification/2025-06-18/server/（tools、resources、prompts 分页）</li>
+<li>Anthropic Claude Platform Docs — Tool use with Claude：https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview — tools 参数、tool_choice、tool_use/tool_result 消息</li>
+<li>OpenAI API 文档 — Function calling：https://platform.openai.com/docs/guides/function-calling — function tool 的 name/description/parameters(JSON Schema)/strict 定义</li>
+<li>本地 OpenClaw 实现：<code>plugins/jaisong1n-blog-tools/src/index.ts</code> 与 <code>openclaw.plugin.json</code> — 本地 Tool 注册（<code>generate_academic_figure</code>、<code>edit_academic_figure</code> 等 13 个工具）</li>
+<li>本地 Skill：<code>skills/academic-figure-prompt/SKILL.md</code>、<code>skills/jaisong1n-blog/SKILL.md</code> — Skill 与 Tool 的职责边界、规划/生成/修改调度规则</li>
+</ul>
+<p><em>注：本文中的”Skill”指本仓库这类”SKILL.md 规则文件”实现；不同平台对 Skill 的实现与加载方式可能不同，MCP 与 Anthropic/OpenAI 的官方定义均不包含统一的”Skill”标准。</em></p>
+]]></content>
+    <author>
+      <name>JaisonG1n</name>
+    </author>
+    <category term="Uncategorized"></category>
+  </entry>
   <entry>
     <title>从手动发布到自动部署：我的个人博客工作流升级记录</title>
     <link href="https://jaisong1n.com/posts/wordpress-astro-auto-deploy-workflow/" rel="alternate" type="text/html"/>
