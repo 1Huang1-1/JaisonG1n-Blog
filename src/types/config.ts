@@ -88,6 +88,7 @@ export interface SiteConfig {
 	tagStyle?: {
 		useNewStyle?: boolean; // 是否使用新样式（悬停高亮样式）还是旧样式（外框常亮样式）
 	};
+	featuredTags?: string[]; // 主页标签组件优先展示的标签；与文章标签合并并去重
 
 	// 壁纸模式配置
 	wallpaperMode: {

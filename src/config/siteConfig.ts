@@ -85,6 +85,17 @@ export const siteConfig: SiteConfig = {
 		// 是否使用新样式（悬停高亮样式）还是旧样式（外框常亮样式）
 		useNewStyle: false,
 	},
+	// 主页标签组件优先展示；文章中已有的其他标签会继续自动追加
+	featuredTags: [
+		"Java",
+		"Spring Boot",
+		"Spring AI",
+		"AI Agent",
+		"RAG",
+		"MCP",
+		"Docker",
+		"Linux",
+	],
 
 	// 壁纸模式配置
 	wallpaperMode: {

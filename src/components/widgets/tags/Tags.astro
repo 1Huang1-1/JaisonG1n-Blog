@@ -1,4 +1,5 @@
 ---
+import { siteConfig } from "../../../config";
 import I18nKey from "../../../i18n/i18nKey";
 import { i18n } from "../../../i18n/translation";
 import { getTagList } from "../../../utils/content-utils";
@@ -7,7 +8,27 @@ import { widgetManager } from "../../../utils/widget-manager";
 import ButtonTag from "../../control/ButtonTag.astro";
 import WidgetLayout from "../common/WidgetLayout.astro";
 
-const tags = await getTagList();
+const contentTags = await getTagList();
+const normalizeTag = (tag: string) => tag.trim().toLocaleLowerCase();
+const featuredTags = [
+	...new Map(
+		(siteConfig.featuredTags ?? [])
+			.map((tag) => tag.trim())
+			.filter(Boolean)
+			.map((tag) => [normalizeTag(tag), tag]),
+	).values(),
+];
+const featuredTagKeys = new Set(featuredTags.map(normalizeTag));
+const contentTagsByName = new Map(
+	contentTags.map((tag) => [normalizeTag(tag.name), tag]),
+);
+const tags = [
+	...featuredTags.map((name) => ({
+		name,
+		count: contentTagsByName.get(normalizeTag(name))?.count ?? 0,
+	})),
+	...contentTags.filter((tag) => !featuredTagKeys.has(normalizeTag(tag.name))),
+];
 
 const COLLAPSED_HEIGHT = "7.5rem";
 
