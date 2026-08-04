@@ -1,0 +1,59 @@
+name: Diag runner sync
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Diagnose egress to CMS
+        shell: bash
+        run: |
+          set -u
+          echo "=== runner egress IP ==="
+          curl -s --max-time 10 https://api.ipify.org || echo "no-egress-ip"
+          echo
+          echo "=== DNS records ==="
+          getent ahosts cms.jaisong1n.com || true
+          echo "=== TCP 443 probes (hostname + both IPv4) ==="
+          for target in cms.jaisong1n.com 77.37.48.30 179.61.189.210; do
+            timeout 25 bash -c "exec 3<>/dev/tcp/${target}/443 && echo connected" >/dev/null 2>&1 \
+              && echo "${target} OK" || echo "${target} FAIL"
+          done
+          echo "=== curl snapshot (connect timeout 10) ==="
+          curl -sv --connect-timeout 10 --max-time 30 \
+            "https://cms.jaisong1n.com/wp-json/jaisong1n/v1/site-snapshot" -o /dev/null 2>&1 | tail -n 16 || true
+          echo "=== pnpm install ==="
+          pnpm install --frozen-lockfile >/dev/null 2>&1 || echo "install failed"
+          echo "=== pinned-dispatcher fetch attempts ==="
+          node --input-type=module - <<'EOF'
+          import { buildFetchDispatcher } from "./scripts/wordpress-sync/network.mjs";
+          const url = new URL("https://cms.jaisong1n.com/wp-json/jaisong1n/v1/site-snapshot");
+          const dispatcher = await buildFetchDispatcher(url);
+          for (let i = 0; i < 3; i += 1) {
+            const t = Date.now();
+            try {
+              const r = await fetch(url, { dispatcher, signal: AbortSignal.timeout(30000) });
+              console.log("attempt", i, "ok", r.status, `${Date.now() - t}ms`);
+              break;
+            } catch (error) {
+              const cause = error.cause ?? {};
+              console.log("attempt", i, "fail", `${Date.now() - t}ms`, {
+                code: cause.code,
+                message: cause.message,
+                hostname: cause.hostname,
+                address: cause.address,
+                port: cause.port,
+                syscall: cause.syscall,
+              });
+            }
+          }
+          EOF
