@@ -25,4 +25,8 @@
 
 ## 状态
 
-- 功能与发布前检查已完成，准备提交部署。
+- 已完成并部署。
+- 源码提交：`964ba5327e2257ba01597d160a8102af8f329886`。
+- 部署分支提交：`ec7287ebde698898bf8d1ad446b296adf218f727`。
+- 线上文章页返回 HTTP 200；目录容器已使用 `max-h-[calc(100vh-6rem)]`，且不再包含独立的固定高度类 `h-[calc(100vh-6rem)]`。
+- 部署过程与线上验收详见 `docs/project/development-log/2026-08-05/0020-deploy-sidebar-toc-auto-height.md`。
