@@ -95,6 +95,7 @@ export const siteConfig: SiteConfig = {
 		"MCP",
 		"Docker",
 		"Linux",
+		"ChatGPT",
 	],
 
 	// 壁纸模式配置
