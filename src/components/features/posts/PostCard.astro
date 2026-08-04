@@ -6,8 +6,6 @@ import { Icon } from "astro-icon/components";
 import { getFileDirFromPath, getPostUrl, getTagUrl } from "@/utils/url-utils";
 
 import { siteConfig } from "../../../config";
-import I18nKey from "../../../i18n/i18nKey";
-import { i18n } from "../../../i18n/translation";
 import Image from "../../atoms/Image/Image.astro";
 import PostMetadata from "./PostMeta.astro";
 import type { PostCardProps } from "./types";
@@ -28,6 +26,22 @@ const {
 	encrypted,
 	password,
 } = entry.data;
+
+const normalizeTag = (tag: string) => tag.trim().toLocaleLowerCase();
+const hiddenTagKeys = new Set(
+	["Astro", "Mizuki", "WordPress"].map(normalizeTag),
+);
+const displayTags = (tags ?? [])
+	.map((tag) => tag.trim())
+	.filter(Boolean)
+	.filter((tag) => !hiddenTagKeys.has(normalizeTag(tag)))
+	.sort((a, b) => {
+		const lengthDifference = Array.from(a).length - Array.from(b).length;
+		return (
+			lengthDifference ||
+			normalizeTag(a).localeCompare(normalizeTag(b), "zh-CN")
+		);
+	});
 
 const url = getPostUrl(entry);
 const hasCover = image !== undefined && image !== null && image !== "";
@@ -115,10 +129,10 @@ const homeContent = getPostHomeContent(
 			{homeContent}
 		</div>
 
-		<div class="flex flex-wrap gap-2 mt-2">
-			{
-				tags && tags.length > 0 ? (
-					tags.map((tag) => (
+		{
+			displayTags.length > 0 && (
+				<div class="flex flex-wrap gap-2 mt-2">
+					{displayTags.map((tag) => (
 						<a
 							href={getTagUrl(tag)}
 							class:list={[
@@ -132,12 +146,10 @@ const homeContent = getPostHomeContent(
 								# {tag.trim()}
 							</span>
 						</a>
-					))
-				) : (
-					<span class="text-xs text-50">{i18n(I18nKey.noTags)}</span>
+					))}
+				</div>
 				)
 			}
-		</div>
 	</div>
 
 	{

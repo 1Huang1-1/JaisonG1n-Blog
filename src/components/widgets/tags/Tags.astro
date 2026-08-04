@@ -10,11 +10,16 @@ import WidgetLayout from "../common/WidgetLayout.astro";
 
 const contentTags = await getTagList();
 const normalizeTag = (tag: string) => tag.trim().toLocaleLowerCase();
+const hiddenTagKeys = new Set(
+	["Astro", "Mizuki", "WordPress"].map(normalizeTag),
+);
+const getTagDisplayLength = (tag: string) => Array.from(tag.trim()).length;
 const featuredTags = [
 	...new Map(
 		(siteConfig.featuredTags ?? [])
 			.map((tag) => tag.trim())
 			.filter(Boolean)
+			.filter((tag) => !hiddenTagKeys.has(normalizeTag(tag)))
 			.map((tag) => [normalizeTag(tag), tag]),
 	).values(),
 ];
@@ -27,8 +32,18 @@ const tags = [
 		name,
 		count: contentTagsByName.get(normalizeTag(name))?.count ?? 0,
 	})),
-	...contentTags.filter((tag) => !featuredTagKeys.has(normalizeTag(tag.name))),
-];
+	...contentTags.filter((tag) => {
+		const key = normalizeTag(tag.name);
+		return !featuredTagKeys.has(key) && !hiddenTagKeys.has(key);
+	}),
+].sort((a, b) => {
+	const lengthDifference =
+		getTagDisplayLength(a.name) - getTagDisplayLength(b.name);
+	return (
+		lengthDifference ||
+		normalizeTag(a.name).localeCompare(normalizeTag(b.name), "zh-CN")
+	);
+});
 
 const COLLAPSED_HEIGHT = "7.5rem";
 
