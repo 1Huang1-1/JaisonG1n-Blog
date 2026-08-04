@@ -1,14 +1,13 @@
 ---
 /**
- * TOC - 侧边栏目录组件（向后兼容包装器）
+ * TOC - 桌面侧栏目录布局包装器
  *
- * @deprecated 请使用 import { SidebarTOC } from "@components/features/toc"
- *
- * 此包装器将在下一个主要版本中删除。
- * 当前引用：SideBar.astro 仍在使用此组件
+ * 复用 SidebarTOC 的目录格式和交互，只负责侧栏内的尺寸、滚动区域与显隐状态。
  */
 
 import type { MarkdownHeading } from "astro";
+
+import { siteConfig } from "@/config";
 
 import SidebarTOC from "../../features/toc/SidebarTOC.astro";
 
@@ -18,6 +17,35 @@ interface Props {
 }
 
 const { class: className, headings } = Astro.props;
+const showDesktopTOC = siteConfig.toc.enable && siteConfig.toc.desktopSidebar;
 ---
 
-<SidebarTOC class={className} headings={headings} />
+{
+	showDesktopTOC ? (
+		<div
+			id="toc-wrapper"
+			class:list={[
+				"transition w-full items-center",
+				className,
+				{
+					"toc-hide":
+						siteConfig.wallpaperMode.defaultMode === "banner",
+				},
+			]}
+		>
+			<div
+				id="toc-inner-wrapper"
+				class="w-full h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] overflow-x-hidden overflow-y-auto"
+			>
+				<div
+					id="toc-container"
+					class="w-full h-full transition-swup-fade"
+				>
+					<SidebarTOC headings={headings} />
+				</div>
+			</div>
+		</div>
+	) : (
+		<div id="toc-container" class="hidden" />
+	)
+}

@@ -9,6 +9,13 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 	// 侧边栏组件属性配置列表
 	properties: [
 		{
+			// 桌面端侧栏目录：复用原目录格式，仅调整到音乐播放器上方
+			type: "toc",
+			position: "sticky",
+			class: "onload-animation",
+			animationDelay: 175,
+		},
+		{
 			// 组件类型：用户资料组件
 			type: "profile",
 			// 组件位置："top" 表示固定在顶部
@@ -100,7 +107,7 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 	// 侧栏组件布局配置
 	components: {
 		left: ["profile", "announcement", "tags", "card-toc"],
-		right: ["site-stats", "calendar", "categories", "music-sidebar"],
+		right: ["site-stats", "calendar", "categories", "toc", "music-sidebar"],
 		drawer: ["profile", "announcement", "music-sidebar", "categories", "tags"],
 	},
 
