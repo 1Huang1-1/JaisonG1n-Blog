@@ -21,10 +21,14 @@ jobs:
         run: |
           set -u
           echo "=== runner egress IP ==="
-          curl -s --max-time 10 https://api.ipify.org || echo "no-egress-ip"
+          echo -n "ipify-v4: "; curl -4 -s --max-time 10 https://api.ipify.org || echo "no-ip"
+          echo -n "ifconfig-v4: "; curl -4 -s --max-time 10 https://ifconfig.me || echo "no-ip"
+          echo -n "github.com: "; curl -4 -s -o /dev/null -w "%{http_code}" --max-time 10 https://github.com && echo
+          echo -n "example.com: "; curl -4 -s -o /dev/null -w "%{http_code}" --max-time 10 https://example.com && echo
+          echo -n "1.1.1.1: "; curl -4 -s -o /dev/null -w "%{http_code}" --max-time 10 https://1.1.1.1 && echo
           echo
           echo "=== DNS records ==="
-          getent ahosts cms.jaisong1n.com || true
+          getent ahosts cms.jaisong1n.com || echo "dns-no-records"
           echo "=== TCP 443 probes (hostname + both IPv4) ==="
           for target in cms.jaisong1n.com 77.37.48.30 179.61.189.210; do
             timeout 25 bash -c "exec 3<>/dev/tcp/${target}/443 && echo connected" >/dev/null 2>&1 \
@@ -34,7 +38,7 @@ jobs:
           curl -sv --connect-timeout 10 --max-time 30 \
             "https://cms.jaisong1n.com/wp-json/jaisong1n/v1/site-snapshot" -o /dev/null 2>&1 | tail -n 16 || true
           echo "=== pnpm install ==="
-          pnpm install --frozen-lockfile >/dev/null 2>&1 || echo "install failed"
+          pnpm install --frozen-lockfile >/dev/null 2>&1 && echo "install ok" || echo "install failed"
           echo "=== pinned-dispatcher fetch attempts ==="
           node --input-type=module - <<'EOF'
           import { buildFetchDispatcher } from "./scripts/wordpress-sync/network.mjs";
