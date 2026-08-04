@@ -5,14 +5,14 @@
   <link href="https://jaisong1n.com/" rel="alternate" type="text/html"/>
   <link href="https://jaisong1n.com/atom.xml" rel="self" type="application/atom+xml"/>
   <id>https://jaisong1n.com/</id>
-  <updated>2026-08-04T05:52:28.284Z</updated>
+  <updated>2026-08-04T07:29:22.704Z</updated>
   <language>zh_CN</language>
   <entry>
     <title>Tool、Skill 与 MCP：能力、工作流与标准协议，不在同一个层次</title>
     <link href="https://jaisong1n.com/posts/tool-skill-mcp-capability-workflow-protocol/" rel="alternate" type="text/html"/>
     <id>https://jaisong1n.com/posts/tool-skill-mcp-capability-workflow-protocol/</id>
     <published>2026-08-04T03:49:37.000Z</published>
-    <updated>2026-08-04T03:49:37.000Z</updated>
+    <updated>2026-08-04T07:27:27.000Z</updated>
     <summary>Tool、Skill 与 MCP：能力、工作流与标准协议，不在同一个层次 打开任意一个 Agent 相关文档， […]</summary>
     <content type="html"><![CDATA[<h1>Tool、Skill 与 MCP：能力、工作流与标准协议，不在同一个层次</h1>
 <p>打开任意一个 Agent 相关文档，你都会同时看到三个词：Tool、Skill、MCP。有人把 Skill 当成”更复杂的 Tool”，有人把 MCP 称为”插件系统”，还有人以为接入 MCP 就不需要本地工具了。这些说法不是完全错误，但都混淆了一个关键事实：<strong>三者解决的并不是同一个问题，它们位于同一个 Agent 系统的不同层次</strong>。</p>
