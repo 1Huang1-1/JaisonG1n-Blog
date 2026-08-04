@@ -3,7 +3,7 @@ Contributors: jaisong1n
 Tags: headless, cms, rest-api, astro
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.11.0
+Stable tag: 0.12.0
 License: GPLv2 or later
 
 Headless WordPress content and safe public configuration manager for jaisong1n.com.
@@ -24,6 +24,15 @@ The plugin accepts a fine-grained GitHub token with Actions Read and write for t
 Deactivation retains all data. Normal uninstall removes plugin-added role capabilities but retains content and settings. Destructive data cleanup runs only when an administrator explicitly enables it before uninstalling.
 
 == Changelog ==
+
+= 0.12.0 =
+
+* Added controlled AI media upload endpoint `POST /wp-json/jaisong1n/v1/ai/media` (multipart, PNG/JPEG/WebP only).
+* Added AI-owned media read endpoint `GET /wp-json/jaisong1n/v1/ai/media/{id}` that never exposes ordinary user media.
+* Added MIME, magic, image dimensions, filename sanitization and executable-file validation before any file is stored.
+* Added SHA-256 and idempotent media reuse scoped to the AI owner; conflicting idempotency keys return 409.
+* Added attribution, source URL, license and license URL metadata on AI-owned attachments.
+* Preserved existing content, publishing, view counting and deployment-status workflows; media uploads never enter the dispatch/build pipeline.
 
 = 0.11.0 =
 

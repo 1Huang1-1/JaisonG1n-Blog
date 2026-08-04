@@ -1,6 +1,6 @@
 # AI Content API
 
-`JaisonG1n Site Manager 0.11.0` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
+`JaisonG1n Site Manager 0.12.0` provides the authenticated API at `/wp-json/jaisong1n/v1/ai`.
 
 Use a dedicated WordPress user with the `jg_ai_content_editor` role and an Application Password. Clients must first request `GET /capabilities`; the response is the live authority for content types, fields, and operations. It never exposes internal meta keys, confirmation tokens, or site secrets.
 
@@ -145,3 +145,43 @@ Status semantics:
 - `publicUrl` comes from the server-side canonical URL helper and the configured production site URL; `cmsUrl` remains the WordPress edit address.
 
 Dispatch records persist in `jg_dispatch_history` and retain every merged content reference, so a debounced build covering several diaries is associated with each of them instead of a single post ID. The endpoint picks the latest record containing the requested content that was triggered at or after the content's last modification; it never hard-binds the site's latest build to unrelated content.
+
+## AI Media Operations (0.12.0)
+
+Two endpoints are exposed when the caller holds the `jg_ai_upload_media`
+capability (granted only to `jg_ai_content_editor`; never to administrators or
+ordinary users):
+
+- `POST /wp-json/jaisong1n/v1/ai/media` — multipart upload.
+- `GET /wp-json/jaisong1n/v1/ai/media/{id}` — read back AI-owned media.
+
+### Upload request (multipart/form-data)
+
+| field | required | notes |
+| --- | --- | --- |
+| `file` | yes | PNG, JPEG or WebP only. SVG and executable files are rejected. |
+| `idempotencyKey` | yes | bounded to 200 chars; reused keys must match the same SHA-256. |
+| `title`, `altText`, `caption`, `description` | no | cleaned and length-bounded. |
+| `attribution`, `sourceUrl`, `license`, `licenseUrl` | no | stored as AI media metadata; URLs must be http(s) and are never fetched by the server. |
+
+Success returns `success`, `reused`, `mediaId`, `url`, `mimeType`, `sha256`,
+`altText`, `caption`, `width`, `height`. Re-uploading the same bytes reuses the
+existing AI-owned attachment; the same idempotency key with different bytes
+returns `409 jg_ai_media_idempotency_conflict`. Dedup is scoped to the AI
+owner: ordinary user media with the same bytes is never claimed.
+
+### Read response
+
+`GET /media/{id}` returns `success`, `mediaId`, `url`, `title`, `altText`,
+`caption`, `description`, `mimeType`, `width`, `height`, `sha256`,
+`attribution`, `sourceUrl`, `license`, `licenseUrl`, `aiOwned`, `createdAt`,
+`modifiedAt`. Ordinary user media returns `403`; missing media returns `404`.
+No server paths, credentials, or internal metadata are exposed.
+
+### Validation
+
+Files are checked by WordPress file-type detection, the real MIME via `finfo`,
+`getimagesize` dimensions, a forbidden-extension block, filename
+sanitization, and a filterable size limit (`jg_ai_media_max_bytes`, default
+10 MiB, capped by `wp_max_upload_size`). Uploads never enter the content
+change/dispatch/build pipeline.

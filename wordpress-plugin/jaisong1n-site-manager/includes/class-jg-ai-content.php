@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) {
  * The private AI-content interface. Callers see content contracts, never meta keys.
  */
 final class JG_AI_Content {
-	private const ROLE = 'jg_ai_content_editor';
+	public const ROLE = 'jg_ai_content_editor';
 	private const SETTINGS_OPTION = 'jg_ai_content_settings';
 	private const IDEMPOTENCY_OPTION = 'jg_ai_content_idempotency';
 	private const AUDIT_OPTION = 'jg_ai_content_audit';
@@ -170,7 +170,16 @@ final class JG_AI_Content {
 			if (self::can_update_published_type($contract)) { $operations[] = 'prepareUpdatePublished'; $operations[] = 'updatePublished'; }
 			$types[$name] = array('operations' => $operations, 'fields' => self::public_fields($contract));
 		}
-		return new WP_REST_Response(array('version' => JG_SITE_MANAGER_VERSION, 'schemaVersion' => 5, 'contentTypes' => $types), 200);
+		$media_operations = current_user_can('jg_ai_upload_media') ? array('uploadMedia', 'readMedia') : array();
+		return new WP_REST_Response(array(
+			'version' => JG_SITE_MANAGER_VERSION,
+			'schemaVersion' => 5,
+			'contentTypes' => $types,
+			'media' => array(
+				'operations' => $media_operations,
+				'fields' => array('file', 'title', 'altText', 'caption', 'description', 'attribution', 'sourceUrl', 'license', 'licenseUrl', 'idempotencyKey'),
+			),
+		), 200);
 	}
 
 	public static function create_content(WP_REST_Request $request) {

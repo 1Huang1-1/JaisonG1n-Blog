@@ -1,5 +1,27 @@
 # 重要技术决策
 
+## 2026-08-04：AI 媒体上传采用白名单校验、SHA-256 幂等与 owner 隔离（Site Manager 0.12.0）
+
+### 问题
+
+AI/微信链路需要上传配图，但不能开放通用媒体入口，也不能把普通用户媒体暴露给 AI 接口。
+
+### 最终选择
+
+- 新增 `POST /ai/media`（multipart）与 `GET /ai/media/{id}`，复用 AI Content API 认证模式；权限由新 capability `jg_ai_upload_media` 门控，仅授予 `jg_ai_content_editor` 角色（另授予其 `upload_files` 以使用 WordPress 原生媒体函数），不授予管理员，不扩大任何原生发布/管理权限。
+- 只允许 PNG/JPEG/WebP：同时通过 WordPress 文件类型检测、finfo 真实 MIME、getimagesize 宽高、禁用扩展名清单与文件名清理；大小限制默认 10 MiB 且可过滤，并受 `wp_max_upload_size` 约束。`sourceUrl` 只作为元数据保存，服务端绝不主动下载远程图片。
+- attachment 由 `wp_handle_upload`（自定义 action 保持可读性校验）+ `wp_insert_attachment` + `wp_generate_attachment_metadata` 创建，不自行拼接 uploads 路径。
+- AI 媒体以 `_jg_ai_media_*` 前缀元数据标记；去重键为 AI owner + SHA-256 + idempotencyKey：同 key 同 SHA 复用、同 SHA 异 key 复用、同 key 异 SHA 返回 409、普通用户媒体绝不认领。
+- GET 仅回读 AI-owned 媒体（owner 或管理员），普通媒体 403、缺失 404，不返回服务器路径、凭据或内部元数据。
+
+### 放弃或暂缓的方案
+
+- 不允许 SVG（OpenClaw 侧先转换 PNG）；不允许按 `sourceUrl` 服务端抓取；不提供媒体列表/删除/替换接口；不为管理员增加通用上传入口；不对 AI 身份授予 `manage_options`。
+
+### 影响
+
+schemaVersion 保持 5；0.11.0→0.12.0 升级只新增能力与角色能力，不迁移数据；媒体上传不进入 dispatch/构建链路，现有内容、发布、浏览量与 deployment-status 流程不受影响。
+
 ## 2026-08-03：浏览量采用独立统计表与内容绑定事件哈希（Site Manager 0.11.0）
 
 ### 问题

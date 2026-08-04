@@ -101,15 +101,15 @@ test("structured summaries prefer post excerpts and keep full content", async ()
 	assert.match(source, /preg_match_all\('\/.\/us'/);
 });
 
-test("version 0.11.0 preserves schemaVersion 5 and deterministic ordering", async () => {
+test("version 0.12.0 preserves schemaVersion 5 and deterministic ordering", async () => {
 	const [entry, readme, snapshot] = await Promise.all([
 		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
 		readFile(path.join(pluginRoot, "readme.txt"), "utf8"),
 		readFile(path.join(pluginRoot, "includes/class-jg-snapshot.php"), "utf8"),
 	]);
-	assert.match(entry, /Version:\s*0\.11\.0/);
-	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.11\.0'/);
-	assert.match(readme, /Stable tag:\s*0\.11\.0/);
+	assert.match(entry, /Version:\s*0\.12\.0/);
+	assert.match(entry, /JG_SITE_MANAGER_VERSION', '0\.12\.0'/);
+	assert.match(readme, /Stable tag:\s*0\.12\.0/);
 	assert.match(snapshot, /'schemaVersion'\s*=>\s*5/);
 	assert.match(
 		snapshot,
@@ -523,7 +523,7 @@ test("plugin packaging fixes the basename and normalizes ZIP paths", async () =>
 	);
 	assert.match(packageJson, /package:wordpress-plugin/);
 	assert.match(packageJson, /verify:wordpress-plugin-package/);
-	assert.match(packageJson, /jaisong1n-site-manager-0\.11\.0\.zip/);
+	assert.match(packageJson, /jaisong1n-site-manager-0\.12\.0\.zip/);
 	assert.match(packageJson, /test:wordpress-upgrade/);
 });
 
@@ -552,4 +552,30 @@ test("public content stats route is privacy-safe and isolated from dispatch", as
 	assert.match(entry, /JG_Content_Stats::init/);
 	assert.doesNotMatch(source, /wp_update_post\s*\(/);
 	assert.doesNotMatch(source, /jg_dispatch_pending/);
+});
+
+test("AI media endpoints are capability-gated and validated", async () => {
+	const [media, entry, aiContent] = await Promise.all([
+		readFile(path.join(pluginRoot, "includes/class-jg-ai-media.php"), "utf8"),
+		readFile(path.join(pluginRoot, "jaisong1n-site-manager.php"), "utf8"),
+		readFile(path.join(pluginRoot, "includes/class-jg-ai-content.php"), "utf8"),
+	]);
+	assert.match(media, /register_rest_route\('jaisong1n\/v1\/ai', '\/media'/);
+	assert.match(
+		media,
+		/register_rest_route\('jaisong1n\/v1\/ai', '\/media\/\(\?P<id>\\d\+\)'/,
+	);
+	assert.match(media, /jg_ai_upload_media/);
+	assert.match(media, /wp_check_filetype_and_ext/);
+	assert.match(media, /finfo_file/);
+	assert.match(media, /getimagesize/);
+	assert.match(media, /hash_file\('sha256'/);
+	assert.match(media, /jg_ai_media_idempotency_conflict/);
+	assert.match(media, /META_CREATED = '_jg_ai_media_created'/);
+	assert.match(media, /wp_insert_attachment/);
+	assert.match(media, /wp_generate_attachment_metadata/);
+	assert.match(media, /permission_callback/);
+	assert.match(entry, /JG_AI_Media::init/);
+	assert.match(aiContent, /'media' => array/);
+	assert.doesNotMatch(media, /permission_callback'\s*=>\s*'__return_true'/);
 });

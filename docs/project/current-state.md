@@ -1,5 +1,15 @@
 # Current project state
 
+## 2026-08-04 Site Manager 0.12.0 受控 AI 媒体上传与回读（本地实现）
+
+- 插件代码版本为 `0.12.0`，公开快照 `schemaVersion` 继续为 `5`。
+- 新增 `POST /wp-json/jaisong1n/v1/ai/media`（multipart）与 `GET /wp-json/jaisong1n/v1/ai/media/{id}`：复用 AI Content API 认证与 `jg_ai_upload_media` capability（仅授予 `jg_ai_content_editor`，不授予管理员，不扩大原生权限）。
+- 仅允许 PNG/JPEG/WebP；同时校验 WordPress 文件类型检测、finfo 真实 MIME、getimagesize 宽高、禁用扩展名（php/phtml/svg/html/js 等）与文件名清理；大小限制默认 10 MiB（可过滤，受 `wp_max_upload_size` 约束）。
+- AI 媒体以 `_jg_ai_media_*` 元数据区分（owner、created、sha256、idempotencyKey、attribution、sourceUrl、license、licenseUrl、原始文件名、上传时间）；去重按 AI owner + SHA256 + idempotencyKey，幂等键冲突返回 409，普通用户媒体绝不认领或暴露。
+- 媒体写入不触发 dispatch/构建（attachment 不在受支持内容类型中）；GET 仅回读 AI-owned 媒体，缺失 404、普通媒体 403，不暴露服务器路径或敏感字段。
+- 本地测试：AI Media Playground 51 断言（PNG/JPEG/WebP 上传、真实 attachment 与 URL、元数据与宽高、GET 回读、幂等复用与 409、跨 owner 隔离、SVG/PHP/HTML/伪装/损坏/超大拒绝、路径穿越清理、无 dispatch、内容 API 回归）；AI Content 222、deployment-status 108、content-stats 45、smoke、`pnpm test` 74 项全通过；0.11.0→0.12.0 升级测试通过（媒体 capability 授予且不扩大角色）。
+- 本版本为本地实现与本地测试结果；尚未安装到真实 WordPress，未执行生产部署与微信端真实上传验收。生产实时版本仍为 `0.11.0`。
+
 ## 2026-08-03 Site Manager 0.11.0 内容浏览量（本地实现）
 
 - 插件代码版本为 `0.11.0`，公开快照 `schemaVersion` 继续为 `5`。
@@ -84,7 +94,7 @@
 ## 基本信息
 
 - 项目名称：JaisonG1n-Blog
-- 当前插件版本：JaisonG1n Site Manager `0.11.0`（本地实现；生产实时版本为 `0.10.1`，未安装 0.11.0）
+- 当前插件版本：JaisonG1n Site Manager `0.12.0`（本地实现；生产实时版本为 `0.11.0`，未安装 0.12.0）
 - 当前快照 schemaVersion：`5`
 - 主分支：`master`（`origin/HEAD` 指向 `origin/master`）
 - 当前工作分支：`codex/ai-content-api-0-7`
