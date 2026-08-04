@@ -3,8 +3,9 @@
 - 时间：2026-08-04 21:58（Asia/Shanghai）
 - 会话或模块：Codex / Astro 主页标签组件
 - 当前分支：`master`（本地）
-- 状态：已完成，本地未提交
-- 是否部署：否
+- 状态：已完成、已提交并部署
+- 功能提交：`373d57c feat: add homepage featured tags`
+- 是否部署：是；GitHub Actions `Build and deploy` 运行 `30916677363` 成功
 
 ## 任务目标
 
@@ -24,6 +25,9 @@ AI Agent、RAG、MCP、Docker、Linux，同时保留已有文章自动生成的�
   的 `id` 未使用），与本次改动无关。
 - `pnpm exec biome check src/types/config.ts src/config/siteConfig.ts src/components/widgets/tags/Tags.astro`：通过。
 - `git diff --check`：通过。
+- GitHub Actions `Lint` 运行 `30916677358`：Biome Check、Type Check、Build
+  全部通过。
+- 公开主页 `https://jaisong1n.com/`：HTTP 200；8 个精选标签及对应归档链接均已回读确认。
 
 ## 修改文件
 
