@@ -7,7 +7,7 @@ const { item } = Astro.props;
 const icon = item.icon || radarIcons[item.domain] || "material-symbols:hub";
 ---
 
-<article class="card-base flex min-w-0 flex-col gap-4 p-5 transition hover:-translate-y-0.5">
+<article class="card-base flex h-full w-full min-w-0 flex-col gap-4 p-5 transition hover:-translate-y-0.5">
 	<div class="flex min-w-0 items-start gap-4">
 		<ResourceIcon image={item.image} icon={icon} fallback="material-symbols:hub" alt={item.title} />
 		<div class="min-w-0 flex-1">
@@ -18,7 +18,7 @@ const icon = item.icon || radarIcons[item.domain] || "material-symbols:hub";
 	</div>
 	<p class="line-clamp-3 text-sm leading-6 text-black/70 dark:text-white/70">{item.description}</p>
 	{item.tags?.length > 0 && <div class="flex flex-wrap gap-2">{item.tags.map((tag: string) => <span class="rounded-full bg-(--btn-regular-bg) px-2 py-1 text-xs">{tag}</span>)}</div>}
-	<div class="flex flex-wrap gap-2 pt-1">
+	<div class="mt-auto flex flex-wrap gap-2 pt-1">
 		{item.officialUrl && <a class="btn-regular inline-flex items-center gap-1.5 text-sm focus-visible:outline-2 focus-visible:outline-(--primary)" href={item.officialUrl} target="_blank" rel="noopener noreferrer"><Icon name="material-symbols:open-in-new" class="h-4 w-4" />官方地址</a>}
 		{item.relatedPost && <a class="btn-regular inline-flex items-center gap-1.5 text-sm focus-visible:outline-2 focus-visible:outline-(--primary)" href={item.relatedPost.path}><Icon name="material-symbols:article-outline" class="h-4 w-4" />查看相关分析</a>}
 	</div>
