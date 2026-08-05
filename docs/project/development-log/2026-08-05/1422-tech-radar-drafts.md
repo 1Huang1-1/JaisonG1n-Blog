@@ -49,6 +49,14 @@
 - GitHub Actions run `30983394395`（head b654b01e）结论 success；deploy 分支更新至 `3066cf6c`（Deploy b654b01e）。
 - 线上验证（jaisong1n.com/radar/）：main CSS 由 `main.s0eHB3R_.css` 变为 `main.BztfKdJG.css`；36 张卡片全部带 `h-full` 包裹层与 `mt-auto` 按钮行。
 
+## 学习资料库草稿（同日，WordPress 写入）
+
+- 通过 WordPress REST API（`/wp-json/wp/v2/jg_learning_resource`）在真实生产 WordPress 创建 17 条学习资源草稿，状态均为 `draft`，ID 范围 232–248。
+- 覆盖：书籍 5（DDIA、Clean Code、You Don't Know JS Yet、西瓜书、花书）、课程 3（CS50、吴恩达机器学习专项、Full Stack Open）、文档 5（MDN、TypeScript Handbook、Astro、React、PostgreSQL 官方文档）、视频 2（3Blue1Brown 线性代数/神经网络）、论文 2（Attention Is All You Need、GPT-3 论文）。
+- 字段：图标（simple-icons 官方 logo / mdi / material-symbols）、type/status/author/published_year/rating/progress/total_units/source_url/独立标签，日期与 related_post_id 留空。
+- 重要发现：WordPress REST 创建自定义文章类型时，meta 校验失败（如 `_jg_related_post_id` 需 string 而非 number）会返回 400，但帖子本身已插入（仅缺 meta）；本次先插入了 17 条无 meta 的草稿，随后用 PATCH 逐条补写 meta 完成，未产生重复数据。后续写 WordPress 结构化内容时，若遇 400 应先查询是否已插入。
+- 未发布、未触发构建；需用户在后台审核发布，发布后由既有同步/构建链路上线。
+
 ## 安全
 
 - 全程未打印、未保存任何凭据、token 或 Authorization 头。
