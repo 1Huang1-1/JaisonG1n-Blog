@@ -88,6 +88,12 @@
 - 字段：官方 logo 图标、分类、熟练度（beginner/intermediate/advanced）、经验年限、品牌色；slug 使用 `-skill` 后缀等避开全站其他内容类型占用。
 - 未发布；需用户在后台审核发布，发布后由既有同步/构建链路上线。
 
+## AI 工具追加（同日，Gemini / Claude Code / 豆包）
+
+- 新增 3 条 AI 工具草稿：Google Gemini（id=319）、Claude Code（id=320）、豆包（id=321），状态均为 `draft`。
+- Gemini 使用 `simple-icons:googlegemini` 官方图标；Claude Code 使用 `simple-icons:anthropic`；豆包无官方图标集，使用 `material-symbols:smart-toy` 占位。
+- 官方链接均已验证可访问（gemini.google.com、Anthropic Claude Code 文档、doubao.com）。
+
 ## 安全
 
 - 全程未打印、未保存任何凭据、token 或 Authorization 头。
