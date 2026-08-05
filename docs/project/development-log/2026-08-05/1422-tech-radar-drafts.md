@@ -73,6 +73,14 @@
 - 提交 `91d028f5` 推送后首次部署 run 被并发取消，用 `gh run rerun` 重跑成功；deploy 分支更新至 `e3eb3e2`（Deploy 91d028f5）。
 - 线上验证（jaisong1n.com/learning/）：11 张已发布学习资源卡片全部带 `h-full` 包裹层与 `mt-auto` 按钮行。
 
+## AI 工具草稿（同日，WordPress 写入）
+
+- 用户明确要求所有内容修改均通过 WordPress 完成，本次未改动任何本地代码。
+- 通过 WordPress REST API（`/wp-json/wp/v2/jg_ai_tool`）创建 10 条 AI 工具草稿，ID 范围 289–298，状态均为 `draft`：DeepSeek、Claude（Anthropic）、OpenAI Codex、Cursor、GitHub Copilot、Perplexity、Ollama、vLLM、Hugging Face、Dify。
+- 字段：官方 logo 图标（simple-icons）、分类（chat/coding/search/other）、使用频率、官网、中文用途说明、独立标签、品牌色。
+- slug 已避开科技雷达等全站其他内容类型的占用（如 deepseek-chat、cursor-ai、hf-hub、dify-app 等）。
+- 未发布；需用户在后台审核发布，发布后由既有同步/构建链路上线。
+
 ## 安全
 
 - 全程未打印、未保存任何凭据、token 或 Authorization 头。
