@@ -65,6 +65,12 @@
 - 用户已自行发布部分学习资源草稿（如 Attention Is All You Need，id=247）；当前学习资料库 = 2 条已发布 + 28 条草稿。
 - 吸取前一批经验，`_jg_related_post_id` 直接以 string 提交，本批一次创建成功，未产生孤儿帖子。
 
+## 学习资料库布局与链接补齐（同日）
+
+- 学习页（learning.astro）与 LearningResourceCard 存在与雷达页相同的卡片高度不齐问题：包裹层补 `h-full`，卡片补 `h-full w-full`，底部按钮区补 `mt-auto`；`pnpm astro build` 通过。
+- 补齐缺失的原始资料链接（PATCH `_jg_source_url`）：西瓜书（豆瓣 26708119）、严蔚敏数据结构（豆瓣 2024655）、谢希仁计网（豆瓣 26960678）、龙书（Pearson 官方页）；链接均已做可用性检查。
+- 《计算机组成原理》（唐朔飞）已被用户发布，AI 账号对已发布内容无编辑权（403 `rest_cannot_edit`），链接与年份（第 3 版为 2020）需用户在后台手动补齐。
+
 ## 安全
 
 - 全程未打印、未保存任何凭据、token 或 Authorization 头。

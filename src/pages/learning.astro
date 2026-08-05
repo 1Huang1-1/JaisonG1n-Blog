@@ -22,7 +22,7 @@ const statuses = [...new Set(learningResources.map((item) => item.status))];
 			<label class="flex items-center gap-2 text-sm"><span>{i18n(I18nKey.filterStatus)}</span><select data-learning-filter="status" class="rounded-lg bg-(--btn-regular-bg) px-3 py-2"><option value="all">全部</option>{statuses.map((value) => <option value={value}>{value}</option>)}</select></label>
 		</div>}
 		<div class="grid gap-6 md:grid-cols-2" data-learning-grid>
-			{learningResources.map((item) => <div data-learning-item data-type={item.type} data-status={item.status}><LearningResourceCard item={item} /></div>)}
+			{learningResources.map((item) => <div class="h-full" data-learning-item data-type={item.type} data-status={item.status}><LearningResourceCard item={item} /></div>)}
 		</div>
 		{learningResources.length === 0 && <div class="py-16 text-center text-black/55 dark:text-white/55"><Icon name="material-symbols:menu-book" class="mx-auto mb-4 h-14 w-14 opacity-40" /><p>{i18n(I18nKey.learningEmpty)}</p></div>}
 		{learningResources.length > 0 && <div data-learning-empty class="hidden py-16 text-center text-black/55 dark:text-white/55"><p>{i18n(I18nKey.noData)}</p></div>}
