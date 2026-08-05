@@ -93,6 +93,7 @@
 - 新增 3 条 AI 工具草稿：Google Gemini（id=319）、Claude Code（id=320）、豆包（id=321），状态均为 `draft`。
 - Gemini 使用 `simple-icons:googlegemini` 官方图标；Claude Code 使用 `simple-icons:anthropic`；豆包无官方图标集，使用 `material-symbols:smart-toy` 占位。
 - 官方链接均已验证可访问（gemini.google.com、Anthropic Claude Code 文档、doubao.com）。
+- 豆包 logo 经 iconify 全库检索与本地 simple-icons 确认不存在；已将豆包图标改为 `simple-icons:bytedance`（字节跳动官方 logo）作为最接近的官方图标。若需豆包专属 logo，需给 aiTool 增加图片字段（插件+前端代码改动并部署），需用户另行授权。
 
 ## 安全
 
