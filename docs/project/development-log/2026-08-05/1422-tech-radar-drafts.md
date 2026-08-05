@@ -70,6 +70,8 @@
 - 学习页（learning.astro）与 LearningResourceCard 存在与雷达页相同的卡片高度不齐问题：包裹层补 `h-full`，卡片补 `h-full w-full`，底部按钮区补 `mt-auto`；`pnpm astro build` 通过。
 - 补齐缺失的原始资料链接（PATCH `_jg_source_url`）：西瓜书（豆瓣 26708119）、严蔚敏数据结构（豆瓣 2024655）、谢希仁计网（豆瓣 26960678）、龙书（Pearson 官方页）；链接均已做可用性检查。
 - 《计算机组成原理》（唐朔飞）已被用户发布，AI 账号对已发布内容无编辑权（403 `rest_cannot_edit`），链接与年份（第 3 版为 2020）需用户在后台手动补齐。
+- 提交 `91d028f5` 推送后首次部署 run 被并发取消，用 `gh run rerun` 重跑成功；deploy 分支更新至 `e3eb3e2`（Deploy 91d028f5）。
+- 线上验证（jaisong1n.com/learning/）：11 张已发布学习资源卡片全部带 `h-full` 包裹层与 `mt-auto` 按钮行。
 
 ## 安全
 
