@@ -81,6 +81,13 @@
 - slug 已避开科技雷达等全站其他内容类型的占用（如 deepseek-chat、cursor-ai、hf-hub、dify-app 等）。
 - 未发布；需用户在后台审核发布，发布后由既有同步/构建链路上线。
 
+## 技能草稿（同日，WordPress 写入）
+
+- 通过 WordPress REST API（`/wp-json/wp/v2/jg_skill`）创建 16 条技能草稿，ID 范围 303–318，状态均为 `draft`。
+- 覆盖：frontend（TypeScript、Astro、React、Tailwind CSS、Svelte）、backend（Node.js、Python、Java、Go）、database（MySQL、PostgreSQL、Redis）、tools（Git、Docker、Linux、GitHub Actions）。
+- 字段：官方 logo 图标、分类、熟练度（beginner/intermediate/advanced）、经验年限、品牌色；slug 使用 `-skill` 后缀等避开全站其他内容类型占用。
+- 未发布；需用户在后台审核发布，发布后由既有同步/构建链路上线。
+
 ## 安全
 
 - 全程未打印、未保存任何凭据、token 或 Authorization 头。
