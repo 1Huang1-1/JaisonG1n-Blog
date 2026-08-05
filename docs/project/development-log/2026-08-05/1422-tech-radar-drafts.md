@@ -39,13 +39,15 @@
 - 图标：Java 使用 `simple-icons:openjdk`（本机 `@iconify-json/simple-icons` 已无 `java` 图标）；Spring 使用 `simple-icons:spring`；Spring Boot 使用 `simple-icons:springboot`。
 - 注意：slug `spring-boot` 与站内其他公开内容冲突（`jg_duplicate_slug`），Spring Boot 实际使用 slug `springboot`。
 
-## 前端布局统一（同日，本地未提交）
+## 前端布局统一（同日，已提交并部署）
 
 - 线上雷达页已有 37 条已发布卡片（网格 `grid md:grid-cols-2` 等宽），但卡片 `<article>` 未撑满网格行高，内容长短不同导致卡片视觉参差。
 - 修改 `src/pages/radar.astro`：`data-radar-item` 包裹层增加 `h-full`。
 - 修改 `src/components/features/resources/RadarCard.astro`：卡片 `<article>` 增加 `h-full w-full`；底部按钮区增加 `mt-auto`，使按钮行在等高卡片底部对齐。
 - 验证：`pnpm astro build` 通过，`dist/radar/index.html` 中三类类名均已生成。
-- 未提交、未 push；上线需 commit + push master 触发现有构建部署链路。
+- 提交 `b654b01e`（fix: unify tech radar card width and height），经用户确认后推送 `origin/master`。
+- GitHub Actions run `30983394395`（head b654b01e）结论 success；deploy 分支更新至 `3066cf6c`（Deploy b654b01e）。
+- 线上验证（jaisong1n.com/radar/）：main CSS 由 `main.s0eHB3R_.css` 变为 `main.BztfKdJG.css`；36 张卡片全部带 `h-full` 包裹层与 `mt-auto` 按钮行。
 
 ## 安全
 
