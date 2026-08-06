@@ -73,6 +73,8 @@ jobs:
         env:
           WP_BASE_URL: ${{ vars.WP_BASE_URL || 'https://cms.jaisong1n.com' }}
           WORDPRESS_STRUCTURED_CONTENT_ENABLED: ${{ vars.WORDPRESS_STRUCTURED_CONTENT_ENABLED || 'false' }}
+          WP_API_USERNAME: ${{ secrets.WP_API_USERNAME }}
+          WP_API_APPLICATION_PASSWORD: ${{ secrets.WP_API_APPLICATION_PASSWORD }}
         run: |
           set -euo pipefail
           for attempt in 1 2 3; do

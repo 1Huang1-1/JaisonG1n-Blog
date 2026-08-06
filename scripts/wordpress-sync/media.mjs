@@ -8,7 +8,7 @@ import { parse } from "node-html-parser";
 import sharp from "sharp";
 import { Agent, request as undiciRequest } from "undici";
 import { ALLOWED_IMAGE_MIME_TYPES, SYNC_LIMITS } from "./contracts.mjs";
-import { SYNC_USER_AGENT } from "./network.mjs";
+import { buildSyncHeaders } from "./network.mjs";
 import { withNetworkRetries } from "./retry.mjs";
 
 const MIME_EXTENSION = new Map([
@@ -206,7 +206,7 @@ export class MediaMirror {
 						const requestResponse = await this.requestImpl(current, {
 							dispatcher: requestDispatcher,
 							method: "GET",
-							headers: { Accept: accept, "User-Agent": SYNC_USER_AGENT },
+							headers: buildSyncHeaders({ Accept: accept }),
 							headersTimeout: this.limits.headersTimeoutMs,
 							bodyTimeout: this.limits.bodyTimeoutMs,
 							maxRedirections: 0,

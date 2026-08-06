@@ -14,6 +14,24 @@ export const SYNC_USER_AGENT =
 	"JaisonG1n-Blog-WordPress-Sync/1.0 (+https://github.com/1Huang1-1/JaisonG1n-Blog)";
 
 /**
+ * Shared headers for WordPress sync requests. When both WP_API_USERNAME and
+ * WP_API_APPLICATION_PASSWORD are configured, a Basic Authorization header is
+ * attached so every request is authenticated as the WordPress application
+ * password user. Hostinger support reports authenticated requests are less
+ * likely to trigger platform bot verification. Credentials are never logged;
+ * without them the header is omitted and behavior stays unchanged.
+ */
+export function buildSyncHeaders(extra = {}, env = process.env) {
+	const username = String(env.WP_API_USERNAME ?? "").trim();
+	const appPassword = String(env.WP_API_APPLICATION_PASSWORD ?? "").trim();
+	const headers = { "User-Agent": SYNC_USER_AGENT, ...extra };
+	if (username && appPassword) {
+		headers.Authorization = `Basic ${Buffer.from(`${username}:${appPassword}`).toString("base64")}`;
+	}
+	return headers;
+}
+
+/**
  * Orders resolved addresses so IPv4 records come first while preserving the
  * relative order within each family. Native fetch otherwise connects to the
  * first resolved record, which can be an unreachable IPv6 address on networks

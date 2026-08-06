@@ -20,6 +20,7 @@ import {
 } from "../scripts/sync-wordpress.mjs";
 import {
 	buildFetchDispatcher,
+	buildSyncHeaders,
 	fetchDispatcherConnectOptions,
 	preferIpv4Addresses,
 	resolveHostAddresses,
@@ -96,6 +97,25 @@ test("converts WordPress HTML and safe frontmatter", () => {
 		/<iframe src="https:\/\/example.com\/embed"><\/iframe>/,
 	);
 	assert.doesNotMatch(markdown, /alert|wp:paragraph/);
+});
+
+test("sync headers include Basic auth when credentials are configured", () => {
+	const headers = buildSyncHeaders(
+		{ Accept: "application/json" },
+		{ WP_API_USERNAME: "sync-user", WP_API_APPLICATION_PASSWORD: "sync pass" },
+	);
+	assert.equal(
+		headers.Authorization,
+		`Basic ${Buffer.from("sync-user:sync pass").toString("base64")}`,
+	);
+	assert.equal(headers.Accept, "application/json");
+	assert.match(headers["User-Agent"], /^JaisonG1n-Blog-WordPress-Sync\/1\.0/);
+});
+
+test("sync headers omit Authorization when credentials are absent", () => {
+	const headers = buildSyncHeaders({ Accept: "application/json" }, {});
+	assert.equal(headers.Authorization, undefined);
+	assert.equal(headers.Accept, "application/json");
 });
 
 test("keeps supported embedded media but removes scripts", () => {

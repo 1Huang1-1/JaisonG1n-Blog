@@ -12,7 +12,7 @@ import {
 	SYNC_LIMITS,
 } from "./wordpress-sync/contracts.mjs";
 import { MediaMirror, rewriteStructuredMedia } from "./wordpress-sync/media.mjs";
-import { buildFetchDispatcher, SYNC_USER_AGENT } from "./wordpress-sync/network.mjs";
+import { buildFetchDispatcher, buildSyncHeaders } from "./wordpress-sync/network.mjs";
 import { describeNetworkError, withNetworkRetries } from "./wordpress-sync/retry.mjs";
 import { commitDirectoryTransaction } from "./wordpress-sync/transaction.mjs";
 import { resolvePostPath } from "./wordpress-sync/post-path.mjs";
@@ -197,7 +197,7 @@ async function fetchJsonResponse(url, fetchImpl, description, retryOptions = {},
 		response = await withNetworkRetries(
 			async () => {
 				const options = {
-					headers: { Accept: "application/json", "User-Agent": SYNC_USER_AGENT },
+					headers: buildSyncHeaders({ Accept: "application/json" }),
 					signal: AbortSignal.timeout(SYNC_LIMITS.requestTimeoutMs),
 				};
 				if (fetchImpl === fetch) {
