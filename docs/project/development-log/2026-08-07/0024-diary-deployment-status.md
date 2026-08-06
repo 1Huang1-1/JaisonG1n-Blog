@@ -33,3 +33,11 @@
 - 面板级根治（需用户操作）：Hostinger hPanel → Websites → Security，确认 Bot Protection 关闭、检查 WAF 日志与白名单；若均关闭则联系 Hostinger 客服放行 GitHub Actions 对 `/wp-json/*` 的请求（平台层防护，用户开关不生效）。
 - 本改动已提交并推送，由 CI 实测同步是否稳定恢复。
 - CI 验证期间 GitHub Actions 自身出现基础设施故障：`Set up job` 报 `Failed to resolve action download info. Error: Service Unavailable`，后续多个 run 长时间排队/被并发取消；属 GitHub 侧问题，非 bot 防护。待 GitHub 恢复后重跑验证。
+
+## Hostinger 客服确认（08-07 续）
+
+- Hostinger 客服核对证据后确认：cms.jaisong1n.com 在 2026-08-06 14:56–14:57 UTC 对 GitHub Actions 的 `/wp-json/` 请求连续返回平台生成的 Bot Verification 403；非 WordPress 权限错误，非 Cloudflare 拦截。
+- 平台侧结论：站点 CDN 未启用；hPanel 无路径级白名单；GitHub-hosted runner 出口 IP 动态变化，无法固定白名单；自定义 User-Agent 不能绕过平台验证。
+- 根治责任方：Hostinger 平台安全侧需解除该站点 `/wp-json/` 的 Bot Verification，或建立针对 GitHub Actions 的例外规则；在此之前构建仍可能间歇失败。
+- 证据留存：run `31113369890`（schedule，2026-08-06 22:56:26 北京时间触发；三次重试 403，时间戳 14:56:56 / 14:57:14 / 14:57:25 UTC），403 响应体前 300 字符含 `charset=windows-1252` 与 `<title>Bot Verification</title>`。
+- 代码侧 `SYNC_USER_AGENT` 保留（良好的请求标识实践），但不作为根治手段；后续以平台侧处理完成、连续多个 schedule run 成功为准重新评估。
