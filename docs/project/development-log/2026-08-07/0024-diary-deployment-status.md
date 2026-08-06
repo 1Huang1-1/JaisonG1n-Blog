@@ -25,3 +25,10 @@
 ## 安全
 
 - 全程未打印任何凭据；仅使用只读状态查询与 `gh run rerun/cancel` 恢复构建。
+
+## 跟进：Bot 防护 403 的根治（同日）
+
+- 根因定位：cms.jaisong1n.com 前置 Cloudflare（DNS 解析到 104.21.x/172.67.x），"Bot Verification" 页面为源站（疑似 SiteGround）bot 防护签名；GitHub Actions 构建机的数据中心 IP + Node/undici 默认 UA 被启发式误判，故障呈间歇性（同一次重跑有时成功）。
+- 代码加固：`scripts/wordpress-sync/network.mjs` 新增 `SYNC_USER_AGENT`（明确的项目标识，非伪装浏览器），`scripts/sync-wordpress.mjs` 与 `scripts/wordpress-sync/media.mjs` 的请求头统一携带；本地语法检查通过，带新 UA 请求 site-snapshot 返回 200。
+- 面板级根治（需用户操作）：若托管为 SiteGround，在 Site Tools → Security → Bot Protection 放行 GitHub Actions 请求（或联系 SG 支持白名单）；若是 Cloudflare Bot Fight Mode，可在 Security → Bots 关闭，或加 WAF 自定义规则对 `cms.jaisong1n.com/wp-json/*` 跳过 Bot Fight Mode。
+- 本改动已提交并推送，由 CI 实测同步是否稳定恢复。

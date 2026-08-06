@@ -5,6 +5,15 @@ import { Agent } from "undici";
 import { SYNC_LIMITS } from "./contracts.mjs";
 
 /**
+ * Explicit client identifier for WordPress sync requests. Native fetch would
+ * otherwise send the bare `node` User-Agent, which hosting bot protections
+ * (e.g. SiteGround Bot Verification, Cloudflare Bot Fight Mode) frequently
+ * flag when requests originate from datacenter IPs such as GitHub Actions.
+ */
+export const SYNC_USER_AGENT =
+	"JaisonG1n-Blog-WordPress-Sync/1.0 (+https://github.com/1Huang1-1/JaisonG1n-Blog)";
+
+/**
  * Orders resolved addresses so IPv4 records come first while preserving the
  * relative order within each family. Native fetch otherwise connects to the
  * first resolved record, which can be an unreachable IPv6 address on networks
