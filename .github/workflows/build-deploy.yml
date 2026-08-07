@@ -110,7 +110,15 @@ jobs:
           fi
 
           deploy_dir="${RUNNER_TEMP}/mizuki-deploy"
-          rm -rf "${deploy_dir}"
+
+          cleanup_deploy_worktree() {
+            git worktree remove --force "${deploy_dir}" >/dev/null 2>&1 || true
+            rm -rf "${deploy_dir}"
+            git worktree prune --expire now
+          }
+
+          cleanup_deploy_worktree
+          trap cleanup_deploy_worktree EXIT
 
           if git ls-remote --exit-code --heads origin deploy >/dev/null 2>&1; then
             git fetch --no-tags origin deploy:refs/remotes/origin/deploy
