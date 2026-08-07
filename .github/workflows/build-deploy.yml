@@ -44,7 +44,7 @@ permissions:
 
 concurrency:
   group: jaisong1n-production-build
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-deploy:
